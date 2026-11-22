@@ -1,0 +1,465 @@
+{
+  "timestamp": 1795307895403,
+  "isoDate": "2026-11-22T00:38:15.403Z",
+  "auditTarget": "SOVRA Phase 13.5 Independent Consensus Certification",
+  "initialSnapshots": {
+    "26657": {
+      "port": 26657,
+      "moniker": "validator-0",
+      "node_id": "2a806ca82d506a025d580d40600abc77a69e10e7",
+      "chain_id": "sovra-testnet-0",
+      "height": 26537,
+      "app_hash": "8ed98058397efbe9c654924b537ad974bef860c812775f379ef9db6f870c95f4",
+      "total_supply": "30041807472021",
+      "lifetime_mint": "30041807472021",
+      "lifetime_burn": "0",
+      "supply_correct": true
+    },
+    "26667": {
+      "port": 26667,
+      "moniker": "validator-1",
+      "node_id": "664a83c922035ce28bb723e4e92aed1e60e26ea1",
+      "chain_id": "sovra-testnet-0",
+      "height": 26537,
+      "app_hash": "8ed98058397efbe9c654924b537ad974bef860c812775f379ef9db6f870c95f4",
+      "total_supply": "30041807472021",
+      "lifetime_mint": "30041807472021",
+      "lifetime_burn": "0",
+      "supply_correct": true
+    },
+    "26677": {
+      "port": 26677,
+      "moniker": "validator-2",
+      "node_id": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+      "chain_id": "sovra-testnet-0",
+      "height": 26537,
+      "app_hash": "8ed98058397efbe9c654924b537ad974bef860c812775f379ef9db6f870c95f4",
+      "total_supply": "30041807472021",
+      "lifetime_mint": "30041807472021",
+      "lifetime_burn": "0",
+      "supply_correct": true
+    },
+    "26687": {
+      "port": 26687,
+      "moniker": "validator-3",
+      "node_id": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+      "chain_id": "sovra-testnet-0",
+      "height": 26537,
+      "app_hash": "8ed98058397efbe9c654924b537ad974bef860c812775f379ef9db6f870c95f4",
+      "total_supply": "30041807472021",
+      "lifetime_mint": "30041807472021",
+      "lifetime_burn": "0",
+      "supply_correct": true
+    }
+  },
+  "netInfos": {
+    "26657": {
+      "port": 26657,
+      "listening": true,
+      "n_peers": 3,
+      "peers": [
+        {
+          "height": 26512,
+          "is_outbound": false,
+          "node_info": {
+            "id": "664a83c922035ce28bb723e4e92aed1e60e26ea1",
+            "listen_addr": "664a83c922035ce28bb723e4e92aed1e60e26ea1@127.0.0.1:26666",
+            "moniker": "validator-1"
+          },
+          "remote_ip": "127.0.0.1:59738"
+        },
+        {
+          "height": 26536,
+          "is_outbound": false,
+          "node_info": {
+            "id": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+            "listen_addr": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20@127.0.0.1:26686",
+            "moniker": "validator-3"
+          },
+          "remote_ip": "127.0.0.1:56652"
+        },
+        {
+          "height": 26535,
+          "is_outbound": false,
+          "node_info": {
+            "id": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+            "listen_addr": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb@127.0.0.1:26676",
+            "moniker": "validator-2"
+          },
+          "remote_ip": "127.0.0.1:56656"
+        }
+      ]
+    },
+    "26667": {
+      "port": 26667,
+      "listening": true,
+      "n_peers": 3,
+      "peers": [
+        {
+          "height": 26535,
+          "is_outbound": false,
+          "node_info": {
+            "id": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+            "listen_addr": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb@127.0.0.1:26676",
+            "moniker": "validator-2"
+          },
+          "remote_ip": "127.0.0.1:56657"
+        },
+        {
+          "height": 26512,
+          "is_outbound": false,
+          "node_info": {
+            "id": "2a806ca82d506a025d580d40600abc77a69e10e7",
+            "listen_addr": "2a806ca82d506a025d580d40600abc77a69e10e7@127.0.0.1:26656",
+            "moniker": "validator-0"
+          },
+          "remote_ip": "127.0.0.1:59737"
+        },
+        {
+          "height": 26536,
+          "is_outbound": false,
+          "node_info": {
+            "id": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+            "listen_addr": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20@127.0.0.1:26686",
+            "moniker": "validator-3"
+          },
+          "remote_ip": "127.0.0.1:56650"
+        }
+      ]
+    },
+    "26677": {
+      "port": 26677,
+      "listening": true,
+      "n_peers": 3,
+      "peers": [
+        {
+          "height": 26537,
+          "is_outbound": true,
+          "node_info": {
+            "id": "2a806ca82d506a025d580d40600abc77a69e10e7",
+            "listen_addr": "2a806ca82d506a025d580d40600abc77a69e10e7@127.0.0.1:26656",
+            "moniker": "validator-0"
+          },
+          "remote_ip": "127.0.0.1:26656"
+        },
+        {
+          "height": 26536,
+          "is_outbound": true,
+          "node_info": {
+            "id": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+            "listen_addr": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20@127.0.0.1:26686",
+            "moniker": "validator-3"
+          },
+          "remote_ip": "127.0.0.1:26686"
+        },
+        {
+          "height": 26534,
+          "is_outbound": true,
+          "node_info": {
+            "id": "664a83c922035ce28bb723e4e92aed1e60e26ea1",
+            "listen_addr": "664a83c922035ce28bb723e4e92aed1e60e26ea1@127.0.0.1:26666",
+            "moniker": "validator-1"
+          },
+          "remote_ip": "127.0.0.1:26666"
+        }
+      ]
+    },
+    "26687": {
+      "port": 26687,
+      "listening": true,
+      "n_peers": 3,
+      "peers": [
+        {
+          "height": 26537,
+          "is_outbound": true,
+          "node_info": {
+            "id": "2a806ca82d506a025d580d40600abc77a69e10e7",
+            "listen_addr": "2a806ca82d506a025d580d40600abc77a69e10e7@127.0.0.1:26656",
+            "moniker": "validator-0"
+          },
+          "remote_ip": "127.0.0.1:26656"
+        },
+        {
+          "height": 26534,
+          "is_outbound": true,
+          "node_info": {
+            "id": "664a83c922035ce28bb723e4e92aed1e60e26ea1",
+            "listen_addr": "664a83c922035ce28bb723e4e92aed1e60e26ea1@127.0.0.1:26666",
+            "moniker": "validator-1"
+          },
+          "remote_ip": "127.0.0.1:26666"
+        },
+        {
+          "height": 26535,
+          "is_outbound": false,
+          "node_info": {
+            "id": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+            "listen_addr": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb@127.0.0.1:26676",
+            "moniker": "validator-2"
+          },
+          "remote_ip": "127.0.0.1:56658"
+        }
+      ]
+    }
+  },
+  "blockProgression": [
+    {
+      "timestamp": 1795307885154,
+      "isoTime": "2026-11-22T00:38:05.154Z",
+      "heights": {
+        "26657": 26537,
+        "26667": 26537,
+        "26677": 26537,
+        "26687": 26537
+      },
+      "appHashes": {
+        "26657": "8ed98058397efbe9c654924b537ad974bef860c812775f379ef9db6f870c95f4",
+        "26667": "8ed98058397efbe9c654924b537ad974bef860c812775f379ef9db6f870c95f4",
+        "26677": "8ed98058397efbe9c654924b537ad974bef860c812775f379ef9db6f870c95f4",
+        "26687": "8ed98058397efbe9c654924b537ad974bef860c812775f379ef9db6f870c95f4"
+      },
+      "supplies": {
+        "26657": "30041807472021",
+        "26667": "30041807472021",
+        "26677": "30041807472021",
+        "26687": "30041807472021"
+      },
+      "lockstepInSync": true
+    },
+    {
+      "timestamp": 1795307886185,
+      "isoTime": "2026-11-22T00:38:06.185Z",
+      "heights": {
+        "26657": 26539,
+        "26667": 26539,
+        "26677": 26539,
+        "26687": 26539
+      },
+      "appHashes": {
+        "26657": "298d1004b16c92b34bb7e02d3f6e0956ed8d45ce13edd50eb8d1816d1be0b9af",
+        "26667": "298d1004b16c92b34bb7e02d3f6e0956ed8d45ce13edd50eb8d1816d1be0b9af",
+        "26677": "298d1004b16c92b34bb7e02d3f6e0956ed8d45ce13edd50eb8d1816d1be0b9af",
+        "26687": "298d1004b16c92b34bb7e02d3f6e0956ed8d45ce13edd50eb8d1816d1be0b9af"
+      },
+      "supplies": {
+        "26657": "30041807472021",
+        "26667": "30041807472021",
+        "26677": "30041807472021",
+        "26687": "30041807472021"
+      },
+      "lockstepInSync": true
+    },
+    {
+      "timestamp": 1795307887214,
+      "isoTime": "2026-11-22T00:38:07.214Z",
+      "heights": {
+        "26657": 26541,
+        "26667": 26540,
+        "26677": 26540,
+        "26687": 26540
+      },
+      "appHashes": {
+        "26657": "68a335868246855d4bddb3dc810e209435ef71f635acdcae072d8d21e45f0f94",
+        "26667": "b010480628870f503dd3cf28bc3d5e1b2eade5f17271488d7c08546532a69738",
+        "26677": "b010480628870f503dd3cf28bc3d5e1b2eade5f17271488d7c08546532a69738",
+        "26687": "b010480628870f503dd3cf28bc3d5e1b2eade5f17271488d7c08546532a69738"
+      },
+      "supplies": {
+        "26657": "30041807472021",
+        "26667": "30041807472021",
+        "26677": "30041807472021",
+        "26687": "30041807472021"
+      },
+      "lockstepInSync": true
+    },
+    {
+      "timestamp": 1795307888248,
+      "isoTime": "2026-11-22T00:38:08.248Z",
+      "heights": {
+        "26657": 26543,
+        "26667": 26543,
+        "26677": 26543,
+        "26687": 26543
+      },
+      "appHashes": {
+        "26657": "026aca98cb729d020ac8218e50bb3204a803888ca4baf66ff5ed54d8e3192f4e",
+        "26667": "026aca98cb729d020ac8218e50bb3204a803888ca4baf66ff5ed54d8e3192f4e",
+        "26677": "026aca98cb729d020ac8218e50bb3204a803888ca4baf66ff5ed54d8e3192f4e",
+        "26687": "026aca98cb729d020ac8218e50bb3204a803888ca4baf66ff5ed54d8e3192f4e"
+      },
+      "supplies": {
+        "26657": "30041807472021",
+        "26667": "30041807472021",
+        "26677": "30041807472021",
+        "26687": "30041807472021"
+      },
+      "lockstepInSync": true
+    },
+    {
+      "timestamp": 1795307889265,
+      "isoTime": "2026-11-22T00:38:09.265Z",
+      "heights": {
+        "26657": 26544,
+        "26667": 26544,
+        "26677": 26544,
+        "26687": 26544
+      },
+      "appHashes": {
+        "26657": "88550508fc79937e4b64478047ebbcd855d97e923444da40ee1493bf8f3e0f09",
+        "26667": "88550508fc79937e4b64478047ebbcd855d97e923444da40ee1493bf8f3e0f09",
+        "26677": "88550508fc79937e4b64478047ebbcd855d97e923444da40ee1493bf8f3e0f09",
+        "26687": "88550508fc79937e4b64478047ebbcd855d97e923444da40ee1493bf8f3e0f09"
+      },
+      "supplies": {
+        "26657": "30041807472021",
+        "26667": "30041807472021",
+        "26677": "30041807472021",
+        "26687": "30041807472021"
+      },
+      "lockstepInSync": true
+    },
+    {
+      "timestamp": 1795307890282,
+      "isoTime": "2026-11-22T00:38:10.282Z",
+      "heights": {
+        "26657": 26547,
+        "26667": 26547,
+        "26677": 26547,
+        "26687": 26547
+      },
+      "appHashes": {
+        "26657": "fc27db60f05b7039c6ceb4e6bf3d3ec1311593002bce50c01780d527190b9b5b",
+        "26667": "fc27db60f05b7039c6ceb4e6bf3d3ec1311593002bce50c01780d527190b9b5b",
+        "26677": "fc27db60f05b7039c6ceb4e6bf3d3ec1311593002bce50c01780d527190b9b5b",
+        "26687": "fc27db60f05b7039c6ceb4e6bf3d3ec1311593002bce50c01780d527190b9b5b"
+      },
+      "supplies": {
+        "26657": "30041807472021",
+        "26667": "30041807472021",
+        "26677": "30041807472021",
+        "26687": "30041807472021"
+      },
+      "lockstepInSync": true
+    },
+    {
+      "timestamp": 1795307891300,
+      "isoTime": "2026-11-22T00:38:11.300Z",
+      "heights": {
+        "26657": 26548,
+        "26667": 26548,
+        "26677": 26548,
+        "26687": 26548
+      },
+      "appHashes": {
+        "26657": "c3fe5d8e7b15153f9a9eaaafaabefc652f9ba5ae753d632165a8bf36f39c8652",
+        "26667": "c3fe5d8e7b15153f9a9eaaafaabefc652f9ba5ae753d632165a8bf36f39c8652",
+        "26677": "c3fe5d8e7b15153f9a9eaaafaabefc652f9ba5ae753d632165a8bf36f39c8652",
+        "26687": "c3fe5d8e7b15153f9a9eaaafaabefc652f9ba5ae753d632165a8bf36f39c8652"
+      },
+      "supplies": {
+        "26657": "30041807472021",
+        "26667": "30041807472021",
+        "26677": "30041807472021",
+        "26687": "30041807472021"
+      },
+      "lockstepInSync": true
+    },
+    {
+      "timestamp": 1795307892327,
+      "isoTime": "2026-11-22T00:38:12.327Z",
+      "heights": {
+        "26657": 26549,
+        "26667": 26549,
+        "26677": 26549,
+        "26687": 26549
+      },
+      "appHashes": {
+        "26657": "fca861077230d126b048cc1b31309f5ade97826d97b32c383a01f4f9c7ba21da",
+        "26667": "fca861077230d126b048cc1b31309f5ade97826d97b32c383a01f4f9c7ba21da",
+        "26677": "fca861077230d126b048cc1b31309f5ade97826d97b32c383a01f4f9c7ba21da",
+        "26687": "fca861077230d126b048cc1b31309f5ade97826d97b32c383a01f4f9c7ba21da"
+      },
+      "supplies": {
+        "26657": "30041807472021",
+        "26667": "30041807472021",
+        "26677": "30041807472021",
+        "26687": "30041807472021"
+      },
+      "lockstepInSync": true
+    },
+    {
+      "timestamp": 1795307893357,
+      "isoTime": "2026-11-22T00:38:13.357Z",
+      "heights": {
+        "26657": 26550,
+        "26667": 26550,
+        "26677": 26550,
+        "26687": 26550
+      },
+      "appHashes": {
+        "26657": "a492d7788de0b57f6ff83b51d3ccc860628c987faa07cae36e90e77483c2f2a4",
+        "26667": "a492d7788de0b57f6ff83b51d3ccc860628c987faa07cae36e90e77483c2f2a4",
+        "26677": "a492d7788de0b57f6ff83b51d3ccc860628c987faa07cae36e90e77483c2f2a4",
+        "26687": "a492d7788de0b57f6ff83b51d3ccc860628c987faa07cae36e90e77483c2f2a4"
+      },
+      "supplies": {
+        "26657": "30041807472021",
+        "26667": "30041807472021",
+        "26677": "30041807472021",
+        "26687": "30041807472021"
+      },
+      "lockstepInSync": true
+    },
+    {
+      "timestamp": 1795307894383,
+      "isoTime": "2026-11-22T00:38:14.383Z",
+      "heights": {
+        "26657": 26551,
+        "26667": 26551,
+        "26677": 26551,
+        "26687": 26551
+      },
+      "appHashes": {
+        "26657": "3b36be178fceefd3ac01c9443d434cf42dbe9a116a186907e29fe1acc104aaa8",
+        "26667": "3b36be178fceefd3ac01c9443d434cf42dbe9a116a186907e29fe1acc104aaa8",
+        "26677": "3b36be178fceefd3ac01c9443d434cf42dbe9a116a186907e29fe1acc104aaa8",
+        "26687": "3b36be178fceefd3ac01c9443d434cf42dbe9a116a186907e29fe1acc104aaa8"
+      },
+      "supplies": {
+        "26657": "30041807472021",
+        "26667": "30041807472021",
+        "26677": "30041807472021",
+        "26687": "30041807472021"
+      },
+      "lockstepInSync": true
+    }
+  ],
+  "sampleBlock": {
+    "id": -1,
+    "jsonrpc": "2.0",
+    "result": {
+      "block": {
+        "data": {
+          "txs": null
+        },
+        "header": {
+          "app_hash": "65512b6484268a0fd7a280134d7fcb22b731865a6577aa09a424044f76880420",
+          "chain_id": "sovra-testnet-0",
+          "height": "26552",
+          "proposer_address": "validator-3",
+          "time": "2026-11-22T00:38:15Z"
+        }
+      },
+      "block_id": {
+        "hash": "65512b6484268a0fd7a280134d7fcb22b731865a6577aa09a424044f76880420"
+      }
+    }
+  },
+  "summary": {
+    "allNodesResponding": true,
+    "chainIdConsistent": true,
+    "totalSupplyConsistent": true,
+    "supplyConservationCorrect": true,
+    "sustainedBlockProduction": true
+  }
+}

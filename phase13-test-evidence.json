@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-11-22T00:21:09.467Z",
+  "timestamp": "2026-11-22T00:50:43.612Z",
   "suitesCount": 20,
   "grandTotal": 197,
   "grandPassed": 197,
@@ -13,8 +13,9 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 5957,
-      "status": "PASSED"
+      "durationMs": 30446,
+      "status": "FAILED",
+      "error": "Command failed: npx vitest run tests/integration/phase10-consensus-operations.test.ts --reporter=json --outputFile=.tmp-suite-0.json\n\u001b[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:\n  - `__dirname` (vitest.config.ts:7:37). Use `import.meta.dirname` instead\nSet `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.\u001b[39m\n\u001b[2m6:13:04 AM\u001b[22m \u001b[33m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[33mwarning: `esbuild` option was specified by \"vitest\" plugin. This option is deprecated, please use `oxc` instead.\u001b[39m\nfile:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388\r\n\t\tconst timer = timeout ? setTimeout(() => reject(new Error(\"Failed to terminate worker\")), timeout) : null;\r\n\t\t                                                ^\r\n\r\nError: Failed to terminate worker\r\n    at Timeout._onTimeout (file:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388:51)\r\n    at listOnTimeout (node:internal/timers:685:17)\r\n    at process.processTimers (node:internal/timers:618:7)\r\n\r\nNode.js v24.22.0\r\n"
     },
     {
       "index": 2,
@@ -23,8 +24,9 @@
       "passed": 25,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 7074,
-      "status": "PASSED"
+      "durationMs": 23025,
+      "status": "FAILED",
+      "error": "Command failed: npx vitest run tests/security/adversarial-remediation-gate.test.ts --reporter=json --outputFile=.tmp-suite-1.json\n\u001b[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:\n  - `__dirname` (vitest.config.ts:7:37). Use `import.meta.dirname` instead\nSet `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.\u001b[39m\n\u001b[2m6:13:25 AM\u001b[22m \u001b[33m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[33mwarning: `esbuild` option was specified by \"vitest\" plugin. This option is deprecated, please use `oxc` instead.\u001b[39m\nfile:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388\r\n\t\tconst timer = timeout ? setTimeout(() => reject(new Error(\"Failed to terminate worker\")), timeout) : null;\r\n\t\t                                                ^\r\n\r\nError: Failed to terminate worker\r\n    at Timeout._onTimeout (file:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388:51)\r\n    at listOnTimeout (node:internal/timers:685:17)\r\n    at process.processTimers (node:internal/timers:618:7)\r\n\r\nNode.js v24.22.0\r\n"
     },
     {
       "index": 3,
@@ -33,7 +35,7 @@
       "passed": 11,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 9990,
+      "durationMs": 20701,
       "status": "PASSED"
     },
     {
@@ -43,7 +45,7 @@
       "passed": 5,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 4360,
+      "durationMs": 15780,
       "status": "PASSED"
     },
     {
@@ -53,7 +55,7 @@
       "passed": 13,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 5725,
+      "durationMs": 18143,
       "status": "PASSED"
     },
     {
@@ -63,7 +65,7 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 4980,
+      "durationMs": 36363,
       "status": "PASSED"
     },
     {
@@ -73,7 +75,7 @@
       "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 5872,
+      "durationMs": 9822,
       "status": "PASSED"
     },
     {
@@ -83,8 +85,9 @@
       "passed": 23,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 6299,
-      "status": "PASSED"
+      "durationMs": 23418,
+      "status": "FAILED",
+      "error": "Command failed: npx vitest run packages/identity/test/governance.test.ts --reporter=json --outputFile=.tmp-suite-7.json\n\u001b[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:\n  - `__dirname` (vitest.config.ts:7:37). Use `import.meta.dirname` instead\nSet `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.\u001b[39m\n\u001b[2m6:15:28 AM\u001b[22m \u001b[33m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[33mwarning: `esbuild` option was specified by \"vitest\" plugin. This option is deprecated, please use `oxc` instead.\u001b[39m\nfile:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388\r\n\t\tconst timer = timeout ? setTimeout(() => reject(new Error(\"Failed to terminate worker\")), timeout) : null;\r\n\t\t                                                ^\r\n\r\nError: Failed to terminate worker\r\n    at Timeout._onTimeout (file:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388:51)\r\n    at listOnTimeout (node:internal/timers:685:17)\r\n    at process.processTimers (node:internal/timers:618:7)\r\n\r\nNode.js v24.22.0\r\n"
     },
     {
       "index": 9,
@@ -93,8 +96,9 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 4133,
-      "status": "PASSED"
+      "durationMs": 26888,
+      "status": "FAILED",
+      "error": "Command failed: npx vitest run tests/reliability/backup-restore-production-drill.test.ts --reporter=json --outputFile=.tmp-suite-8.json\n\u001b[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:\n  - `__dirname` (vitest.config.ts:7:37). Use `import.meta.dirname` instead\nSet `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.\u001b[39m\n\u001b[2m6:15:53 AM\u001b[22m \u001b[33m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[33mwarning: `esbuild` option was specified by \"vitest\" plugin. This option is deprecated, please use `oxc` instead.\u001b[39m\nfile:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388\r\n\t\tconst timer = timeout ? setTimeout(() => reject(new Error(\"Failed to terminate worker\")), timeout) : null;\r\n\t\t                                                ^\r\n\r\nError: Failed to terminate worker\r\n    at Timeout._onTimeout (file:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388:51)\r\n    at listOnTimeout (node:internal/timers:685:17)\r\n    at process.processTimers (node:internal/timers:618:7)\r\n\r\nNode.js v24.22.0\r\n"
     },
     {
       "index": 10,
@@ -103,7 +107,7 @@
       "passed": 9,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 3872,
+      "durationMs": 19244,
       "status": "PASSED"
     },
     {
@@ -113,7 +117,7 @@
       "passed": 13,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 4637,
+      "durationMs": 17271,
       "status": "PASSED"
     },
     {
@@ -123,8 +127,9 @@
       "passed": 12,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 4787,
-      "status": "PASSED"
+      "durationMs": 27698,
+      "status": "FAILED",
+      "error": "Command failed: npx vitest run tests/integration/phase9-api-decoupling-horizontal.test.ts --reporter=json --outputFile=.tmp-suite-11.json\n\u001b[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:\n  - `__dirname` (vitest.config.ts:7:37). Use `import.meta.dirname` instead\nSet `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.\u001b[39m\n\u001b[2m6:16:57 AM\u001b[22m \u001b[33m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[33mwarning: `esbuild` option was specified by \"vitest\" plugin. This option is deprecated, please use `oxc` instead.\u001b[39m\nfile:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388\r\n\t\tconst timer = timeout ? setTimeout(() => reject(new Error(\"Failed to terminate worker\")), timeout) : null;\r\n\t\t                                                ^\r\n\r\nError: Failed to terminate worker\r\n    at Timeout._onTimeout (file:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388:51)\r\n    at listOnTimeout (node:internal/timers:685:17)\r\n    at process.processTimers (node:internal/timers:618:7)\r\n\r\nNode.js v24.22.0\r\n"
     },
     {
       "index": 13,
@@ -133,7 +138,7 @@
       "passed": 8,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 4111,
+      "durationMs": 18049,
       "status": "PASSED"
     },
     {
@@ -143,7 +148,7 @@
       "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 3898,
+      "durationMs": 21171,
       "status": "PASSED"
     },
     {
@@ -153,7 +158,7 @@
       "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 5085,
+      "durationMs": 31008,
       "status": "PASSED"
     },
     {
@@ -163,8 +168,9 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 8371,
-      "status": "PASSED"
+      "durationMs": 31531,
+      "status": "FAILED",
+      "error": "Command failed: npx vitest run tests/integration/phase9-multi-cloud-partition.test.ts --reporter=json --outputFile=.tmp-suite-15.json\n\u001b[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:\n  - `__dirname` (vitest.config.ts:7:37). Use `import.meta.dirname` instead\nSet `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.\u001b[39m\n\u001b[2m6:18:42 AM\u001b[22m \u001b[33m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[33mwarning: `esbuild` option was specified by \"vitest\" plugin. This option is deprecated, please use `oxc` instead.\u001b[39m\nfile:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388\r\n\t\tconst timer = timeout ? setTimeout(() => reject(new Error(\"Failed to terminate worker\")), timeout) : null;\r\n\t\t                                                ^\r\n\r\nError: Failed to terminate worker\r\n    at Timeout._onTimeout (file:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388:51)\r\n    at listOnTimeout (node:internal/timers:685:17)\r\n    at process.processTimers (node:internal/timers:618:7)\r\n\r\nNode.js v24.22.0\r\n"
     },
     {
       "index": 17,
@@ -173,7 +179,7 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 9287,
+      "durationMs": 21442,
       "status": "PASSED"
     },
     {
@@ -183,8 +189,9 @@
       "passed": 17,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 12514,
-      "status": "PASSED"
+      "durationMs": 28360,
+      "status": "FAILED",
+      "error": "Command failed: npx vitest run tests/security/phase12-secret-and-auth-hardening.test.ts --reporter=json --outputFile=.tmp-suite-17.json\n\u001b[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:\n  - `__dirname` (vitest.config.ts:7:37). Use `import.meta.dirname` instead\nSet `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.\u001b[39m\n\u001b[2m6:19:29 AM\u001b[22m \u001b[33m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[33mwarning: `esbuild` option was specified by \"vitest\" plugin. This option is deprecated, please use `oxc` instead.\u001b[39m\nfile:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388\r\n\t\tconst timer = timeout ? setTimeout(() => reject(new Error(\"Failed to terminate worker\")), timeout) : null;\r\n\t\t                                                ^\r\n\r\nError: Failed to terminate worker\r\n    at Timeout._onTimeout (file:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388:51)\r\n    at listOnTimeout (node:internal/timers:685:17)\r\n    at process.processTimers (node:internal/timers:618:7)\r\n\r\nNode.js v24.22.0\r\n"
     },
     {
       "index": 19,
@@ -193,8 +200,9 @@
       "passed": 10,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 13100,
-      "status": "PASSED"
+      "durationMs": 30118,
+      "status": "FAILED",
+      "error": "Command failed: npx vitest run tests/security/phase12-cors-validation.test.ts --reporter=json --outputFile=.tmp-suite-18.json\n\u001b[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:\n  - `__dirname` (vitest.config.ts:7:37). Use `import.meta.dirname` instead\nSet `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.\u001b[39m\n\u001b[2m6:19:58 AM\u001b[22m \u001b[33m\u001b[1m[vite]\u001b[22m\u001b[39m \u001b[33mwarning: `esbuild` option was specified by \"vitest\" plugin. This option is deprecated, please use `oxc` instead.\u001b[39m\nfile:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388\r\n\t\tconst timer = timeout ? setTimeout(() => reject(new Error(\"Failed to terminate worker\")), timeout) : null;\r\n\t\t                                                ^\r\n\r\nError: Failed to terminate worker\r\n    at Timeout._onTimeout (file:///D:/Sovra/node_modules/.pnpm/tinypool@2.2.0/node_modules/tinypool/dist/index.js:388:51)\r\n    at listOnTimeout (node:internal/timers:685:17)\r\n    at process.processTimers (node:internal/timers:618:7)\r\n\r\nNode.js v24.22.0\r\n"
     },
     {
       "index": 20,
@@ -203,7 +211,7 @@
       "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "durationMs": 8840,
+      "durationMs": 21071,
       "status": "PASSED"
     }
   ]
