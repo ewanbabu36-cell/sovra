@@ -20,6 +20,10 @@ var (
 	ErrInsufficientQuorum     = errors.New("commit certificate voting power strictly less than 2/3+ quorum")
 	ErrValidatorSetMismatch   = errors.New("commit certificate voting power attribution does not match canonical validator set")
 	ErrRevokedValidator       = errors.New("validator identity has been permanently revoked by protocol security transition")
+	ErrConflictingTransition  = errors.New("conflicting validator transition proposal for existing height")
+	ErrReplayedTransition     = errors.New("validator transition height is not strictly monotonically increasing")
+	ErrUnauthorizedTransition = errors.New("validator transition lacks authorized cryptographic quorum")
+	ErrInvalidTransition      = errors.New("validator transition parameters are invalid")
 )
 
 // VerifyCommitCertificate validates the cryptographic commit certificate against the validator set

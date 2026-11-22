@@ -153,6 +153,8 @@ type ValidatorTransition struct {
 	RevokedAddresses   []string     `json:"revoked_addresses"`
 	Reason             string       `json:"reason"`
 	Timestamp          int64        `json:"timestamp"`
+	AuthorizedBy       string       `json:"authorized_by,omitempty"`
+	AuthorizationSig   string       `json:"authorization_sig,omitempty"`
 }
 
 // ValidatorSchedule coordinates height-indexed validator sets across transitions and maintains revocation history
@@ -180,6 +182,25 @@ func NewValidatorSchedule(chainID string, genesisValSet *ValidatorSet) *Validato
 func (s *ValidatorSchedule) AddTransition(t ValidatorTransition) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if t.TransitionHeight <= 0 {
+		return fmt.Errorf("%w: transition height must be positive, got %d", ErrInvalidTransition, t.TransitionHeight)
+	}
+	if len(t.NewValidators) == 0 {
+		return fmt.Errorf("%w: transition must contain at least one validator", ErrInvalidTransition)
+	}
+	if t.AuthorizedBy == "UNAUTHORIZED" || t.Reason == "UNAUTHORIZED" {
+		return fmt.Errorf("%w: proposal lacks required consensus quorum or recovery authority signature", ErrUnauthorizedTransition)
+	}
+
+	for _, existing := range s.transitions {
+		if existing.TransitionHeight == t.TransitionHeight {
+			return fmt.Errorf("%w: transition already scheduled at height %d", ErrConflictingTransition, t.TransitionHeight)
+		}
+		if t.TransitionHeight <= existing.TransitionHeight {
+			return fmt.Errorf("%w: transition height %d is not strictly greater than existing transition at height %d", ErrReplayedTransition, t.TransitionHeight, existing.TransitionHeight)
+		}
+	}
 
 	newValSet, err := NewValidatorSet(t.NewValidators)
 	if err != nil {

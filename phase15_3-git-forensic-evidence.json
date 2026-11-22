@@ -1,0 +1,81 @@
+{
+  "auditPhase": "Phase 15.3 Git History Forensic Audit & Remediation",
+  "timestamp": "2026-11-22T07:44:00Z",
+  "repository": "D:\\Sovra",
+  "upstreamRemote": "https://github.com/ewanbabu36-cell/sovra.git",
+  "identifiedCompromisedBlobs": [
+    {
+      "blobHash": "98a9f734a474c030915317d2b9fbe08b11f35497",
+      "historicalPath": "chain/mytestnet/node0/validator-0.key.json",
+      "introducedCommit": "9bc310b",
+      "removedCommit": "c40011b",
+      "statusInMainHistory": "REACHABLE_HISTORICAL_OBJECT",
+      "statusInRecoveryBranch": "PERMANENTLY_ABSENT"
+    },
+    {
+      "blobHash": "fe9beee8175b2145666b6e0c93d990101604f866",
+      "historicalPath": "chain/mytestnet/node1/validator-1.key.json",
+      "introducedCommit": "9bc310b",
+      "removedCommit": "c40011b",
+      "statusInMainHistory": "REACHABLE_HISTORICAL_OBJECT",
+      "statusInRecoveryBranch": "PERMANENTLY_ABSENT"
+    },
+    {
+      "blobHash": "bbb9aba2ec0d45d1e6d237c31064adc18ce14a72",
+      "historicalPath": "chain/mytestnet/node2/validator-2.key.json",
+      "introducedCommit": "9bc310b",
+      "removedCommit": "c40011b",
+      "statusInMainHistory": "REACHABLE_HISTORICAL_OBJECT",
+      "statusInRecoveryBranch": "PERMANENTLY_ABSENT"
+    },
+    {
+      "blobHash": "672c30160f34ffe5762ccef25cee40c2854f29a9",
+      "historicalPath": "chain/mytestnet/node3/validator-3.key.json",
+      "introducedCommit": "9bc310b",
+      "removedCommit": "c40011b",
+      "statusInMainHistory": "REACHABLE_HISTORICAL_OBJECT",
+      "statusInRecoveryBranch": "PERMANENTLY_ABSENT"
+    },
+    {
+      "blobHash": "a21281d32267e9fe08aadf1510f55fd63513dcca",
+      "historicalPath": "chain/mytestnet/node4/validator.key.json",
+      "introducedCommit": "50b9c46",
+      "removedCommit": "c40011b",
+      "statusInMainHistory": "REACHABLE_HISTORICAL_OBJECT",
+      "statusInRecoveryBranch": "PERMANENTLY_ABSENT"
+    }
+  ],
+  "offlineBackups": {
+    "plainBundle": {
+      "path": "D:\\Sovra-backup-pre-phase15_2.bundle",
+      "sizeBytes": 12392075,
+      "verified": true
+    },
+    "encryptedBundle": {
+      "path": "D:\\Sovra-backup-pre-phase15_2.bundle.enc",
+      "sizeBytes": 12392135,
+      "cipher": "aes-256-gcm",
+      "kdf": "scrypt (N=32768, r=8, p=1, maxmem=128MB)",
+      "sha256": "13618c817e8d7ace5483fa251e31270a31ed6b8804bcd6e70b4a2448f37c2975",
+      "verified": true,
+      "roundtripDecryptionVerified": true
+    },
+    "bareMirrorClone": {
+      "path": "D:\\Sovra-backup-pre-phase15_2.git",
+      "verified": true
+    }
+  },
+  "dedicatedRecoveryBranch": {
+    "branchName": "recovery/history-remediation-phase15-3",
+    "remotePushed": true,
+    "remoteRef": "refs/heads/recovery/history-remediation-phase15-3",
+    "purgedBlobCount": 5,
+    "compromisedBlobsRemaining": 0,
+    "verifiedClean": true
+  },
+  "collaboratorSynchronizationStatus": {
+    "canonicalMainBranch": "PRESERVED_FOR_OWNER_COORDINATION",
+    "forcePushAuthorizedByOwner": false,
+    "classification": "RESOLVED_ON_RECOVERY_BRANCH_BLOCKED_ON_REMOTE_TESTNET_UNTIL_COORDINATED_FORCE_REWRITE"
+  }
+}

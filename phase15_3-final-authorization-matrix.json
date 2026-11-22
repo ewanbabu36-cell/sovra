@@ -1,0 +1,42 @@
+{
+  "gateName": "SOVRA Phase 15.3 Final Release Gate & Environment Authorization Matrix",
+  "timestamp": "2026-11-22T07:45:00Z",
+  "baselineCommit": "d16d239",
+  "phase": "15.3",
+  "chainId": "sovra-testnet-0",
+  "environmentalAuthorizations": {
+    "local_development": {
+      "status": "CERTIFIED",
+      "rationale": "Single-node test harnesses and simulation drivers operate deterministically with 100% pass rate."
+    },
+    "local_loopback_testnet": {
+      "status": "CERTIFIED",
+      "rationale": "Four independent CometBFT nodes running continuously on loopback with synchronized block progression and monetary supply conservation."
+    },
+    "validator_transition_activation": {
+      "status": "CERTIFIED_ON_BOUNDARY_TESTS",
+      "rationale": "All 14 transition-boundary adversarial tests passed; compromised genesis keys are strictly rejected with ErrRevokedValidator at and above transition height 40,000."
+    },
+    "git_history_secret_remediation": {
+      "status": "RECOVERY_BRANCH_VERIFIED_CLEAN__MAIN_REWRITE_BLOCKED",
+      "rationale": "All 5 historical key blobs completely purged on recovery/history-remediation-phase15-3 and pushed to origin. Canonical main branch force-rewrite is withheld pending explicit repository owner authorization to avoid breaking collaborator clones."
+    },
+    "hardware_backed_signing": {
+      "status": "BLOCKED__DEVELOPMENT_ONLY",
+      "rationale": "Physical HSM device is not present in local environment. PKCS#11 specification (AWS CloudHSM SDK 5+ / YubiHSM 2 with CKM_EDDSA) is formally codified, and memory enclave driver is strictly tagged as [DEVELOPMENT_ONLY]."
+    },
+    "remote_multi_cloud_testnet": {
+      "status": "BLOCKED",
+      "blockingPrerequisites": [
+        "Provisioning of 4 physical multi-cloud server hosts across independent cloud providers (AWS, GCP, Azure, DigitalOcean).",
+        "Physical integration of PKCS#11 hardware security modules (AWS CloudHSM SDK 5+ or YubiHSM 2).",
+        "mTLS node-to-node P2P transport network configuration across external public IPs.",
+        "Repository owner authorization and coordination of the remote Git history rewrite or explicit risk-acceptance."
+      ]
+    },
+    "production_mainnet": {
+      "status": "STRICTLY_NOT_AUTHORIZED",
+      "rationale": "Mainnet authorization is permanently prohibited prior to multi-month live operation on decentralized remote testnet and formal external cryptographic audits."
+    }
+  }
+}

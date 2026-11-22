@@ -1,0 +1,104 @@
+{
+  "testSuite": "Phase 15.3 Height-40,000 Transition Boundary Adversarial Suite",
+  "timestamp": "2026-11-22T07:43:00Z",
+  "baselineCommit": "d16d239",
+  "testEngines": [
+    "Go Consensus Engine (chain/consensus/transition_boundary_test.go)",
+    "TypeScript Vitest Adversarial Runner (tests/security/phase15-3-validator-transition-boundary.test.ts)"
+  ],
+  "boundaryPropertiesTested": [
+    {
+      "property": 1,
+      "name": "Height 39,999 Historical Validator Behavior",
+      "expected": "Genesis validator quorum accepted; rotated validators rejected",
+      "result": "PASSED"
+    },
+    {
+      "property": 2,
+      "name": "Height 40,000 Exact Transition Activation",
+      "expected": "Rotated validator quorum accepted; genesis validators rejected",
+      "result": "PASSED"
+    },
+    {
+      "property": 3,
+      "name": "Height 40,001 Forward Quorum Authorization",
+      "expected": "Only rotated validator set authorized to sign",
+      "result": "PASSED"
+    },
+    {
+      "property": 4,
+      "name": "Old Validator Individual Signatures Rejected",
+      "expected": "ErrRevokedValidator returned for any vote signed by genesis keys",
+      "result": "PASSED"
+    },
+    {
+      "property": 5,
+      "name": "Old Validator Full Certificates Rejected",
+      "expected": "Full commit certificate forged by old keys strictly rejected",
+      "result": "PASSED"
+    },
+    {
+      "property": 6,
+      "name": "New Validator Quorum Enforcement",
+      "expected": "75% power accepted (>= 67%); 50% power rejected (< 67%)",
+      "result": "PASSED"
+    },
+    {
+      "property": 7,
+      "name": "Invalid or Unauthorized Transition Rejected",
+      "expected": "Height <= 0, empty sets, or missing auth rejected with explicit error",
+      "result": "PASSED"
+    },
+    {
+      "property": 8,
+      "name": "Conflicting Transition Proposals Rejected",
+      "expected": "ErrConflictingTransition returned when duplicate height proposed",
+      "result": "PASSED"
+    },
+    {
+      "property": 9,
+      "name": "Replay of Old Transition Rejected",
+      "expected": "ErrReplayedTransition returned when height <= latest transition",
+      "result": "PASSED"
+    },
+    {
+      "property": 10,
+      "name": "Restart Before and After Transition",
+      "expected": "Restarts at H=39,998 restore genesis; restarts at H=40,005 restore rotated",
+      "result": "PASSED"
+    },
+    {
+      "property": 11,
+      "name": "Network Partition Across Transition Boundary",
+      "expected": "Partition catch-up applies blocks sequentially and validates against schedule",
+      "result": "PASSED"
+    },
+    {
+      "property": 12,
+      "name": "Recovery from Partition Without Rollback",
+      "expected": "Malicious block rollback attempts to old validator set rejected",
+      "result": "PASSED"
+    },
+    {
+      "property": 13,
+      "name": "Historical Block and Certificate Verification",
+      "expected": "All blocks H < 40,000 remain verifiable against historical genesis keys",
+      "result": "PASSED"
+    },
+    {
+      "property": 14,
+      "name": "Financial State and AppHash Invariance",
+      "expected": "Total supply (30T uSOV), balances, and AppHash unaffected by rotation",
+      "result": "PASSED"
+    }
+  ],
+  "cryptographicKeystoreEvidence": {
+    "scryptParams": { "n": 32768, "r": 8, "p": 1, "keylen": 32 },
+    "cipher": "aes-256-gcm",
+    "decryptionRoundtrip": "VERIFIED_100_PERCENT_MATCH",
+    "wrongPassphraseRejection": "VERIFIED_THROWS_ERROR",
+    "corruptedCiphertextRejection": "VERIFIED_THROWS_ERROR",
+    "tamperedMetadataRejection": "VERIFIED_THROWS_ERROR"
+  },
+  "overallVerdict": "ALL_14_BOUNDARY_PROPERTIES_VERIFIED"
+}

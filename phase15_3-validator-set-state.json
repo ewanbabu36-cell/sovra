@@ -1,0 +1,103 @@
+{
+  "auditPhase": "Phase 15.3 Forensic Validator Transition Audit",
+  "timestamp": "2026-11-22T07:42:00Z",
+  "chainId": "sovra-testnet-0",
+  "canonicalChainState": {
+    "latestHeight": 40380,
+    "height40000Reached": true,
+    "transitionHeight": 40000,
+    "appHashDeterminism": "VERIFIED_CONTINUOUS",
+    "totalCoinSupplyMicroSov": "30000000000000",
+    "totalCoinSupplySov": "30000000",
+    "financialLedgerState": "CONSERVED"
+  },
+  "heightIndexedValidatorSets": {
+    "historicalEpoch": {
+      "heightRange": "1 <= H < 40000",
+      "authoritativeValidatorSet": "GENESIS_SET",
+      "quorumPower": 67,
+      "totalPower": 100,
+      "validators": [
+        {
+          "name": "validator-0",
+          "address": "sovra12a806ca82d506a025d580d40600abc77a69e10e7",
+          "pub_key": "50dec499bc1281f64488a3ca9500c9c1a4eea67f5147af0450ee0deebf8601be",
+          "voting_power": 25,
+          "revocationHeight": 40000,
+          "status": "VALID_HISTORICALLY_REVOKED_FORWARD"
+        },
+        {
+          "name": "validator-1",
+          "address": "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1",
+          "pub_key": "a81cd7b53eb1edcfc9abce54679faf08ccaa002bd5898b63431f29cc964e67e3",
+          "voting_power": 25,
+          "revocationHeight": 40000,
+          "status": "VALID_HISTORICALLY_REVOKED_FORWARD"
+        },
+        {
+          "name": "validator-2",
+          "address": "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+          "pub_key": "d6cbcf5c5acf4688995801c2993a53f4c5ff164bd897362909fb2f1a5ede7724",
+          "voting_power": 25,
+          "revocationHeight": 40000,
+          "status": "VALID_HISTORICALLY_REVOKED_FORWARD"
+        },
+        {
+          "name": "validator-3",
+          "address": "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+          "pub_key": "b5fc366f668f7d6dfc43a9b2942895ccb9e4eea5d7b1ca46f1e8c710347977ec",
+          "voting_power": 25,
+          "revocationHeight": 40000,
+          "status": "VALID_HISTORICALLY_REVOKED_FORWARD"
+        }
+      ]
+    },
+    "rotatedEpoch": {
+      "heightRange": "H >= 40000",
+      "authoritativeValidatorSet": "ROTATED_SET",
+      "quorumPower": 67,
+      "totalPower": 100,
+      "validators": [
+        {
+          "name": "validator-0",
+          "address": "sovra1e4654fa45393171840964bce0716ea8d9742f6b8",
+          "pub_key": "9c7965188c69a5b8c69ff94e6ee6ff65b8d30bf8a9c5b75368ddbc9afae80e8d",
+          "voting_power": 25,
+          "keystorePath": "chain/rotated_keystores/validator-0.keystore",
+          "status": "AUTHORITATIVE_ACTIVE"
+        },
+        {
+          "name": "validator-1",
+          "address": "sovra1f7878b4c2f9e783c95feda305f1a7cbd30ed5df3",
+          "pub_key": "407e7d2d35ee9f071fdc74b50389d6ce6e1eb59713246209b6e13ca4fe9a405c",
+          "voting_power": 25,
+          "keystorePath": "chain/rotated_keystores/validator-1.keystore",
+          "status": "AUTHORITATIVE_ACTIVE"
+        },
+        {
+          "name": "validator-2",
+          "address": "sovra13c97b27b53207767d67495900c3ab9d88a09e311",
+          "pub_key": "15c2de73d9195ad0b1866d1799f6bdcd25d8614afc08b84a12e93e18fafb56af",
+          "voting_power": 25,
+          "keystorePath": "chain/rotated_keystores/validator-2.keystore",
+          "status": "AUTHORITATIVE_ACTIVE"
+        },
+        {
+          "name": "validator-3",
+          "address": "sovra1162e4bf6312e39ee210a94309cf3911f52798e90",
+          "pub_key": "2e428524e705d2face294d429286b94f96f46cda8db83e7a7182750dc7ab0053",
+          "voting_power": 25,
+          "keystorePath": "chain/rotated_keystores/validator-3.keystore",
+          "status": "AUTHORITATIVE_ACTIVE"
+        }
+      ]
+    }
+  },
+  "transitionSecurityRules": {
+    "atomicity": "Instantaneous transition at height 40000 boundary with zero intermediate heights",
+    "revocationEnforcement": "ErrRevokedValidator enforced in consensus verification on all blocks at H >= 40000",
+    "threatModelMitigation": "Compromised genesis keys prohibited from self-authorizing replacement; requires protocol schedule or emergency recovery authority",
+    "replayProtection": "Transitions strictly monotonically ordered by TransitionHeight",
+    "conflictingProposalProtection": "Schedule rejects multiple transitions proposed for the same height"
+  }
+}
