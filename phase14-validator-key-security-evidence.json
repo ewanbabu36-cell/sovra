@@ -1,0 +1,170 @@
+{
+  "timestamp": "2026-11-22T01:32:43.772Z",
+  "auditSummary": {
+    "keystoresAudited": 4,
+    "gen2IdentitiesGenerated": 4,
+    "filesScanned": 2904,
+    "unauthorizedSecretsFound": 17
+  },
+  "existingKeystores": [
+    {
+      "node": "validator-0",
+      "address": "sovra12a806ca82d506a025d580d40600abc77a69e10e7",
+      "pubKeyHex": "50dec499bc1281f64488a3ca9500c9c1a4eea67f5147af0450ee0deebf8601be",
+      "cipher": "aes-256-gcm",
+      "kdf": "scrypt",
+      "status": "VERIFIED_ENCRYPTED"
+    },
+    {
+      "node": "validator-1",
+      "address": "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1",
+      "pubKeyHex": "a81cd7b53eb1edcfc9abce54679faf08ccaa002bd5898b63431f29cc964e67e3",
+      "cipher": "aes-256-gcm",
+      "kdf": "scrypt",
+      "status": "VERIFIED_ENCRYPTED"
+    },
+    {
+      "node": "validator-2",
+      "address": "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+      "pubKeyHex": "d6cbcf5c5acf4688995801c2993a53f4c5ff164bd897362909fb2f1a5ede7724",
+      "cipher": "aes-256-gcm",
+      "kdf": "scrypt",
+      "status": "VERIFIED_ENCRYPTED"
+    },
+    {
+      "node": "validator-3",
+      "address": "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+      "pubKeyHex": "b5fc366f668f7d6dfc43a9b2942895ccb9e4eea5d7b1ca46f1e8c710347977ec",
+      "cipher": "aes-256-gcm",
+      "kdf": "scrypt",
+      "status": "VERIFIED_ENCRYPTED"
+    }
+  ],
+  "gen2RotatedValidatorSet": [
+    {
+      "moniker": "validator-0",
+      "address": "sovra1ae36a8254cae76a28ef4aa82a347761e523c50a4",
+      "pubKeyHex": "417442f034e9aa6802a275e283092ba903f7e71be48f53b8638797cd1fb7a9d5",
+      "keystoreFile": "D:\\Sovra\\chain\\rotated_keys\\validator-0.keystore",
+      "votingPower": 25
+    },
+    {
+      "moniker": "validator-1",
+      "address": "sovra18b7424760a12f880d42ee4a49a7ceb185c01c527",
+      "pubKeyHex": "0fa95b0c82ee66f5885778479371be60136d53b228d892adaa422aedaaf890e6",
+      "keystoreFile": "D:\\Sovra\\chain\\rotated_keys\\validator-1.keystore",
+      "votingPower": 25
+    },
+    {
+      "moniker": "validator-2",
+      "address": "sovra158eef3f0ef9805909109e5bba9c505ac90a84f0b",
+      "pubKeyHex": "e18c05f8668bf44ccdc37a3ba9cbd926077db318c91fd103efa90b0576e21b6f",
+      "keystoreFile": "D:\\Sovra\\chain\\rotated_keys\\validator-2.keystore",
+      "votingPower": 25
+    },
+    {
+      "moniker": "validator-3",
+      "address": "sovra14d56d88075ddd8a8e0e0112bdc9bf323284d7a6d",
+      "pubKeyHex": "abbc6c1abdc3e2393016fdfaf6830a4e3d1a5066a3b16f46275dc21bd147f74d",
+      "keystoreFile": "D:\\Sovra\\chain\\rotated_keys\\validator-3.keystore",
+      "votingPower": 25
+    }
+  ],
+  "secretScanFindings": [
+    {
+      "file": "D:\\Sovra\\backups\\phase13_pre_migration_backup\\node0\\validator-0.key.json",
+      "type": "STANDALONE_KEY_JSON",
+      "severity": "MEDIUM"
+    },
+    {
+      "file": "D:\\Sovra\\backups\\phase13_pre_migration_backup\\node1\\validator-1.key.json",
+      "type": "STANDALONE_KEY_JSON",
+      "severity": "MEDIUM"
+    },
+    {
+      "file": "D:\\Sovra\\backups\\phase13_pre_migration_backup\\node2\\validator-2.key.json",
+      "type": "STANDALONE_KEY_JSON",
+      "severity": "MEDIUM"
+    },
+    {
+      "file": "D:\\Sovra\\backups\\phase13_pre_migration_backup\\node3\\validator-3.key.json",
+      "type": "STANDALONE_KEY_JSON",
+      "severity": "MEDIUM"
+    },
+    {
+      "file": "D:\\Sovra\\REPRODUCIBLE_TEST_COMMANDS.md",
+      "type": "PEM_PRIVATE_KEY",
+      "severity": "HIGH"
+    },
+    {
+      "file": "D:\\Sovra\\scripts\\phase14-rotate-validator-keys.ts",
+      "type": "PEM_PRIVATE_KEY",
+      "severity": "HIGH"
+    },
+    {
+      "file": "D:\\Sovra\\scripts\\phase14-rotate-validator-keys.ts",
+      "type": "HARDCODED_FALLBACK_SECRET",
+      "severity": "HIGH"
+    },
+    {
+      "file": "D:\\Sovra\\services\\api\\src\\server.ts",
+      "type": "HARDCODED_FALLBACK_SECRET",
+      "severity": "HIGH"
+    },
+    {
+      "file": "D:\\Sovra\\SOVRA_INDUSTRY_STANDARD_MASTER_GOAL_AND_ACCEPTANCE.md",
+      "type": "HARDCODED_FALLBACK_SECRET",
+      "severity": "HIGH"
+    },
+    {
+      "file": "D:\\Sovra\\SOVRA_PHASE10_DEPLOYMENT_AUDIT.md",
+      "type": "PEM_PRIVATE_KEY",
+      "severity": "HIGH"
+    },
+    {
+      "file": "D:\\Sovra\\SOVRA_PHASE12_AUTHENTICATION_ADVERSARIAL_AUDIT.md",
+      "type": "HARDCODED_FALLBACK_SECRET",
+      "severity": "HIGH"
+    },
+    {
+      "file": "D:\\Sovra\\SOVRA_PHASE12_CRITICAL_SECURITY_AUDIT.md",
+      "type": "HARDCODED_FALLBACK_SECRET",
+      "severity": "HIGH"
+    },
+    {
+      "file": "D:\\Sovra\\SOVRA_PHASE12_FINAL_BLOCKER_REGISTER.md",
+      "type": "HARDCODED_FALLBACK_SECRET",
+      "severity": "HIGH"
+    },
+    {
+      "file": "D:\\Sovra\\SOVRA_PHASE12_FINAL_RELEASE_GATE.md",
+      "type": "HARDCODED_FALLBACK_SECRET",
+      "severity": "HIGH"
+    },
+    {
+      "file": "D:\\Sovra\\SOVRA_PHASE12_INDEPENDENT_FORENSIC_AUDIT.md",
+      "type": "HARDCODED_FALLBACK_SECRET",
+      "severity": "HIGH"
+    },
+    {
+      "file": "D:\\Sovra\\tests\\e2e\\mobile-https-webrtc-gate.test.ts",
+      "type": "PEM_PRIVATE_KEY",
+      "severity": "HIGH"
+    },
+    {
+      "file": "D:\\Sovra\\tests\\security\\phase12-secret-and-auth-hardening.test.ts",
+      "type": "HARDCODED_FALLBACK_SECRET",
+      "severity": "HIGH"
+    }
+  ],
+  "remediationRunbook": {
+    "action": "Git History Secret Remediation & Key Hygiene",
+    "instructions": [
+      "1. Ensure backups/phase13_pre_migration_backup remains preserved in secure cold storage.",
+      "2. For any historical commits containing plaintext testnet keys, use git-filter-repo with expression-filtering.",
+      "3. Replace any historical plaintext keys with dummy placeholders in forensic logs.",
+      "4. Rotate all operational secrets in KMS/Vault prior to any public testnet authorization.",
+      "5. Remote Testnet and Mainnet strictly mandate remote PrivValidator HSM deamons (zero private keys on node disks)."
+    ]
+  }
+}

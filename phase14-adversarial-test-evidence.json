@@ -1,0 +1,174 @@
+{
+  "testnet": "sovra-testnet-0",
+  "timestamp": "2026-11-22T01:30:57.788Z",
+  "totalScenarios": 14,
+  "passed": 14,
+  "failed": 0,
+  "passRate": "100.00%",
+  "allPassed": true,
+  "scenarios": [
+    {
+      "id": 1,
+      "name": "One Byzantine Validator Failure",
+      "category": "Liveness",
+      "status": "PASSED",
+      "description": "Consensus continues uninterrupted when 1 of 4 nodes fails (75% power >= 66.7% quorum).",
+      "details": {
+        "initialHeight": 28941,
+        "finalHeight": 28943,
+        "activePowerPercent": 75,
+        "quorumRequiredPercent": 66.7
+      }
+    },
+    {
+      "id": 2,
+      "name": "Conflicting Proposals (Equivocation Detection)",
+      "category": "Safety",
+      "status": "PASSED",
+      "description": "Conflicting block proposals for the same height/round are detected and rejected by VotePool.",
+      "details": {
+        "height": 99999,
+        "round": 0,
+        "proposalA": "3de2fd23d0bd68c120d6529d1856000a360068bddbdd338ba233105d34a73af3",
+        "proposalB": "be6c89b159badc66e6aea229531223f4a2f04f19707291cdad714712daf5d5eb",
+        "detected": true
+      }
+    },
+    {
+      "id": 3,
+      "name": "Double Signing Rejection",
+      "category": "Safety",
+      "status": "PASSED",
+      "description": "Validator double-signing precommits for distinct blocks at same height is rejected.",
+      "details": {
+        "step": "PRECOMMIT",
+        "height": 100,
+        "rejected": true
+      }
+    },
+    {
+      "id": 4,
+      "name": "Invalid Ed25519 Signature Rejection",
+      "category": "Cryptographic",
+      "status": "PASSED",
+      "description": "Forged or bit-flipped Ed25519 signatures are strictly rejected by VerifyVote / VerifyCommitCertificate.",
+      "details": {
+        "verified": false,
+        "expected": false
+      }
+    },
+    {
+      "id": 5,
+      "name": "Forged Commit Certificate Rejection",
+      "category": "Cryptographic",
+      "status": "PASSED",
+      "description": "Blocks without authentic >2/3 quorum commit certificates cannot be finalized or committed.",
+      "details": {
+        "verifiedCertSignatures": 3,
+        "quorumRequired": 3
+      }
+    },
+    {
+      "id": 6,
+      "name": "Insufficient Voting Power Safety Halt",
+      "category": "Safety",
+      "status": "PASSED",
+      "description": "When voting power drops to 50% (<= 66.7%), consensus safely halts without producing empty or split blocks.",
+      "details": {
+        "startHeight": 28943,
+        "endHeight": 28943,
+        "activePower": 50,
+        "quorumRequired": 67
+      }
+    },
+    {
+      "id": 7,
+      "name": "Network Partition Healing & Quorum Restoration",
+      "category": "Partition",
+      "status": "PASSED",
+      "description": "Partition healing restores active power to 100%, and BFT consensus automatically resumes.",
+      "details": {
+        "previousHaltHeight": 28943,
+        "resumedHeight": 28950
+      }
+    },
+    {
+      "id": 8,
+      "name": "Delayed and Reordered Message Handling",
+      "category": "Liveness",
+      "status": "PASSED",
+      "description": "Asynchronous delayed votes and future round votes are buffered or discarded safely.",
+      "details": {
+        "handledGracefully": true
+      }
+    },
+    {
+      "id": 9,
+      "name": "Validator Restart and Fast-Sync Recovery",
+      "category": "Liveness",
+      "status": "PASSED",
+      "description": "All 4 nodes synchronized in lockstep with matching block height and AppHash after restart.",
+      "details": {
+        "heights": [
+          28950,
+          28950,
+          28950,
+          28950
+        ],
+        "appHash": "ee12b55027689fb05d489924f633d6005d8a8cfdf1ecc38ab8c498d28e5c1568"
+      }
+    },
+    {
+      "id": 10,
+      "name": "Conflicting Commits Rejection",
+      "category": "Safety",
+      "status": "PASSED",
+      "description": "CommitCertificate height/hash must strictly match block data; mismatched commits fail closed.",
+      "details": {
+        "enforced": true
+      }
+    },
+    {
+      "id": 11,
+      "name": "Validator-Set Binding & Unknown Validator Rejection",
+      "category": "Cryptographic",
+      "status": "PASSED",
+      "description": "Signatures from identities not registered in canonical genesis validator set are rejected.",
+      "details": {
+        "unknownAddressRejected": true
+      }
+    },
+    {
+      "id": 12,
+      "name": "Replay Attack Rejection",
+      "category": "Cryptographic",
+      "status": "PASSED",
+      "description": "Canonical vote serialization binds ChainID, Step, Height, Round, and Hash, preventing replay.",
+      "details": {
+        "byteDisparityVerified": true
+      }
+    },
+    {
+      "id": 13,
+      "name": "Malicious Synchronization Response Rejection",
+      "category": "Safety",
+      "status": "PASSED",
+      "description": "Blocks without cryptographically verified commit certificates are rejected during fast-sync.",
+      "details": {
+        "enforcedInApplyBlock": true
+      }
+    },
+    {
+      "id": 14,
+      "name": "Application State Divergence & Financial Invariant",
+      "category": "StateIntegrity",
+      "status": "PASSED",
+      "description": "Total bank supply, minted, burned, and AppHash are identical across all 4 nodes (Delta = 0).",
+      "details": {
+        "totalSupply": "30041807472021",
+        "masterInvariantHolds": true,
+        "nodesInSync": 4
+      }
+    }
+  ]
+}

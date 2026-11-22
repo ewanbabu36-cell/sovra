@@ -8,16 +8,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sovra/chain/consensus"
 	"github.com/sovra/chain/node"
+	"github.com/sovra/chain/privval"
 )
 
 // SwitchCallbacks defines application hooks for state sync and tx relay
 type SwitchCallbacks struct {
-	GetLocalHeight func() int64
-	GetAppHash     func() []byte
-	GetBlocks      func(from, to int64) []BlockData
-	ApplyBlock     func(b BlockData) error
-	OnReceiveTx    func(tx node.SignedTransaction) error
+	GetLocalHeight      func() int64
+	GetAppHash          func() []byte
+	GetBlocks           func(from, to int64) []BlockData
+	ApplyBlock          func(b BlockData) error
+	OnReceiveTx         func(tx node.SignedTransaction) error
+	OnReceiveVote       func(vote privval.Vote) error
+	OnReceiveCommitCert func(cert consensus.CommitCertificate) error
 }
 
 // Switch coordinates CometBFT P2P connections, PEX discovery, and fast-sync
@@ -458,6 +462,24 @@ func (sw *Switch) handleMessage(p *Peer, env Envelope, rawPayload json.RawMessag
 		if sw.callbacks.OnReceiveTx != nil {
 			_ = sw.callbacks.OnReceiveTx(txPayload.Tx)
 		}
+
+	case MsgTypeVote:
+		var vp VotePayload
+		if err := json.Unmarshal(rawPayload, &vp); err != nil {
+			return
+		}
+		if sw.callbacks.OnReceiveVote != nil {
+			_ = sw.callbacks.OnReceiveVote(vp.Vote)
+		}
+
+	case MsgTypeCommitCert:
+		var ccp CommitCertPayload
+		if err := json.Unmarshal(rawPayload, &ccp); err != nil {
+			return
+		}
+		if sw.callbacks.OnReceiveCommitCert != nil {
+			_ = sw.callbacks.OnReceiveCommitCert(ccp.Certificate)
+		}
 	}
 }
 
@@ -508,6 +530,24 @@ func (sw *Switch) BroadcastTx(tx node.SignedTransaction) {
 
 	for _, p := range sw.peers {
 		_ = p.Send(MsgTypeTx, TxPayload{Tx: tx})
+	}
+}
+
+func (sw *Switch) BroadcastVote(vote privval.Vote, chainID string) {
+	sw.mu.RLock()
+	defer sw.mu.RUnlock()
+
+	for _, p := range sw.peers {
+		_ = p.Send(MsgTypeVote, VotePayload{ChainID: chainID, Vote: vote})
+	}
+}
+
+func (sw *Switch) BroadcastCommitCert(cert consensus.CommitCertificate) {
+	sw.mu.RLock()
+	defer sw.mu.RUnlock()
+
+	for _, p := range sw.peers {
+		_ = p.Send(MsgTypeCommitCert, CommitCertPayload{Certificate: cert})
 	}
 }
 

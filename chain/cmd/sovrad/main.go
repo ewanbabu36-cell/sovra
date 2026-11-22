@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/sovra/chain/consensus"
 	"github.com/sovra/chain/node"
 	"github.com/sovra/chain/p2p"
 	"github.com/sovra/chain/privval"
@@ -903,8 +904,27 @@ func startNode(flags NodeFlags) {
 		fmt.Printf("Resumed chain from persistent store at block %d (AppHash: %x)\n", lastHeight, hashPrefix)
 	}
 
+	// Build canonical BFT ValidatorSet from genesis
+	var canonicalValidators []consensus.Validator
+	for _, v := range gen.Validators {
+		canonicalValidators = append(canonicalValidators, consensus.Validator{
+			Name:        v.Name,
+			Address:     v.Address,
+			PubKeyHex:   v.PubKeyHex,
+			VotingPower: v.VotingPower,
+			NodeID:      v.NodeID,
+		})
+	}
+	canonicalValSet, valSetErr := consensus.NewValidatorSet(canonicalValidators)
+	if valSetErr != nil {
+		fmt.Printf("Warning: failed to initialize canonical validator set: %v\n", valSetErr)
+	}
+	consensusEngine := consensus.NewEngine(cfg.ChainID, canonicalValSet, privVal, cfg.Moniker)
+
 	// CometBFT WebSocket Hub
 	hub := newWsHub()
+
+	var p2pSwitch *p2p.Switch
 
 	// Setup CometBFT P2P Switch
 	swCallbacks := p2p.SwitchCallbacks{
@@ -931,6 +951,32 @@ func startNode(flags NodeFlags) {
 			if b.Height <= app.GetHeight() {
 				return nil
 			}
+
+			// If block has no CommitCertificate, treat as unfinalized proposal
+			if b.CommitCert == nil {
+				if consensusEngine.IsValidator() && b.Height == app.GetHeight()+1 {
+					// Sign precommit for the valid proposed block
+					precommit, err := consensusEngine.SignPrecommit(b.Height, 0, b.AppHash)
+					if err == nil && precommit != nil && p2pSwitch != nil {
+						p2pSwitch.BroadcastVote(*precommit, cfg.ChainID)
+					}
+				}
+				// Candidate proposal is NOT committed into canonical state until 2/3+ quorum commit cert is verified
+				return nil
+			}
+
+			// Verify Cryptographic CommitCertificate
+			if err := consensus.VerifyCommitCertificate(b.CommitCert, canonicalValSet, cfg.ChainID); err != nil {
+				fmt.Printf("[CONSENSUS REJECT] Invalid CommitCertificate on H=%d from %s: %v\n", b.Height, b.Proposer, err)
+				return fmt.Errorf("invalid commit certificate: %w", err)
+			}
+
+			if b.CommitCert.Height != b.Height || b.CommitCert.BlockHash != b.AppHash {
+				fmt.Printf("[CONSENSUS REJECT] Height/Hash mismatch on H=%d: block Hash=%s vs cert Hash=%s\n", b.Height, b.AppHash, b.CommitCert.BlockHash)
+				return fmt.Errorf("height/hash mismatch in commit certificate")
+			}
+
+			// Cryptographic quorum certified — commit state transition
 			_ = app.BeginBlock(b.Height, b.Time)
 			for _, tx := range b.Txs {
 				_ = app.DeliverTx(tx)
@@ -938,7 +984,10 @@ func startNode(flags NodeFlags) {
 			newAppHash := app.Commit()
 			bBz, _ := json.Marshal(b)
 			app.SaveBlock(b.Height, bBz)
-			fmt.Printf("[P2P CONSENSUS COMMITTED] H=%04d | Proposer: %s | AppHash: %s | Txs: %d\n", b.Height, b.Proposer, hex.EncodeToString(newAppHash), b.TxCount)
+			fmt.Printf("[P2P CONSENSUS COMMITTED] H=%04d | Proposer: %s | AppHash: %s | Txs: %d | CertPower: %d/%d (%.1f%%)\n",
+				b.Height, b.Proposer, hex.EncodeToString(newAppHash), b.TxCount,
+				b.CommitCert.TotalVotingPower(), canonicalValSet.TotalPower,
+				float64(b.CommitCert.TotalVotingPower())/float64(canonicalValSet.TotalPower)*100)
 
 			// Broadcast CometBFT NewBlock event to WebSocket subscribers
 			blockEvent := map[string]interface{}{
@@ -960,6 +1009,7 @@ func startNode(flags NodeFlags) {
 								"data": map[string]interface{}{
 									"txs": []string{},
 								},
+								"last_commit": b.CommitCert,
 							},
 						},
 					},
@@ -974,9 +1024,19 @@ func startNode(flags NodeFlags) {
 			}
 			return app.DeliverTx(tx)
 		},
+		OnReceiveVote: func(vote privval.Vote) error {
+			_, err := consensusEngine.ProcessIncomingVote(&vote)
+			return err
+		},
+		OnReceiveCommitCert: func(cert consensus.CommitCertificate) error {
+			if err := consensus.VerifyCommitCertificate(&cert, canonicalValSet, cfg.ChainID); err != nil {
+				return err
+			}
+			return nil
+		},
 	}
 
-	p2pSwitch := p2p.NewSwitch(cfg.P2P, nodeID, cfg.Moniker, cfg.ChainID, cfg.P2PPort, swCallbacks)
+	p2pSwitch = p2p.NewSwitch(cfg.P2P, nodeID, cfg.Moniker, cfg.ChainID, cfg.P2PPort, swCallbacks)
 	if err := p2pSwitch.Start(); err != nil {
 		fmt.Printf("Warning: P2P Switch failed to start: %v\n", err)
 	} else {
@@ -1090,43 +1150,64 @@ func startNode(flags NodeFlags) {
 					now := time.Now().Unix()
 					_ = app.BeginBlock(nextHeight, now)
 					newAppHash := app.Commit()
-					lastSeenHeight = nextHeight
-					lastHeightTime = time.Now()
-					currentRound = 0
+					candidateHash := hex.EncodeToString(newAppHash)
 
 					blockData := p2p.BlockData{
 						Height:   nextHeight,
 						Time:     now,
-						AppHash:  hex.EncodeToString(newAppHash),
+						AppHash:  candidateHash,
 						Proposer: cfg.Moniker,
 						TxCount:  0,
 						Txs:      []node.SignedTransaction{},
 					}
 
-					// Sign proposal block via PrivValidator interface (remote HSM or memory enclave)
+					// 1. Sign Proposal
 					if privVal != nil {
-						prop := &privval.Proposal{
-							Height:          nextHeight,
-							Round:           currentRound,
-							BlockHash:       hex.EncodeToString(newAppHash),
-							ProposerAddress: nodeAddr,
-						}
-						sig, err := privVal.SignProposal(cfg.ChainID, prop)
-						if err != nil {
-							fmt.Printf("[VALIDATOR SIGNER] High-water mark error: %v\n", err)
-						} else {
-							_ = sig
-						}
+						_, _ = consensusEngine.SignProposal(nextHeight, currentRound, candidateHash)
 					}
 
+					// 2. Sign Precommit for self
+					myPrecommit, _ := consensusEngine.SignPrecommit(nextHeight, currentRound, candidateHash)
+
+					// 3. Broadcast Candidate Block and Proposer Precommit
+					p2pSwitch.BroadcastNewBlock(blockData)
+					if myPrecommit != nil {
+						p2pSwitch.BroadcastVote(*myPrecommit, cfg.ChainID)
+					}
+
+					// 4. Wait for 2/3+ Precommit Quorum (or build immediately if single validator)
+					var cert *consensus.CommitCertificate
+					if len(gen.Validators) > 1 {
+						var err error
+						cert, err = consensusEngine.WaitForPrecommitQuorum(nextHeight, currentRound, candidateHash, 2*time.Second)
+						if err != nil || cert == nil {
+							fmt.Printf("[CONSENSUS QUORUM TIMEOUT] H=%d R=%d failed to collect 2/3+ precommits: %v\n", nextHeight, currentRound, err)
+							continue
+						}
+					} else {
+						cert, _ = consensusEngine.BuildCommitCertificate(nextHeight, currentRound, candidateHash)
+					}
+
+					// 5. Attach Commit Certificate and finalize
+					blockData.CommitCert = cert
 					bBz, _ := json.Marshal(blockData)
 					app.SaveBlock(nextHeight, bBz)
 
-					// Gossip over P2P network
-					p2pSwitch.BroadcastNewBlock(blockData)
+					lastSeenHeight = nextHeight
+					lastHeightTime = time.Now()
+					currentRound = 0
 
-					fmt.Printf("[BLOCK %04d PROPOSED] Proposer: %s | Time: %d | AppHash: %x | Supply: %s uSOV\n",
-						nextHeight, cfg.Moniker, now, newAppHash[:8], app.QueryTotalSupply().String())
+					// Broadcast Finalized Block & Certificate to network
+					p2pSwitch.BroadcastNewBlock(blockData)
+					if cert != nil {
+						p2pSwitch.BroadcastCommitCert(*cert)
+					}
+
+					fmt.Printf("[BLOCK %04d FINALIZED] Proposer: %s | Time: %d | AppHash: %x | CommitPower: %d/%d (%.1f%%) | Supply: %s uSOV\n",
+						nextHeight, cfg.Moniker, now, newAppHash[:8],
+						cert.TotalVotingPower(), canonicalValSet.TotalPower,
+						float64(cert.TotalVotingPower())/float64(canonicalValSet.TotalPower)*100,
+						app.QueryTotalSupply().String())
 
 					// Broadcast CometBFT NewBlock event to WebSocket subscribers
 					blockEvent := map[string]interface{}{
@@ -1142,12 +1223,13 @@ func startNode(flags NodeFlags) {
 											"chain_id":         cfg.ChainID,
 											"height":           strconv.FormatInt(nextHeight, 10),
 											"time":             time.Unix(now, 0).UTC().Format(time.RFC3339Nano),
-											"app_hash":         hex.EncodeToString(newAppHash),
+											"app_hash":         candidateHash,
 											"proposer_address": cfg.Moniker,
 										},
 										"data": map[string]interface{}{
 											"txs": []string{},
 										},
+										"last_commit": cert,
 									},
 								},
 							},
@@ -1250,7 +1332,54 @@ func startNode(flags NodeFlags) {
 					"data": map[string]interface{}{
 						"txs": bData.Txs,
 					},
+					"last_commit": bData.CommitCert,
 				},
+			},
+		})
+	})
+
+	mux.HandleFunc("/commit", func(w http.ResponseWriter, r *http.Request) {
+		hStr := r.URL.Query().Get("height")
+		targetHeight := app.GetHeight()
+		if hStr != "" {
+			if h, err := strconv.ParseInt(hStr, 10, 64); err == nil && h > 0 {
+				targetHeight = h
+			}
+		}
+		bBz := app.GetBlock(targetHeight)
+		var bData p2p.BlockData
+		if len(bBz) > 0 {
+			_ = json.Unmarshal(bBz, &bData)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"jsonrpc": "2.0",
+			"id":      -1,
+			"result": map[string]interface{}{
+				"signed_header": map[string]interface{}{
+					"header": map[string]interface{}{
+						"chain_id": cfg.ChainID,
+						"height":   strconv.FormatInt(targetHeight, 10),
+						"app_hash": bData.AppHash,
+					},
+					"commit": bData.CommitCert,
+				},
+				"canonical": bData.CommitCert != nil,
+			},
+		})
+	})
+
+	mux.HandleFunc("/consensus_state", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"jsonrpc": "2.0",
+			"id":      -1,
+			"result": map[string]interface{}{
+				"height":             app.GetHeight(),
+				"validators":         canonicalValSet.Validators,
+				"total_voting_power": canonicalValSet.TotalPower,
+				"quorum_power":       canonicalValSet.QuorumPower,
+				"is_validator":       consensusEngine.IsValidator(),
 			},
 		})
 	})
