@@ -51,12 +51,13 @@ type Validator struct {
 
 // ValidatorSet represents the canonical active validator set with quorum calculation
 type ValidatorSet struct {
-	Validators   []Validator
-	TotalPower   int64
-	QuorumPower  int64 // Strictly > 2/3 of TotalPower: floor(2*TotalPower / 3) + 1
-	byAddress    map[string]*Validator
-	byPubKeyHex  map[string]*Validator
-	byIndex      map[int32]*Validator
+	Validators        []Validator
+	TotalPower        int64
+	QuorumPower       int64 // Strictly > 2/3 of TotalPower: floor(2*TotalPower / 3) + 1
+	byAddress         map[string]*Validator
+	byPubKeyHex       map[string]*Validator
+	byIndex           map[int32]*Validator
+	revokedValidators map[string]int64 // address -> revokedAtHeight
 }
 
 // NewValidatorSet constructs an authenticated validator set
@@ -66,10 +67,11 @@ func NewValidatorSet(vals []Validator) (*ValidatorSet, error) {
 	}
 
 	vs := &ValidatorSet{
-		Validators:  make([]Validator, len(vals)),
-		byAddress:   make(map[string]*Validator),
-		byPubKeyHex: make(map[string]*Validator),
-		byIndex:     make(map[int32]*Validator),
+		Validators:        make([]Validator, len(vals)),
+		byAddress:         make(map[string]*Validator),
+		byPubKeyHex:       make(map[string]*Validator),
+		byIndex:           make(map[int32]*Validator),
+		revokedValidators: make(map[string]int64),
 	}
 
 	var totalPower int64
@@ -110,6 +112,138 @@ func (vs *ValidatorSet) GetByIndex(idx int32) *Validator {
 
 func (vs *ValidatorSet) GetByPubKeyHex(pubHex string) *Validator {
 	return vs.byPubKeyHex[pubHex]
+}
+
+// RevokeValidator records permanent revocation of a validator identity at or above a given block height
+func (vs *ValidatorSet) RevokeValidator(addr string, revokedAtHeight int64) {
+	if vs.revokedValidators == nil {
+		vs.revokedValidators = make(map[string]int64)
+	}
+	vs.revokedValidators[addr] = revokedAtHeight
+}
+
+// IsRevokedAtHeight checks whether an address has been revoked at or before the queried height
+func (vs *ValidatorSet) IsRevokedAtHeight(addr string, height int64) bool {
+	if vs.revokedValidators == nil {
+		return false
+	}
+	revH, exists := vs.revokedValidators[addr]
+	if !exists {
+		return false
+	}
+	return height >= revH
+}
+
+// GetRevokedValidators returns a copy of all revoked addresses and their revocation heights
+func (vs *ValidatorSet) GetRevokedValidators() map[string]int64 {
+	res := make(map[string]int64)
+	if vs.revokedValidators != nil {
+		for k, v := range vs.revokedValidators {
+			res[k] = v
+		}
+	}
+	return res
+}
+
+// ValidatorTransition records a formal on-chain validator set transition
+type ValidatorTransition struct {
+	TransitionHeight   int64        `json:"transition_height"`
+	PreviousValidators []Validator  `json:"previous_validators"`
+	NewValidators      []Validator  `json:"new_validators"`
+	RevokedAddresses   []string     `json:"revoked_addresses"`
+	Reason             string       `json:"reason"`
+	Timestamp          int64        `json:"timestamp"`
+}
+
+// ValidatorSchedule coordinates height-indexed validator sets across transitions and maintains revocation history
+type ValidatorSchedule struct {
+	mu              sync.RWMutex
+	chainID         string
+	genesisValSet   *ValidatorSet
+	transitions     []ValidatorTransition
+	activeValSet    *ValidatorSet
+	revokedAtHeight map[string]int64
+}
+
+// NewValidatorSchedule initializes a validator schedule with the genesis set
+func NewValidatorSchedule(chainID string, genesisValSet *ValidatorSet) *ValidatorSchedule {
+	return &ValidatorSchedule{
+		chainID:         chainID,
+		genesisValSet:   genesisValSet,
+		transitions:     make([]ValidatorTransition, 0),
+		activeValSet:    genesisValSet,
+		revokedAtHeight: make(map[string]int64),
+	}
+}
+
+// AddTransition applies a verified validator set transition to the schedule
+func (s *ValidatorSchedule) AddTransition(t ValidatorTransition) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	newValSet, err := NewValidatorSet(t.NewValidators)
+	if err != nil {
+		return fmt.Errorf("invalid transition validator set: %w", err)
+	}
+
+	// Carry over existing revocations
+	for addr, h := range s.revokedAtHeight {
+		newValSet.RevokeValidator(addr, h)
+	}
+
+	// Apply new revocations
+	for _, addr := range t.RevokedAddresses {
+		s.revokedAtHeight[addr] = t.TransitionHeight
+		newValSet.RevokeValidator(addr, t.TransitionHeight)
+	}
+
+	s.transitions = append(s.transitions, t)
+	s.activeValSet = newValSet
+	return nil
+}
+
+// GetValidatorSetForHeight resolves the active validator set for a given block height
+func (s *ValidatorSchedule) GetValidatorSetForHeight(height int64) (*ValidatorSet, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if len(s.transitions) == 0 {
+		return s.genesisValSet, nil
+	}
+
+	var current *ValidatorSet = s.genesisValSet
+	for _, t := range s.transitions {
+		if height >= t.TransitionHeight {
+			valSet, err := NewValidatorSet(t.NewValidators)
+			if err != nil {
+				return nil, err
+			}
+			for addr, revH := range s.revokedAtHeight {
+				valSet.RevokeValidator(addr, revH)
+			}
+			current = valSet
+		}
+	}
+	return current, nil
+}
+
+// IsRevokedAtHeight checks revocation across the schedule
+func (s *ValidatorSchedule) IsRevokedAtHeight(addr string, height int64) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if revH, exists := s.revokedAtHeight[addr]; exists {
+		return height >= revH
+	}
+	return false
+}
+
+// GetTransitions returns a copy of all transitions
+func (s *ValidatorSchedule) GetTransitions() []ValidatorTransition {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	res := make([]ValidatorTransition, len(s.transitions))
+	copy(res, s.transitions)
+	return res
 }
 
 // EquivocationEvidence records proof of double-signing
@@ -157,6 +291,10 @@ func (vp *VotePool) AddVote(vote *privval.Vote) (bool, error) {
 	val := vp.valSet.GetByAddress(vote.ValidatorAddress)
 	if val == nil {
 		return false, fmt.Errorf("vote from unknown validator: %s", vote.ValidatorAddress)
+	}
+
+	if vp.valSet.IsRevokedAtHeight(vote.ValidatorAddress, vote.Height) {
+		return false, fmt.Errorf("vote from revoked validator %s at height %d: %w", vote.ValidatorAddress, vote.Height, ErrRevokedValidator)
 	}
 
 	sigBytes, err := hex.DecodeString(vote.SignatureHex)
@@ -260,4 +398,11 @@ func (vp *VotePool) MakeCommitCertificate(height, round int64, blockHash string)
 		BlockHash:  blockHash,
 		Signatures: sigs,
 	}, nil
+}
+
+// UpdateValidatorSet updates the active validator set referenced by the vote pool
+func (vp *VotePool) UpdateValidatorSet(newValSet *ValidatorSet) {
+	vp.mu.Lock()
+	defer vp.mu.Unlock()
+	vp.valSet = newValSet
 }

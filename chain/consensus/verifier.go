@@ -19,6 +19,7 @@ var (
 	ErrInvalidSignature       = errors.New("cryptographic signature verification failed")
 	ErrInsufficientQuorum     = errors.New("commit certificate voting power strictly less than 2/3+ quorum")
 	ErrValidatorSetMismatch   = errors.New("commit certificate voting power attribution does not match canonical validator set")
+	ErrRevokedValidator       = errors.New("validator identity has been permanently revoked by protocol security transition")
 )
 
 // VerifyCommitCertificate validates the cryptographic commit certificate against the validator set
@@ -56,6 +57,11 @@ func VerifyCommitCertificate(cert *CommitCertificate, valSet *ValidatorSet, chai
 		val := valSet.GetByAddress(sig.ValidatorAddress)
 		if val == nil {
 			return fmt.Errorf("%w: %s", ErrUnknownValidator, sig.ValidatorAddress)
+		}
+
+		// Reject permanently revoked validators at or above revocation height
+		if valSet.IsRevokedAtHeight(sig.ValidatorAddress, cert.Height) {
+			return fmt.Errorf("%w: validator %s was revoked at or before height %d", ErrRevokedValidator, sig.ValidatorAddress, cert.Height)
 		}
 
 		// Ensure voting power matches canonical set
@@ -120,4 +126,19 @@ func VerifyProposal(prop *privval.Proposal, valSet *ValidatorSet, chainID string
 	}
 
 	return nil
+}
+
+// VerifyCommitCertificateWithSchedule validates the commit certificate using the height-indexed validator schedule
+func VerifyCommitCertificateWithSchedule(cert *CommitCertificate, schedule *ValidatorSchedule, chainID string) error {
+	if cert == nil {
+		return ErrNilCertificate
+	}
+	if schedule == nil {
+		return errors.New("validator schedule is nil")
+	}
+	valSet, err := schedule.GetValidatorSetForHeight(cert.Height)
+	if err != nil {
+		return fmt.Errorf("failed to get validator set for height %d: %w", cert.Height, err)
+	}
+	return VerifyCommitCertificate(cert, valSet, chainID)
 }
