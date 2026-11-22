@@ -1,0 +1,502 @@
+{
+  "timestamp": "2026-11-22T15:16:42.439Z",
+  "network": "sovra-recovery-1",
+  "start_height": 205,
+  "end_height": 265,
+  "blocks_audited_count": 50,
+  "consecutive_blocks_sample": [
+    {
+      "height": 206,
+      "proposer": "validator-1",
+      "app_hash": "b365380e9a42ef6fd0baa6844709ae132e3f3bdf05ae5ee17f170ec0b19c20a9",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:46Z"
+    },
+    {
+      "height": 207,
+      "proposer": "validator-2",
+      "app_hash": "6de8ba4d39e36e71cb3afe41fb6137ef90788aebc5119cdbe09b5a151f4de195",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:47Z"
+    },
+    {
+      "height": 208,
+      "proposer": "validator-3",
+      "app_hash": "e7a9cbc3168940030eb3cd1dd28f86adba59a0a5641ef232aa94a6e9522fd305",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:48Z"
+    },
+    {
+      "height": 209,
+      "proposer": "validator-0",
+      "app_hash": "87ff20647011b3f63d474b6d997ca83950f2e7b8b5951dfef5b3044b6697f471",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:48Z"
+    },
+    {
+      "height": 210,
+      "proposer": "validator-1",
+      "app_hash": "024717fd10d1f7e52ebf31800f214ecb023767c7f4f6257da616c8e20793739a",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:49Z"
+    },
+    {
+      "height": 211,
+      "proposer": "validator-2",
+      "app_hash": "492018d4d87f2ff1ef8bc6d072738fecf03fa7083482b8323f439b110c528f30",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:50Z"
+    },
+    {
+      "height": 212,
+      "proposer": "validator-3",
+      "app_hash": "8ed329d672fa51c70bd04b20394377f5bcab61142ac5621592188f058485d5fd",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:51Z"
+    },
+    {
+      "height": 213,
+      "proposer": "validator-0",
+      "app_hash": "59606380e7f2ef5f52086087abaf8712133f75be80893151659a69f4cece7672",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:51Z"
+    },
+    {
+      "height": 214,
+      "proposer": "validator-1",
+      "app_hash": "9641203696b0bc3c471651bd0ffd088cfe2a7448d45132cdd3ed39342a5b20bf",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:52Z"
+    },
+    {
+      "height": 215,
+      "proposer": "validator-2",
+      "app_hash": "48c2363e7b4ce295215e12a25b14e0a0afb4dbd93815617afd2e13e1e7d4e9fe",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:53Z"
+    },
+    {
+      "height": 216,
+      "proposer": "validator-3",
+      "app_hash": "789f3a1da756b5cbd9cb5e604aaee7fc9b47257f240908e07d9165ed57c0af89",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:54Z"
+    },
+    {
+      "height": 217,
+      "proposer": "validator-0",
+      "app_hash": "831ba13e106ae033176cc72148d3024e1ad30edfe83c80e3787037c7c04d19b8",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:54Z"
+    },
+    {
+      "height": 218,
+      "proposer": "validator-1",
+      "app_hash": "bd214ce2c2fa9499e0662d8b0cf33f506228068bb47c50a58f1bfc81c4ea6c45",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:55Z"
+    },
+    {
+      "height": 219,
+      "proposer": "validator-2",
+      "app_hash": "c16562053b7bb31e311cc21cb0dae872ee39604491e8438c351eb586342f96c2",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:56Z"
+    },
+    {
+      "height": 220,
+      "proposer": "validator-3",
+      "app_hash": "43899a8d8d9194e7e5d1fd2ef3bb0a3ebfe81a0b973f45d342b41accab72dc41",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:57Z"
+    },
+    {
+      "height": 221,
+      "proposer": "validator-0",
+      "app_hash": "518b97c671e3bf2e389d6c3fe131e2227ce87349e4afec8cba5e07de32515e1b",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:57Z"
+    },
+    {
+      "height": 222,
+      "proposer": "validator-1",
+      "app_hash": "e2a4a032774c5b781d6e2e1560cb4127f2882ff90783fbb36ea6a3a25273ac09",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:58Z"
+    },
+    {
+      "height": 223,
+      "proposer": "validator-2",
+      "app_hash": "0ab595072b07d83442acc0c49c66011615df9aba13d7f88c5cfa7debaa8c584c",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:15:59Z"
+    },
+    {
+      "height": 224,
+      "proposer": "validator-3",
+      "app_hash": "7e08dc80ad188c3c3c8be10dd43d76a58a121592400c0aed9efd877855fd53e9",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:00Z"
+    },
+    {
+      "height": 225,
+      "proposer": "validator-0",
+      "app_hash": "50512e1a4cc26955e7a5e148fdf09698ea4f15a58f843e190d99290cc7ef3e9f",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:00Z"
+    },
+    {
+      "height": 226,
+      "proposer": "validator-1",
+      "app_hash": "03df022c6c98376f29c920f10adbbda316f10d6631bf052abea31a06e0865a2b",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:01Z"
+    },
+    {
+      "height": 227,
+      "proposer": "validator-2",
+      "app_hash": "002182febf86ce93d80574155ddbe3afa91cc824a1cc5fccbc2613879f769fbd",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:02Z"
+    },
+    {
+      "height": 228,
+      "proposer": "validator-3",
+      "app_hash": "b45ff52d8c7b492706b7fe498fdd2e1ecc10b3761ba9f7572ab7ac0f8c4c0b83",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:03Z"
+    },
+    {
+      "height": 229,
+      "proposer": "validator-0",
+      "app_hash": "d1637583deda695a44fdcff29f50bd1bf7bff3277cbed9f6f4ebe1501124af6a",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:03Z"
+    },
+    {
+      "height": 230,
+      "proposer": "validator-1",
+      "app_hash": "a6dec2b8a0010c25d16dc764c89de423dc2d8f7a8cc58a96a27a7fc546ba5cef",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:04Z"
+    },
+    {
+      "height": 231,
+      "proposer": "validator-2",
+      "app_hash": "ea5a0c1b49c9ec370c9e0c7591b264d61f6f86e205dbf855aa2f9dc0293e169b",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:05Z"
+    },
+    {
+      "height": 232,
+      "proposer": "validator-3",
+      "app_hash": "734bc9d8de3609de97889cd7855cd128efc06b9f190c926441f916212f5d89c8",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:06Z"
+    },
+    {
+      "height": 233,
+      "proposer": "validator-0",
+      "app_hash": "c84e7558ca46e8d1d590dc734ab52424ccd6dfed569e8524b39b70b3ff32fa9b",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:06Z"
+    },
+    {
+      "height": 234,
+      "proposer": "validator-1",
+      "app_hash": "cb8dd665dc3f0c7174537c252bcac27162f5412645ad47f9ad5f2c0dcc459f68",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:07Z"
+    },
+    {
+      "height": 235,
+      "proposer": "validator-2",
+      "app_hash": "92adb9c9c63d593dade9c471107150a333cd89d09cbf368178d91f68e01d38e3",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:08Z"
+    },
+    {
+      "height": 236,
+      "proposer": "validator-3",
+      "app_hash": "bff25c243d83e78ada1bbe3470004232e551b35fa875c7ad5f15e06f4ee6a0ba",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:09Z"
+    },
+    {
+      "height": 237,
+      "proposer": "validator-0",
+      "app_hash": "0a1b00ccb10b20389af8920c32d81ec64b299702585865580773ff825eb84504",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:09Z"
+    },
+    {
+      "height": 238,
+      "proposer": "validator-1",
+      "app_hash": "9d052cc6c075b3cb9cf6e44f0ce9ed37b3e754b7a4e18be3ec0045759c4af297",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:10Z"
+    },
+    {
+      "height": 239,
+      "proposer": "validator-2",
+      "app_hash": "6c10a54c08078b9a9d034f6be3137e63b2d92ab4303e4171099c07b199719ba1",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:11Z"
+    },
+    {
+      "height": 240,
+      "proposer": "validator-3",
+      "app_hash": "cb4c36ee75a7df414a97f44e124cc086f979e0801973ff057167b8cb4c8d09b6",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:12Z"
+    },
+    {
+      "height": 241,
+      "proposer": "validator-0",
+      "app_hash": "3cf609015b0f9acd48481faae8f24a908535bbad821519cbad8e592de6ac94cb",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:12Z"
+    },
+    {
+      "height": 242,
+      "proposer": "validator-1",
+      "app_hash": "b573c0e2fbad2a7deaf3ea5c901096eb7ef2246fb8c3100480eea90c1c8030a7",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:13Z"
+    },
+    {
+      "height": 243,
+      "proposer": "validator-2",
+      "app_hash": "f7ef768b15dca7e771cadbd143ea8168eae4ad59ab25a4c34d1c945f700783a8",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:14Z"
+    },
+    {
+      "height": 244,
+      "proposer": "validator-3",
+      "app_hash": "610c7563109ca1c12bc75952092cef5cd9248b9074edb7e2145d0e623b861357",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:15Z"
+    },
+    {
+      "height": 245,
+      "proposer": "validator-0",
+      "app_hash": "32dfde26d22cf07a20e5511d721f8accc466ac23c250edc656267d0b4ab2e5a0",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:15Z"
+    },
+    {
+      "height": 246,
+      "proposer": "validator-1",
+      "app_hash": "74de893c0900d734d4284f18338d87aae4fcd14fe4864c9d2ea316a08440e897",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:16Z"
+    },
+    {
+      "height": 247,
+      "proposer": "validator-2",
+      "app_hash": "7d7d87f6f64831bd522dec48cd4dc95e388c3a8add2aef228377ee653d37ba21",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:17Z"
+    },
+    {
+      "height": 248,
+      "proposer": "validator-3",
+      "app_hash": "9aa5fada5e413d50cf0ba06e93de151529ff1b932d3d7f357e832fed878ad01d",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:18Z"
+    },
+    {
+      "height": 249,
+      "proposer": "validator-0",
+      "app_hash": "de79de06e61de91624771e718b942e5c196f165feb80a2df2e23acc5e8333730",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:18Z"
+    },
+    {
+      "height": 250,
+      "proposer": "validator-1",
+      "app_hash": "24891918c1172ce8a67af53054b37f134eeeb5a220328e9be97e41322aa5fb84",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:19Z"
+    },
+    {
+      "height": 251,
+      "proposer": "validator-2",
+      "app_hash": "d4959b8769f81a2f4c4ba7abe13434705f9f692170abeadfbe0332c46a66c067",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:20Z"
+    },
+    {
+      "height": 252,
+      "proposer": "validator-3",
+      "app_hash": "7e1d61564c1bac45f1c9ff24004b72d791b82d9cbdfa33c5533b774a06e3232e",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:21Z"
+    },
+    {
+      "height": 253,
+      "proposer": "validator-0",
+      "app_hash": "5b94758431bfd693fb788653adf24e3933b080f305b7b2957e10ce6dc1208089",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:21Z"
+    },
+    {
+      "height": 254,
+      "proposer": "validator-1",
+      "app_hash": "f53ae3998a9cb9c198ddd6d41762252c8e282b31ea8b161e071715a8ab8524b2",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:22Z"
+    },
+    {
+      "height": 255,
+      "proposer": "validator-2",
+      "app_hash": "5e55bc58cd4577d76bd3c7db295307aad740bd3ad3b0b6274ff2d31bffe607b0",
+      "signatures_count": 4,
+      "accumulated_power": 100,
+      "quorum_met": true,
+      "timestamp": "2026-11-22T15:16:23Z"
+    }
+  ],
+  "three_of_four_fault_tolerance": {
+    "tested": true,
+    "blocks_produced_offline": 6,
+    "offline_commit_power": 75,
+    "node3_restarted": true,
+    "node3_caught_up": true,
+    "node3_final_height": 268
+  },
+  "cluster_financial_state": [
+    {
+      "port": 26757,
+      "moniker": "validator-0",
+      "height": 268,
+      "app_hash": "101c73171e62e3f84a8ef0529b2b41f8ab0ce99487ea6a7ceea23fce004ce9a9",
+      "total_supply": "30013935824007",
+      "supply_correct": true
+    },
+    {
+      "port": 26767,
+      "moniker": "validator-1",
+      "height": 268,
+      "app_hash": "101c73171e62e3f84a8ef0529b2b41f8ab0ce99487ea6a7ceea23fce004ce9a9",
+      "total_supply": "30013935824007",
+      "supply_correct": true
+    },
+    {
+      "port": 26777,
+      "moniker": "validator-2",
+      "height": 268,
+      "app_hash": "101c73171e62e3f84a8ef0529b2b41f8ab0ce99487ea6a7ceea23fce004ce9a9",
+      "total_supply": "30013935824007",
+      "supply_correct": true
+    },
+    {
+      "port": 26787,
+      "moniker": "validator-3",
+      "height": 268,
+      "app_hash": "101c73171e62e3f84a8ef0529b2b41f8ab0ce99487ea6a7ceea23fce004ce9a9",
+      "total_supply": "30013935824007",
+      "supply_correct": true
+    }
+  ],
+  "financial_invariants_valid": true
+}

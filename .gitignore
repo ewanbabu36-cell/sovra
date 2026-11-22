@@ -90,6 +90,7 @@ chain/mytestnet/signer*
 chain/*-node/**/data/
 chain/*-node/**/exported-genesis.json
 chain/*-node/**/priv_validator_state.json
+chain/recovery-testnet/
 *.sst
 test_tmp_*
 scratch/

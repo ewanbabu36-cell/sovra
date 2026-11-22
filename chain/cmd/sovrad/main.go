@@ -960,6 +960,46 @@ func startNode(flags NodeFlags) {
 		}
 	}
 
+	// Load deterministic offline transition configuration if present
+	staticTransFile := filepath.Join(homeDir, "transition.json")
+	if stBz, err := os.ReadFile(staticTransFile); err == nil {
+		var sTrans struct {
+			TransitionHeight int64                   `json:"transition_height"`
+			NewValidators    []node.GenesisValidator `json:"new_validators"`
+			RevokedAddresses []string                `json:"revoked_addresses"`
+			Reason           string                  `json:"reason"`
+		}
+		if err := json.Unmarshal(stBz, &sTrans); err == nil && sTrans.TransitionHeight > 0 {
+			var prevVals []consensus.Validator
+			currSet, _ := valSchedule.GetValidatorSetForHeight(sTrans.TransitionHeight - 1)
+			if currSet != nil {
+				prevVals = currSet.Validators
+			}
+			var newVals []consensus.Validator
+			for _, nv := range sTrans.NewValidators {
+				newVals = append(newVals, consensus.Validator{
+					Name:        nv.Name,
+					Address:     nv.Address,
+					PubKeyHex:   nv.PubKeyHex,
+					VotingPower: nv.VotingPower,
+					NodeID:      nv.NodeID,
+				})
+			}
+			cTrans := consensus.ValidatorTransition{
+				TransitionHeight:   sTrans.TransitionHeight,
+				PreviousValidators: prevVals,
+				NewValidators:      newVals,
+				RevokedAddresses:   sTrans.RevokedAddresses,
+				Reason:             sTrans.Reason,
+				Timestamp:          time.Now().Unix(),
+			}
+			if err := valSchedule.AddTransition(cTrans); err == nil {
+				fmt.Printf("[CONSENSUS SCHEDULE] Loaded static transition from %s at H=%d (revoked: %v)\n",
+					staticTransFile, sTrans.TransitionHeight, sTrans.RevokedAddresses)
+			}
+		}
+	}
+
 	consensusEngine := consensus.NewEngine(cfg.ChainID, canonicalValSet, privVal, cfg.Moniker)
 	consensusEngine.SetValidatorSchedule(valSchedule)
 
@@ -997,8 +1037,8 @@ func startNode(flags NodeFlags) {
 			// If block has no CommitCertificate, treat as unfinalized proposal
 			if b.CommitCert == nil {
 				if consensusEngine.IsValidatorAtHeight(b.Height) && b.Height == app.GetHeight()+1 {
-					// Sign precommit for the valid proposed block
-					precommit, err := consensusEngine.SignPrecommit(b.Height, 0, b.AppHash)
+					// Sign precommit for the valid proposed block at current round
+					precommit, err := consensusEngine.SignPrecommit(b.Height, b.Round, b.AppHash)
 					if err == nil && precommit != nil && p2pSwitch != nil {
 						p2pSwitch.BroadcastVote(*precommit, cfg.ChainID)
 					}
@@ -1223,12 +1263,12 @@ func startNode(flags NodeFlags) {
 
 				if isMyTurnToPropose(nextHeight, currentRound) {
 					now := time.Now().Unix()
-					_ = app.BeginBlock(nextHeight, now)
-					newAppHash := app.Commit()
-					candidateHash := hex.EncodeToString(newAppHash)
+					candidateAppHash := app.ComputeCandidateAppHash(nextHeight)
+					candidateHash := hex.EncodeToString(candidateAppHash)
 
 					blockData := p2p.BlockData{
 						Height:   nextHeight,
+						Round:    currentRound,
 						Time:     now,
 						AppHash:  candidateHash,
 						Proposer: cfg.Moniker,
@@ -1263,7 +1303,9 @@ func startNode(flags NodeFlags) {
 						cert, _ = consensusEngine.BuildCommitCertificate(nextHeight, currentRound, candidateHash)
 					}
 
-					// 5. Attach Commit Certificate and finalize
+					// 5. Commit state atomically ONLY AFTER quorum certificate is verified
+					_ = app.BeginBlock(nextHeight, now)
+					newAppHash := app.Commit()
 					blockData.CommitCert = cert
 					bBz, _ := json.Marshal(blockData)
 					app.SaveBlock(nextHeight, bBz)
@@ -1496,25 +1538,95 @@ func startNode(flags NodeFlags) {
 	mux.HandleFunc("/consensus/transition", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			http.Error(w, `{"error":"Method not allowed"}`, http.StatusMethodNotAllowed)
 			return
 		}
+
+		type QuorumSigItem struct {
+			ValidatorAddress string `json:"validator_address"`
+			SignatureHex     string `json:"signature_hex"`
+		}
+
 		var req struct {
 			TransitionHeight int64                   `json:"transition_height"`
 			NewValidators    []node.GenesisValidator `json:"new_validators"`
 			RevokedAddresses []string                `json:"revoked_addresses"`
 			Reason           string                  `json:"reason"`
-			QuorumSignatures []string                `json:"quorum_signatures"`
+			QuorumSignatures []QuorumSigItem         `json:"quorum_signatures"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid payload: %v", err), http.StatusBadRequest)
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"error": fmt.Sprintf("invalid payload: %v", err),
+			})
 			return
 		}
+
 		var prevVals []consensus.Validator
 		currSet, _ := valSchedule.GetValidatorSetForHeight(req.TransitionHeight - 1)
 		if currSet != nil {
 			prevVals = currSet.Validators
 		}
+
+		// Security Authorization Gate:
+		// 1. Check for Emergency Recovery Auth Token
+		recoveryToken := os.Getenv("SOVRA_RECOVERY_AUTH_TOKEN")
+		authHeader := r.Header.Get("Authorization")
+		customHeader := r.Header.Get("X-Sovra-Transition-Auth")
+		isTokenAuthorized := false
+		if recoveryToken != "" {
+			if authHeader == "Bearer "+recoveryToken || customHeader == recoveryToken {
+				isTokenAuthorized = true
+			}
+		}
+
+		// 2. If token auth not satisfied, check 2/3+ cryptographic quorum signatures from current active validators
+		if !isTokenAuthorized {
+			if currSet == nil || len(currSet.Validators) == 0 {
+				w.WriteHeader(http.StatusUnauthorized)
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"error": "unauthorized: no active validator set configured to verify transition signatures",
+				})
+				return
+			}
+
+			transMsg := []byte(fmt.Sprintf("%s:transition:%d:%s", cfg.ChainID, req.TransitionHeight, req.Reason))
+			msgHash := sha256.Sum256(transMsg)
+
+			var accumulatedPower int64
+			verifiedValidators := make(map[string]bool)
+
+			for _, qSig := range req.QuorumSignatures {
+				if verifiedValidators[qSig.ValidatorAddress] {
+					continue
+				}
+				val := currSet.GetByAddress(qSig.ValidatorAddress)
+				if val == nil {
+					continue
+				}
+				sigBytes, err := hex.DecodeString(qSig.SignatureHex)
+				if err != nil || len(sigBytes) != ed25519.SignatureSize {
+					continue
+				}
+				if ed25519.Verify(val.PubKeyBytes, msgHash[:], sigBytes) {
+					verifiedValidators[qSig.ValidatorAddress] = true
+					accumulatedPower += val.VotingPower
+				}
+			}
+
+			if accumulatedPower < currSet.QuorumPower {
+				w.WriteHeader(http.StatusUnauthorized)
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"error":             "unauthorized: /consensus/transition requires 2/3+ cryptographic quorum signatures from current validator set or valid emergency recovery auth token",
+					"accumulated_power": accumulatedPower,
+					"required_quorum":   currSet.QuorumPower,
+					"total_power":       currSet.TotalPower,
+					"verified_signers":  len(verifiedValidators),
+				})
+				return
+			}
+		}
+
 		var newVals []consensus.Validator
 		for _, nv := range req.NewValidators {
 			newVals = append(newVals, consensus.Validator{
@@ -1534,7 +1646,10 @@ func startNode(flags NodeFlags) {
 			Timestamp:          time.Now().Unix(),
 		}
 		if err := valSchedule.AddTransition(cTrans); err != nil {
-			http.Error(w, fmt.Sprintf("rejected transition: %v", err), http.StatusConflict)
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"error": fmt.Sprintf("rejected transition: %v", err),
+			})
 			return
 		}
 		_ = app.RecordValidatorTransition(node.ValidatorSetTransition{
@@ -1550,6 +1665,7 @@ func startNode(flags NodeFlags) {
 			"transition_height": req.TransitionHeight,
 			"active_validators": len(newVals),
 			"revoked_count":     len(req.RevokedAddresses),
+			"authorized_via":    map[string]interface{}{"token": isTokenAuthorized, "quorum_verified": !isTokenAuthorized},
 		})
 	})
 

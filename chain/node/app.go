@@ -485,6 +485,20 @@ func (app *SovraApp) computeStateRoot() []byte {
 	return h.Sum(nil)
 }
 
+// ComputeCandidateAppHash calculates candidate state root for a proposal without committing
+func (app *SovraApp) ComputeCandidateAppHash(height int64) []byte {
+	app.mu.RLock()
+	defer app.mu.RUnlock()
+
+	h := sha256.New()
+	supply := app.bankKeeper.GetTotalSupply(app.store).String()
+	minted := app.issuanceKeeper.GetLifetimeMinted(app.store).String()
+	burned := app.issuanceKeeper.GetLifetimeBurned(app.store).String()
+
+	h.Write([]byte(fmt.Sprintf("%d:%s:%s:%s", height, supply, minted, burned)))
+	return h.Sum(nil)
+}
+
 // Read-only Queries
 func (app *SovraApp) QueryBalance(addr string) math.Int {
 	app.mu.RLock()

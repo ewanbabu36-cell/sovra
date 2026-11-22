@@ -1,0 +1,417 @@
+{
+  "timestamp": "2026-11-22T14:30:22.442Z",
+  "backupDir": "D:\\Sovra\\backups\\phase15_5_pre_recovery_backup",
+  "totalFiles": 82,
+  "manifest": [
+    {
+      "file": "node0\\config.json",
+      "size": 879,
+      "sha256": "49fd3070e57033c3f628514adae7fda532c15be92946eaa9656948667d4abecf"
+    },
+    {
+      "file": "node0\\data\\000002.log",
+      "size": 11,
+      "sha256": "9662e47dd54a87077c095c3cf6af126e158df34c3b8139f7c927c794d58315dd"
+    },
+    {
+      "file": "node0\\data\\CURRENT",
+      "size": 16,
+      "sha256": "0f1bad70c7bd1e0a69562853ec529355462fcd0423263a3d39d6d0d70b780443"
+    },
+    {
+      "file": "node0\\data\\LOCK",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "node0\\data\\MANIFEST-000001",
+      "size": 52,
+      "sha256": "97e174b312672b8fcf4d4d10e49b8aa8b77c565ca0797db70767f0243628e4c2"
+    },
+    {
+      "file": "node0\\data\\OPTIONS-000003",
+      "size": 1170,
+      "sha256": "9fc710c6b33f8e1fb1d7c8b084787a9cfb8f0a18c1cee4dbef2e5070f64bcc78"
+    },
+    {
+      "file": "node0\\data\\sovradb\\000100.log",
+      "size": 4085597,
+      "sha256": "dbd869998f9782c7967ca1b7c81ceff0d3b0ac5bb818754570ed3c2327902a96"
+    },
+    {
+      "file": "node0\\data\\sovradb\\000103.log",
+      "size": 4087580,
+      "sha256": "e42f3b9303e4e52f5cf770dee15b5e0751333e277cc8414358f4b19c0f2cb338"
+    },
+    {
+      "file": "node0\\data\\sovradb\\000110.log",
+      "size": 4086092,
+      "sha256": "97ed6c43f72ac30e991b3b901f6922284e93733b7e853133217a6065200b9772"
+    },
+    {
+      "file": "node0\\data\\sovradb\\000113.log",
+      "size": 4086713,
+      "sha256": "007804a0eb6e323007859b8e7da0cc17f9ac013d26633e6d6cfbdbdaf72ceb66"
+    },
+    {
+      "file": "node0\\data\\sovradb\\000116.sst",
+      "size": 4222063,
+      "sha256": "ac91f2d38edc838c4168f052d5dc45699f36614ff92cf88eeec55b01535e2a6c"
+    },
+    {
+      "file": "node0\\data\\sovradb\\000117.sst",
+      "size": 4219890,
+      "sha256": "1a5592998ef46f4951f5debfe0dec063ae2270ff9aefeb4d1880d3b98467f17d"
+    },
+    {
+      "file": "node0\\data\\sovradb\\000118.sst",
+      "size": 4218588,
+      "sha256": "b68467a3ebd478c083622c28aa2b36a6bf20ac44a2c15ffca91aef9f9d2c4953"
+    },
+    {
+      "file": "node0\\data\\sovradb\\000119.sst",
+      "size": 4220064,
+      "sha256": "0902208bd366a5c6f51c67f4d3a45dfb2aaff4331bb908eede6a2ff9d758b09a"
+    },
+    {
+      "file": "node0\\data\\sovradb\\000120.sst",
+      "size": 1563449,
+      "sha256": "a80f6deb49a430593ad188767cf611b6fb495d0fd2dd0fc2bca67853938faea1"
+    },
+    {
+      "file": "node0\\data\\sovradb\\CURRENT",
+      "size": 16,
+      "sha256": "85807b426eb7d21ae1f5b737e939c80f2ced73049bed8fc5e940712a6dc31e3d"
+    },
+    {
+      "file": "node0\\data\\sovradb\\MANIFEST-000078",
+      "size": 262,
+      "sha256": "197d2be032783d837e1c83424b6954543c2349ae7c9708aff325cc4fc452d97e"
+    },
+    {
+      "file": "node0\\data\\sovradb\\MANIFEST-000083",
+      "size": 1762,
+      "sha256": "bf97919adb5adf58509e09a95973b88a0ad1e7acba7eede5bcdbd183cea0616b"
+    },
+    {
+      "file": "node0\\data\\sovradb\\OPTIONS-000084",
+      "size": 1170,
+      "sha256": "9fc710c6b33f8e1fb1d7c8b084787a9cfb8f0a18c1cee4dbef2e5070f64bcc78"
+    },
+    {
+      "file": "node0\\genesis.json",
+      "size": 1909,
+      "sha256": "19d788219464d4e2fd95264ffd476abed95a431b6dc01184bae58abdd9b199cb"
+    },
+    {
+      "file": "node0\\keyring\\validator-0.keystore",
+      "size": 782,
+      "sha256": "57eb5cd173d6797fc015f45dfceab44a8d6cf6275f23057f5a9ed0cd0808db74"
+    },
+    {
+      "file": "node1\\config.json",
+      "size": 879,
+      "sha256": "58b6fb538973318ef322da7ea798761397bbe0bfa63cc22cc76a51772f9ca5d4"
+    },
+    {
+      "file": "node1\\data\\sovradb\\000090.log",
+      "size": 4086452,
+      "sha256": "313eea820c30201ea81a24b46fd035dcdb15b1324cee695fbf35e1bf462b5ae4"
+    },
+    {
+      "file": "node1\\data\\sovradb\\000096.log",
+      "size": 4087709,
+      "sha256": "76475a1d853e8d6346d0ea8b4845770db6e9b8dcd0261ce8e0177f0b4a502b64"
+    },
+    {
+      "file": "node1\\data\\sovradb\\000099.log",
+      "size": 4085747,
+      "sha256": "feaf420914a389620375845d0af80e08a2cd7a61f2c9c279a7643b8fffc649bc"
+    },
+    {
+      "file": "node1\\data\\sovradb\\000102.sst",
+      "size": 4221647,
+      "sha256": "87cfb8c761d8a10db4e777d608ad3350a2b75e0693ed2dc02946602fdf8b8877"
+    },
+    {
+      "file": "node1\\data\\sovradb\\000103.sst",
+      "size": 4219039,
+      "sha256": "36c9f58773e4e6bf105d96bb3b4892f09f36ee206405e7d5df7435204dea7226"
+    },
+    {
+      "file": "node1\\data\\sovradb\\000104.sst",
+      "size": 4219663,
+      "sha256": "69264507be3bd9af96698ef2d00435bdf20b4167edd2917f47e543ecfb4424a7"
+    },
+    {
+      "file": "node1\\data\\sovradb\\000105.sst",
+      "size": 3616466,
+      "sha256": "7a8203bd694c975626f5be1fa49b7eba87d6e94a767fa489648b35961c787043"
+    },
+    {
+      "file": "node1\\data\\sovradb\\000106.log",
+      "size": 4086249,
+      "sha256": "4aaf20cd4cbc73b0bf1e9394f9fdde778662cc5b3ad3e5cf44afb5500340dd9a"
+    },
+    {
+      "file": "node1\\data\\sovradb\\000107.sst",
+      "size": 2112478,
+      "sha256": "32562dd20010e7f11dd5605afe3e791b34a054222d00462b3bf7f95806ed3c99"
+    },
+    {
+      "file": "node1\\data\\sovradb\\000108.sst",
+      "size": 63072,
+      "sha256": "f6444de916428fdeeadb3e5f8f522bd33c17fec519a7ffa1192077d8a02948df"
+    },
+    {
+      "file": "node1\\data\\sovradb\\CURRENT",
+      "size": 16,
+      "sha256": "22f75dcba4f2548d197f247c8bf19a952d3e5fcbf202ce922c3d579ed4cdcd80"
+    },
+    {
+      "file": "node1\\data\\sovradb\\MANIFEST-000071",
+      "size": 148,
+      "sha256": "3788a6277834456f5b9080887dc00b538908582e51157bf96b1bf72dc8640410"
+    },
+    {
+      "file": "node1\\data\\sovradb\\MANIFEST-000075",
+      "size": 1589,
+      "sha256": "e1a4871f7dd3a5264701a51a5556bdc293b505e3be8f2bce35528771edf23ce6"
+    },
+    {
+      "file": "node1\\data\\sovradb\\OPTIONS-000076",
+      "size": 1170,
+      "sha256": "9fc710c6b33f8e1fb1d7c8b084787a9cfb8f0a18c1cee4dbef2e5070f64bcc78"
+    },
+    {
+      "file": "node1\\genesis.json",
+      "size": 1909,
+      "sha256": "19d788219464d4e2fd95264ffd476abed95a431b6dc01184bae58abdd9b199cb"
+    },
+    {
+      "file": "node1\\keyring\\validator-1.keystore",
+      "size": 782,
+      "sha256": "11aa65955ddeee7b36450a40f68a15d74371fd9d21f0eebadd7c2a909d1b4f61"
+    },
+    {
+      "file": "node2\\config.json",
+      "size": 879,
+      "sha256": "2ee8fb99cf76a7ac1643e2c8320a8f13e6eb2c286eb58130d6491e722ae81aa8"
+    },
+    {
+      "file": "node2\\data\\sovradb\\000103.log",
+      "size": 4086193,
+      "sha256": "b3a866f019f790f067a8ed8f3c623be0e08d1c2565b44ace7b0d8ffd8255a213"
+    },
+    {
+      "file": "node2\\data\\sovradb\\000109.log",
+      "size": 4086650,
+      "sha256": "ee8754ae028e5975de2e42a1f724c65de56b0bb198f87b878a752fc4eec2654d"
+    },
+    {
+      "file": "node2\\data\\sovradb\\000112.log",
+      "size": 4086889,
+      "sha256": "c720bbcb1b129c68a7784ca093ee1158ca9736deac88d9c200491b37b189886d"
+    },
+    {
+      "file": "node2\\data\\sovradb\\000115.sst",
+      "size": 4221987,
+      "sha256": "9548ce1c4fa4235264c40a4ba0190f109ae38ced2d154e271cf7013317dd7c6e"
+    },
+    {
+      "file": "node2\\data\\sovradb\\000116.sst",
+      "size": 4219399,
+      "sha256": "b017b0f19a9ff8bfd4d5df99af77174a23ece013bd98812b42b6f0010a4eb4d4"
+    },
+    {
+      "file": "node2\\data\\sovradb\\000117.sst",
+      "size": 4219070,
+      "sha256": "7965951c366d494db73dad08a3923deb914ba57f37dba15d923fa20dcce5f05e"
+    },
+    {
+      "file": "node2\\data\\sovradb\\000118.sst",
+      "size": 3615510,
+      "sha256": "18a309da5e77a2dcdd1a60a62f4f696e04488f351bf7e4830d6a69cd178fe6e5"
+    },
+    {
+      "file": "node2\\data\\sovradb\\000119.log",
+      "size": 4086438,
+      "sha256": "c23497c65f001049fbec3b7adf28460b4f8cd05786cb9d76f4ae4766361013e5"
+    },
+    {
+      "file": "node2\\data\\sovradb\\000120.sst",
+      "size": 2112059,
+      "sha256": "5cb3cb8796e23e9b3473af429dfd55b316daae62792d70e2c995b9fa306d2ba7"
+    },
+    {
+      "file": "node2\\data\\sovradb\\000121.sst",
+      "size": 63030,
+      "sha256": "207309b77f552614374e4f2c2eb06f6794420f4c4eee937cbc384a4eae6a4578"
+    },
+    {
+      "file": "node2\\data\\sovradb\\CURRENT",
+      "size": 16,
+      "sha256": "726b9fc132f35cc8bf5067754cc764378f3f88da61916c100d0f5589af2dde0d"
+    },
+    {
+      "file": "node2\\data\\sovradb\\MANIFEST-000084",
+      "size": 140,
+      "sha256": "d575011d761f0f324e5dc293efc43fc7ddfaaeb8b0d88b033a5611af2769e0d4"
+    },
+    {
+      "file": "node2\\data\\sovradb\\MANIFEST-000088",
+      "size": 1549,
+      "sha256": "96b8e1be47af5f7f52fc58feaa91e894ae4f61d5af541c77f8914c63891a9a61"
+    },
+    {
+      "file": "node2\\data\\sovradb\\OPTIONS-000089",
+      "size": 1170,
+      "sha256": "9fc710c6b33f8e1fb1d7c8b084787a9cfb8f0a18c1cee4dbef2e5070f64bcc78"
+    },
+    {
+      "file": "node2\\genesis.json",
+      "size": 1909,
+      "sha256": "19d788219464d4e2fd95264ffd476abed95a431b6dc01184bae58abdd9b199cb"
+    },
+    {
+      "file": "node2\\keyring\\validator-2.keystore",
+      "size": 782,
+      "sha256": "18331fddc5a5c07010ac90314808fac589f79f1fc894688ea6f2217d3b4d3fcd"
+    },
+    {
+      "file": "node3\\config.json",
+      "size": 879,
+      "sha256": "a326e0fbd299c9a12558805b2afd468b3c1b104e4d9cb441b84f647fb0ec5c51"
+    },
+    {
+      "file": "node3\\data\\sovradb\\000121.log",
+      "size": 4085301,
+      "sha256": "03a0ee214b064bef4e6a1daa5274f867f7bfc1be0c00bd6feac84f6ffd89e1c1"
+    },
+    {
+      "file": "node3\\data\\sovradb\\000124.log",
+      "size": 4086359,
+      "sha256": "47ee9c851e7dd9c2d8a2c7751bbbc901341ddf422c0e07164e1180a0aa564a64"
+    },
+    {
+      "file": "node3\\data\\sovradb\\000131.log",
+      "size": 4085767,
+      "sha256": "467f214aa8145a539e6bd53827455286831e989a4eadfd65e5e8579831a6b122"
+    },
+    {
+      "file": "node3\\data\\sovradb\\000134.log",
+      "size": 4086427,
+      "sha256": "fa04a9a097c9f744c7f2c60475b94c1a7da45c7b194fb2022fa18f35b3a693c0"
+    },
+    {
+      "file": "node3\\data\\sovradb\\000137.sst",
+      "size": 4221673,
+      "sha256": "672fd1d2046acb4fc7dcf45d96197cee7364b6d74c740be3135168495470c306"
+    },
+    {
+      "file": "node3\\data\\sovradb\\000138.sst",
+      "size": 4219550,
+      "sha256": "4f547fab8ee2ee1cc55e5528754425b1eb9763219f15561366adc48b6e7e8b22"
+    },
+    {
+      "file": "node3\\data\\sovradb\\000139.sst",
+      "size": 4219914,
+      "sha256": "5da10ba557709a86439c85a68e42b8bd6822063bc47924a1dc9617406a5820a5"
+    },
+    {
+      "file": "node3\\data\\sovradb\\000140.sst",
+      "size": 4218939,
+      "sha256": "9ce32bd29a02d431403bd482d6a1c0ba098041e61c6bdb53e74104d50f622d64"
+    },
+    {
+      "file": "node3\\data\\sovradb\\000141.sst",
+      "size": 1569354,
+      "sha256": "13f2662546797c22347990d1b8a9cfbf8f2e48f526ef2160884f071298d7a23c"
+    },
+    {
+      "file": "node3\\data\\sovradb\\CURRENT",
+      "size": 16,
+      "sha256": "6f80afc7d951410a8409713e9d2ee8de52590032d28043b41c6b613f982c15c2"
+    },
+    {
+      "file": "node3\\data\\sovradb\\MANIFEST-000099",
+      "size": 246,
+      "sha256": "ca5b5d6e3ee51aa3256809744b4d4f5c68c76f6b8014c1e4cbc1193c482edd46"
+    },
+    {
+      "file": "node3\\data\\sovradb\\MANIFEST-000104",
+      "size": 1747,
+      "sha256": "d889e2c7ffc0c059d3c4ada4534b3d14579cdac0162a54b977c20d8343a7d86e"
+    },
+    {
+      "file": "node3\\data\\sovradb\\OPTIONS-000105",
+      "size": 1170,
+      "sha256": "9fc710c6b33f8e1fb1d7c8b084787a9cfb8f0a18c1cee4dbef2e5070f64bcc78"
+    },
+    {
+      "file": "node3\\genesis.json",
+      "size": 1909,
+      "sha256": "19d788219464d4e2fd95264ffd476abed95a431b6dc01184bae58abdd9b199cb"
+    },
+    {
+      "file": "node3\\keyring\\validator-3.keystore",
+      "size": 782,
+      "sha256": "802763a2bf7c6ae770fbce26157ff9622fb2491025b86f0538a1cb2eedbafb21"
+    },
+    {
+      "file": "node4\\config.json",
+      "size": 769,
+      "sha256": "57ae1f4c947b8552eb07eb3aca720cb1e6267fcec93b383d8697d0acb0f5afd8"
+    },
+    {
+      "file": "node4\\data\\sovradb\\000009.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "node4\\data\\sovradb\\000012.sst",
+      "size": 15697,
+      "sha256": "3977f9de504df5821c43dd04102bf281dca37b11ff91e58c0bafff569e0fa60a"
+    },
+    {
+      "file": "node4\\data\\sovradb\\CURRENT",
+      "size": 16,
+      "sha256": "e91d13722e31f9b06c5df3582cad1ea5b73547ce3dc08b12ed461f095aad48ee"
+    },
+    {
+      "file": "node4\\data\\sovradb\\LOCK",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "node4\\data\\sovradb\\MANIFEST-000006",
+      "size": 97,
+      "sha256": "7fa41ba0202083709b10b040a1503fec50cdd3c74175a9249b37fb6348bcfb19"
+    },
+    {
+      "file": "node4\\data\\sovradb\\MANIFEST-000010",
+      "size": 203,
+      "sha256": "b24f626094abb686f5ba4f6fa432f8296894731f4f6099962d2704dd6865e7fc"
+    },
+    {
+      "file": "node4\\data\\sovradb\\OPTIONS-000011",
+      "size": 1170,
+      "sha256": "9fc710c6b33f8e1fb1d7c8b084787a9cfb8f0a18c1cee4dbef2e5070f64bcc78"
+    },
+    {
+      "file": "node4\\genesis.json",
+      "size": 2790,
+      "sha256": "b3835d3c47e13a594702bfaff1a0bce35ffc020bb33d5ad34ac5bb657b4de81b"
+    },
+    {
+      "file": "node4\\keyring\\validator.keystore",
+      "size": 780,
+      "sha256": "99e1cad6c5b60df0dbf07491a68dcd9a57cfa6316171af1fb294d94b8d4292d9"
+    },
+    {
+      "file": "signer0\\keyring\\validator-0.keystore",
+      "size": 782,
+      "sha256": "57eb5cd173d6797fc015f45dfceab44a8d6cf6275f23057f5a9ed0cd0808db74"
+    }
+  ]
+}

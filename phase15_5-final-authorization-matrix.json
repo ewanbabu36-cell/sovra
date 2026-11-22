@@ -1,0 +1,83 @@
+{
+  "gateName": "SOVRA Phase 15.5 Final Release Gate & Multi-Tier Independent Authorization Matrix",
+  "timestamp": "2026-11-22T15:25:00Z",
+  "baselineCommit": "7dc7b7b",
+  "phase": "15.5",
+  "canonicalChain": {
+    "chainId": "sovra-testnet-0",
+    "observedHeight": 52389,
+    "observedSupply": "30055743296028",
+    "status": "IMMUTABLE_HISTORICAL_RECORD_PRESERVED",
+    "unreachedTargetHeight": 50000,
+    "compromisedKeyStatus": "USED_HISTORICALLY_UNTIL_ROTATION",
+    "preRecoveryBackupManifest": "phase15_5-pre-recovery-backup-manifest.json",
+    "backupDirectory": "backups/phase15_5_pre_recovery_backup"
+  },
+  "recoveryChain": {
+    "chainId": "sovra-recovery-1",
+    "observedHeight": 269,
+    "observedSupply": "30013935824007",
+    "status": "LIVE_STANDALONE_RECOVERY_CONSENSUS_ACTIVE",
+    "validatorSet": "100% replacement keys (zero compromised keys)",
+    "activeValidators": [
+      "sovra1e4654fa45393171840964bce0716ea8d9742f6b8",
+      "sovra1f7878b4c2f9e783c95feda305f1a7cbd30ed5df3",
+      "sovra13c97b27b53207767d67495900c3ab9d88a09e311",
+      "sovra1162e4bf6312e39ee210a94309cf3911f52798e90"
+    ],
+    "normalQuorumPower": 100,
+    "faultTolerantQuorumPower": 75,
+    "financialInvariantsValid": true
+  },
+  "fiveTierVerificationMatrix": {
+    "tier_1_source_code_integration": {
+      "status": "VERIFIED",
+      "details": "ValidatorSchedule integration into block propose and apply paths, atomic AppHash commit strictly after 2/3+ quorum commit cert validation, dynamic round tracking in P2P BlockData, and fail-closed /consensus/transition endpoint requiring Bearer auth token or Ed25519 quorum signatures."
+    },
+    "tier_2_isolated_test_verification": {
+      "status": "VERIFIED",
+      "details": "All 24 test suites (254 tests) and all Go unit tests passed with 100% pass rate. Dedicated Phase 15.5 live recovery security suite (13 tests) passed."
+    },
+    "tier_3_upgraded_daemon_execution": {
+      "status": "VERIFIED",
+      "binaryPath": "D:\\Sovra\\chain\\sovrad_v15_5.exe",
+      "binarySha256": "3F5CF31B8416AF04B35F12FDFE03F3FEB4358F4DE54AE4812549873D22A544E1",
+      "runtimeEvidence": "4 independent node instances executing upgraded binary across RPC ports 26757, 26767, 26777, 26787 and P2P ports 26756, 26766, 26776, 26786."
+    },
+    "tier_4_actual_validator_set_activation": {
+      "status": "VERIFIED",
+      "details": "Validator set strictly contains replacement keys. Compromised genesis validator keys are permanently revoked and rejected across proposal signing, prevote signing, precommit signing, commit cert aggregation, and P2P gossip."
+    },
+    "tier_5_stable_four_node_consensus": {
+      "status": "VERIFIED",
+      "details": "Audited over 50 continuous blocks with 100% commit certificate quorum power. Sustained 3-of-4 BFT operation (75% voting power) during intentional node3 outage. Verified automatic resync and catchup upon node3 restart. Financial supply invariant (30T uSOV) conserved exactly across all 4 nodes."
+    }
+  },
+  "environmentalAuthorizations": {
+    "local_development": {
+      "status": "CERTIFIED",
+      "rationale": "All isolated unit, consensus, cryptography, and application tests operate deterministically with 100% pass rate."
+    },
+    "local_loopback_multi_node": {
+      "status": "CERTIFIED",
+      "rationale": "Four-node upgraded cluster on sovra-recovery-1 demonstrates continuous BFT consensus, atomic commits, fault tolerance, and restart recovery with replacement identities."
+    },
+    "historical_chain_preservation": {
+      "status": "CERTIFIED",
+      "rationale": "Historical ledger truth of sovra-testnet-0 (height 52,389+) preserved intact with verified SHA-256 backup manifest and zero state rewriting."
+    },
+    "remote_multi_cloud_testnet": {
+      "status": "BLOCKED",
+      "blockingPrerequisites": [
+        "Provisioning of 4 physical multi-cloud server hosts across independent cloud providers (AWS, GCP, Azure, DigitalOcean).",
+        "Physical integration of PKCS#11 hardware security modules (AWS CloudHSM SDK 5+ or YubiHSM 2 with CKM_EDDSA).",
+        "mTLS node-to-node P2P transport network configuration across external public IPs.",
+        "Repository owner authorization and coordination of the remote Git history rewrite or explicit risk-acceptance."
+      ]
+    },
+    "production_mainnet": {
+      "status": "STRICTLY_NOT_AUTHORIZED",
+      "rationale": "Mainnet authorization is permanently prohibited prior to multi-month live operation on decentralized remote testnet and formal external cryptographic audits."
+    }
+  }
+}

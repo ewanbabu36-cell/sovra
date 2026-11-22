@@ -1,0 +1,359 @@
+{
+  "auditTimestamp": "2026-11-22T14:29:48.576Z",
+  "baselineCommit": "7dc7b7b",
+  "chainId": "sovra-testnet-0",
+  "currentHeights": [
+    {
+      "moniker": "validator-0",
+      "port": 26657,
+      "height": 47823
+    },
+    {
+      "moniker": "validator-1",
+      "port": 26667,
+      "height": 47823
+    },
+    {
+      "moniker": "validator-2",
+      "port": 26677,
+      "height": 47823
+    },
+    {
+      "moniker": "validator-3",
+      "port": 26687,
+      "height": 47823
+    }
+  ],
+  "height50000Reached": false,
+  "allNodesRunningSameBinaryImage": true,
+  "diskBinaryHashes": {
+    "D:/Sovra/chain/sovrad.exe": "40510b9adf69fed69433c6a8a94e890a8a49c5aaa8f07fe74802182f79a22acd",
+    "D:/Sovra/bin/sovrad.exe": "315134559670f50316e3e288be76add2c6c7de7bd966dd535514347db87df7e0"
+  },
+  "nodes": [
+    {
+      "port": 26657,
+      "moniker": "validator-0",
+      "nodeId": "2a806ca82d506a025d580d40600abc77a69e10e7",
+      "chainId": "sovra-testnet-0",
+      "height": 47823,
+      "appHash": "9b977f3ce8a42c95c7527f900dfa15d35540c090ace318b117b21b6e6c345873",
+      "totalSupply": "30055743296028",
+      "validators": [
+        {
+          "name": "validator-0",
+          "address": "sovra12a806ca82d506a025d580d40600abc77a69e10e7",
+          "pub_key": "50dec499bc1281f64488a3ca9500c9c1a4eea67f5147af0450ee0deebf8601be",
+          "voting_power": 25,
+          "node_id": "2a806ca82d506a025d580d40600abc77a69e10e7"
+        },
+        {
+          "name": "validator-1",
+          "address": "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1",
+          "pub_key": "a81cd7b53eb1edcfc9abce54679faf08ccaa002bd5898b63431f29cc964e67e3",
+          "voting_power": 25,
+          "node_id": "664a83c922035ce28bb723e4e92aed1e60e26ea1"
+        },
+        {
+          "name": "validator-2",
+          "address": "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+          "pub_key": "d6cbcf5c5acf4688995801c2993a53f4c5ff164bd897362909fb2f1a5ede7724",
+          "voting_power": 25,
+          "node_id": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb"
+        },
+        {
+          "name": "validator-3",
+          "address": "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+          "pub_key": "b5fc366f668f7d6dfc43a9b2942895ccb9e4eea5d7b1ca46f1e8c710347977ec",
+          "voting_power": 25,
+          "node_id": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20"
+        }
+      ],
+      "quorumPower": 67,
+      "totalPower": 100,
+      "commitCert": {
+        "height": 47823,
+        "round": 0,
+        "block_hash": "9b977f3ce8a42c95c7527f900dfa15d35540c090ace318b117b21b6e6c345873",
+        "signatures": [
+          {
+            "validator_address": "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+            "validator_index": 2,
+            "voting_power": 25,
+            "signature": "52678656c3b6c345f11df5984de6e5c0a4df0d95d916a78ce0d4fe6be435454ba9f581bd6fb832049853d9c3b3b1ef12a72a5430a0bf5ca1f82178422fda7806",
+            "timestamp": 1795357788
+          },
+          {
+            "validator_address": "sovra12a806ca82d506a025d580d40600abc77a69e10e7",
+            "validator_index": 0,
+            "voting_power": 25,
+            "signature": "469fe4647a83c8658f821362c44d40f7f6d1554f9eb2a766749f8d773c42ad58fd9e6b256e9b8f8268d804f3a6cfbe51f2c92c625affb23b665c770d24d8af00",
+            "timestamp": 1795357788
+          },
+          {
+            "validator_address": "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1",
+            "validator_index": 1,
+            "voting_power": 25,
+            "signature": "ab6c9a6ef5bcbbc90f978e29af9c5ff25bbefc32a92ef6d88bcd0a816a2fa142fa94624af543f40b4ff3103f82b30bc4a41b09cc4131f104fe85ad18e391500e",
+            "timestamp": 1795357788
+          },
+          {
+            "validator_address": "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+            "validator_index": 3,
+            "voting_power": 25,
+            "signature": "9c303402c57127cf7bf3eb3a358e7167c35dbd8bd311522b0a8aea17f7165e50eac84b4d0b8134f89956b9d8860ff3886979be34b665b001924f8648425c5e05",
+            "timestamp": 1795357788
+          }
+        ]
+      },
+      "processInfo": {
+        "pid": 12240,
+        "path": "D:\\Sovra\\chain\\sovrad.exe",
+        "commandLine": "D:\\Sovra\\chain\\sovrad.exe start --home=chain/mytestnet/node0 --passphrase=sovra-testnet-secret"
+      }
+    },
+    {
+      "port": 26667,
+      "moniker": "validator-1",
+      "nodeId": "664a83c922035ce28bb723e4e92aed1e60e26ea1",
+      "chainId": "sovra-testnet-0",
+      "height": 47823,
+      "appHash": "9b977f3ce8a42c95c7527f900dfa15d35540c090ace318b117b21b6e6c345873",
+      "totalSupply": "30055743296028",
+      "validators": [
+        {
+          "name": "validator-0",
+          "address": "sovra12a806ca82d506a025d580d40600abc77a69e10e7",
+          "pub_key": "50dec499bc1281f64488a3ca9500c9c1a4eea67f5147af0450ee0deebf8601be",
+          "voting_power": 25,
+          "node_id": "2a806ca82d506a025d580d40600abc77a69e10e7"
+        },
+        {
+          "name": "validator-1",
+          "address": "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1",
+          "pub_key": "a81cd7b53eb1edcfc9abce54679faf08ccaa002bd5898b63431f29cc964e67e3",
+          "voting_power": 25,
+          "node_id": "664a83c922035ce28bb723e4e92aed1e60e26ea1"
+        },
+        {
+          "name": "validator-2",
+          "address": "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+          "pub_key": "d6cbcf5c5acf4688995801c2993a53f4c5ff164bd897362909fb2f1a5ede7724",
+          "voting_power": 25,
+          "node_id": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb"
+        },
+        {
+          "name": "validator-3",
+          "address": "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+          "pub_key": "b5fc366f668f7d6dfc43a9b2942895ccb9e4eea5d7b1ca46f1e8c710347977ec",
+          "voting_power": 25,
+          "node_id": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20"
+        }
+      ],
+      "quorumPower": 67,
+      "totalPower": 100,
+      "commitCert": {
+        "height": 47823,
+        "round": 0,
+        "block_hash": "9b977f3ce8a42c95c7527f900dfa15d35540c090ace318b117b21b6e6c345873",
+        "signatures": [
+          {
+            "validator_address": "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+            "validator_index": 2,
+            "voting_power": 25,
+            "signature": "52678656c3b6c345f11df5984de6e5c0a4df0d95d916a78ce0d4fe6be435454ba9f581bd6fb832049853d9c3b3b1ef12a72a5430a0bf5ca1f82178422fda7806",
+            "timestamp": 1795357788
+          },
+          {
+            "validator_address": "sovra12a806ca82d506a025d580d40600abc77a69e10e7",
+            "validator_index": 0,
+            "voting_power": 25,
+            "signature": "469fe4647a83c8658f821362c44d40f7f6d1554f9eb2a766749f8d773c42ad58fd9e6b256e9b8f8268d804f3a6cfbe51f2c92c625affb23b665c770d24d8af00",
+            "timestamp": 1795357788
+          },
+          {
+            "validator_address": "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1",
+            "validator_index": 1,
+            "voting_power": 25,
+            "signature": "ab6c9a6ef5bcbbc90f978e29af9c5ff25bbefc32a92ef6d88bcd0a816a2fa142fa94624af543f40b4ff3103f82b30bc4a41b09cc4131f104fe85ad18e391500e",
+            "timestamp": 1795357788
+          },
+          {
+            "validator_address": "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+            "validator_index": 3,
+            "voting_power": 25,
+            "signature": "9c303402c57127cf7bf3eb3a358e7167c35dbd8bd311522b0a8aea17f7165e50eac84b4d0b8134f89956b9d8860ff3886979be34b665b001924f8648425c5e05",
+            "timestamp": 1795357788
+          }
+        ]
+      },
+      "processInfo": {
+        "pid": 10176,
+        "path": "D:\\Sovra\\chain\\sovrad.exe",
+        "commandLine": "D:\\Sovra\\chain\\sovrad.exe start --home=D:\\Sovra\\chain\\mytestnet\\node1 --passphrase=sovra-testnet-secret"
+      }
+    },
+    {
+      "port": 26677,
+      "moniker": "validator-2",
+      "nodeId": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+      "chainId": "sovra-testnet-0",
+      "height": 47823,
+      "appHash": "9b977f3ce8a42c95c7527f900dfa15d35540c090ace318b117b21b6e6c345873",
+      "totalSupply": "30055743296028",
+      "validators": [
+        {
+          "name": "validator-0",
+          "address": "sovra12a806ca82d506a025d580d40600abc77a69e10e7",
+          "pub_key": "50dec499bc1281f64488a3ca9500c9c1a4eea67f5147af0450ee0deebf8601be",
+          "voting_power": 25,
+          "node_id": "2a806ca82d506a025d580d40600abc77a69e10e7"
+        },
+        {
+          "name": "validator-1",
+          "address": "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1",
+          "pub_key": "a81cd7b53eb1edcfc9abce54679faf08ccaa002bd5898b63431f29cc964e67e3",
+          "voting_power": 25,
+          "node_id": "664a83c922035ce28bb723e4e92aed1e60e26ea1"
+        },
+        {
+          "name": "validator-2",
+          "address": "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+          "pub_key": "d6cbcf5c5acf4688995801c2993a53f4c5ff164bd897362909fb2f1a5ede7724",
+          "voting_power": 25,
+          "node_id": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb"
+        },
+        {
+          "name": "validator-3",
+          "address": "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+          "pub_key": "b5fc366f668f7d6dfc43a9b2942895ccb9e4eea5d7b1ca46f1e8c710347977ec",
+          "voting_power": 25,
+          "node_id": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20"
+        }
+      ],
+      "quorumPower": 67,
+      "totalPower": 100,
+      "commitCert": {
+        "height": 47823,
+        "round": 0,
+        "block_hash": "9b977f3ce8a42c95c7527f900dfa15d35540c090ace318b117b21b6e6c345873",
+        "signatures": [
+          {
+            "validator_address": "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+            "validator_index": 2,
+            "voting_power": 25,
+            "signature": "52678656c3b6c345f11df5984de6e5c0a4df0d95d916a78ce0d4fe6be435454ba9f581bd6fb832049853d9c3b3b1ef12a72a5430a0bf5ca1f82178422fda7806",
+            "timestamp": 1795357788
+          },
+          {
+            "validator_address": "sovra12a806ca82d506a025d580d40600abc77a69e10e7",
+            "validator_index": 0,
+            "voting_power": 25,
+            "signature": "469fe4647a83c8658f821362c44d40f7f6d1554f9eb2a766749f8d773c42ad58fd9e6b256e9b8f8268d804f3a6cfbe51f2c92c625affb23b665c770d24d8af00",
+            "timestamp": 1795357788
+          },
+          {
+            "validator_address": "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1",
+            "validator_index": 1,
+            "voting_power": 25,
+            "signature": "ab6c9a6ef5bcbbc90f978e29af9c5ff25bbefc32a92ef6d88bcd0a816a2fa142fa94624af543f40b4ff3103f82b30bc4a41b09cc4131f104fe85ad18e391500e",
+            "timestamp": 1795357788
+          },
+          {
+            "validator_address": "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+            "validator_index": 3,
+            "voting_power": 25,
+            "signature": "9c303402c57127cf7bf3eb3a358e7167c35dbd8bd311522b0a8aea17f7165e50eac84b4d0b8134f89956b9d8860ff3886979be34b665b001924f8648425c5e05",
+            "timestamp": 1795357788
+          }
+        ]
+      },
+      "processInfo": {
+        "pid": 5492,
+        "path": "D:\\Sovra\\chain\\sovrad.exe",
+        "commandLine": "D:\\Sovra\\chain\\sovrad.exe start --home=D:\\Sovra\\chain\\mytestnet\\node2 --passphrase=sovra-testnet-secret"
+      }
+    },
+    {
+      "port": 26687,
+      "moniker": "validator-3",
+      "nodeId": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+      "chainId": "sovra-testnet-0",
+      "height": 47823,
+      "appHash": "9b977f3ce8a42c95c7527f900dfa15d35540c090ace318b117b21b6e6c345873",
+      "totalSupply": "30055743296028",
+      "validators": [
+        {
+          "name": "validator-0",
+          "address": "sovra12a806ca82d506a025d580d40600abc77a69e10e7",
+          "pub_key": "50dec499bc1281f64488a3ca9500c9c1a4eea67f5147af0450ee0deebf8601be",
+          "voting_power": 25,
+          "node_id": "2a806ca82d506a025d580d40600abc77a69e10e7"
+        },
+        {
+          "name": "validator-1",
+          "address": "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1",
+          "pub_key": "a81cd7b53eb1edcfc9abce54679faf08ccaa002bd5898b63431f29cc964e67e3",
+          "voting_power": 25,
+          "node_id": "664a83c922035ce28bb723e4e92aed1e60e26ea1"
+        },
+        {
+          "name": "validator-2",
+          "address": "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+          "pub_key": "d6cbcf5c5acf4688995801c2993a53f4c5ff164bd897362909fb2f1a5ede7724",
+          "voting_power": 25,
+          "node_id": "cb55be9a3d2afab1c9bcbffb88367bec797d11cb"
+        },
+        {
+          "name": "validator-3",
+          "address": "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+          "pub_key": "b5fc366f668f7d6dfc43a9b2942895ccb9e4eea5d7b1ca46f1e8c710347977ec",
+          "voting_power": 25,
+          "node_id": "d96f6140a4c4ae797d9e3a5badf467eb756d3d20"
+        }
+      ],
+      "quorumPower": 67,
+      "totalPower": 100,
+      "commitCert": {
+        "height": 47823,
+        "round": 0,
+        "block_hash": "9b977f3ce8a42c95c7527f900dfa15d35540c090ace318b117b21b6e6c345873",
+        "signatures": [
+          {
+            "validator_address": "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+            "validator_index": 2,
+            "voting_power": 25,
+            "signature": "52678656c3b6c345f11df5984de6e5c0a4df0d95d916a78ce0d4fe6be435454ba9f581bd6fb832049853d9c3b3b1ef12a72a5430a0bf5ca1f82178422fda7806",
+            "timestamp": 1795357788
+          },
+          {
+            "validator_address": "sovra12a806ca82d506a025d580d40600abc77a69e10e7",
+            "validator_index": 0,
+            "voting_power": 25,
+            "signature": "469fe4647a83c8658f821362c44d40f7f6d1554f9eb2a766749f8d773c42ad58fd9e6b256e9b8f8268d804f3a6cfbe51f2c92c625affb23b665c770d24d8af00",
+            "timestamp": 1795357788
+          },
+          {
+            "validator_address": "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1",
+            "validator_index": 1,
+            "voting_power": 25,
+            "signature": "ab6c9a6ef5bcbbc90f978e29af9c5ff25bbefc32a92ef6d88bcd0a816a2fa142fa94624af543f40b4ff3103f82b30bc4a41b09cc4131f104fe85ad18e391500e",
+            "timestamp": 1795357788
+          },
+          {
+            "validator_address": "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+            "validator_index": 3,
+            "voting_power": 25,
+            "signature": "9c303402c57127cf7bf3eb3a358e7167c35dbd8bd311522b0a8aea17f7165e50eac84b4d0b8134f89956b9d8860ff3886979be34b665b001924f8648425c5e05",
+            "timestamp": 1795357788
+          }
+        ]
+      },
+      "processInfo": {
+        "pid": 13196,
+        "path": "D:\\Sovra\\chain\\sovrad.exe",
+        "commandLine": "D:\\Sovra\\chain\\sovrad.exe start --home=D:\\Sovra\\chain\\mytestnet\\node3 --passphrase=sovra-testnet-secret"
+      }
+    }
+  ]
+}
