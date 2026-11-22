@@ -1,0 +1,76 @@
+{
+  "timestamp": "2026-11-22T01:34:03.615Z",
+  "masterInvariantFormula": "TotalSupply == LifetimeMinted - LifetimeBurned",
+  "allInvariantsHold": true,
+  "allSuppliesMatch": true,
+  "replayProtectionVerified": true,
+  "crashRecoveryVerified": true,
+  "supplyResults": [
+    {
+      "nodeId": 0,
+      "moniker": "validator-0",
+      "height": 28956,
+      "appHash": "c08b0dbd5050d67569009ba2f8c1459f8df7d1e9546e2c7957cb47638f82d05a",
+      "totalSupply": "30041807472021",
+      "lifetimeMinted": "30041807472021",
+      "lifetimeBurned": "0",
+      "delta": "0",
+      "invariantHolds": true
+    },
+    {
+      "nodeId": 1,
+      "moniker": "validator-1",
+      "height": 28956,
+      "appHash": "c08b0dbd5050d67569009ba2f8c1459f8df7d1e9546e2c7957cb47638f82d05a",
+      "totalSupply": "30041807472021",
+      "lifetimeMinted": "30041807472021",
+      "lifetimeBurned": "0",
+      "delta": "0",
+      "invariantHolds": true
+    },
+    {
+      "nodeId": 2,
+      "moniker": "validator-2",
+      "height": 28956,
+      "appHash": "c08b0dbd5050d67569009ba2f8c1459f8df7d1e9546e2c7957cb47638f82d05a",
+      "totalSupply": "30041807472021",
+      "lifetimeMinted": "30041807472021",
+      "lifetimeBurned": "0",
+      "delta": "0",
+      "invariantHolds": true
+    },
+    {
+      "nodeId": 3,
+      "moniker": "validator-3",
+      "height": 28956,
+      "appHash": "c08b0dbd5050d67569009ba2f8c1459f8df7d1e9546e2c7957cb47638f82d05a",
+      "totalSupply": "30041807472021",
+      "lifetimeMinted": "30041807472021",
+      "lifetimeBurned": "0",
+      "delta": "0",
+      "invariantHolds": true
+    }
+  ],
+  "accountBalances": [
+    {
+      "address": "sovra12a806ca82d506a025d580d40600abc77a69e10e7",
+      "balance": "7499999996700",
+      "nonce": 3
+    },
+    {
+      "address": "sovra1664a83c922035ce28bb723e4e92aed1e60e26ea1",
+      "balance": "7500000000000",
+      "nonce": 0
+    },
+    {
+      "address": "sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb",
+      "balance": "7500000000000",
+      "nonce": 0
+    },
+    {
+      "address": "sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20",
+      "balance": "7500000000000",
+      "nonce": 0
+    }
+  ]
+}

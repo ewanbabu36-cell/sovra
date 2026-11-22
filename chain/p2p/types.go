@@ -9,7 +9,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sovra/chain/consensus"
 	"github.com/sovra/chain/node"
+	"github.com/sovra/chain/privval"
 )
 
 // ComputeNodeID derives the canonical 20-byte CometBFT Node ID from an Ed25519 public key
@@ -98,6 +100,8 @@ const (
 	MsgTypeBlockResponse = "block_resp"
 	MsgTypeNewBlock     = "new_block"
 	MsgTypeTx           = "tx"
+	MsgTypeVote         = "vote"
+	MsgTypeCommitCert   = "commit_cert"
 )
 
 // Envelope wraps all wire-protocol P2P messages
@@ -124,12 +128,14 @@ type BlockRequestPayload struct {
 }
 
 type BlockData struct {
-	Height    int64                    `json:"height"`
-	Time      int64                    `json:"time"`
-	AppHash   string                   `json:"app_hash"`
-	Proposer  string                   `json:"proposer"`
-	TxCount   int                      `json:"tx_count"`
-	Txs       []node.SignedTransaction `json:"txs,omitempty"`
+	Height     int64                        `json:"height"`
+	Round      int64                        `json:"round,omitempty"`
+	Time       int64                        `json:"time"`
+	AppHash    string                       `json:"app_hash"`
+	Proposer   string                       `json:"proposer"`
+	TxCount    int                          `json:"tx_count"`
+	Txs        []node.SignedTransaction     `json:"txs,omitempty"`
+	CommitCert *consensus.CommitCertificate `json:"commit_cert,omitempty"`
 }
 
 type BlockResponsePayload struct {
@@ -142,6 +148,15 @@ type NewBlockPayload struct {
 
 type TxPayload struct {
 	Tx node.SignedTransaction `json:"tx"`
+}
+
+type VotePayload struct {
+	ChainID string       `json:"chain_id"`
+	Vote    privval.Vote `json:"vote"`
+}
+
+type CommitCertPayload struct {
+	Certificate consensus.CommitCertificate `json:"certificate"`
 }
 
 // PeerInfo holds telemetry about an active connected peer
