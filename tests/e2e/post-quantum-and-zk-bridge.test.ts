@@ -204,7 +204,7 @@ describe('🚀 SOVRA POST-QUANTUM & ZERO-KNOWLEDGE ENTERPRISE EXPANSION PROTOCOL
     };
 
     beforeAll(() => {
-      sovraDb.load();
+      sovraDb.load(true);
       if (sovraDb.db && Array.isArray(sovraDb.db.zk_nullifiers)) {
         sovraDb.db.zk_nullifiers = sovraDb.db.zk_nullifiers.filter(
           (n: any) => n.nullifierHash !== testNullifier

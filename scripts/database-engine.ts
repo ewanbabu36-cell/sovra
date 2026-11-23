@@ -2242,6 +2242,41 @@ export class SovraDatabaseEngine {
   // ==========================================
   // P0 PHASE 39 DELEGATES: 100M SUPPLY & VIDEO SESSIONS
   // ==========================================
+  public getUltraSoundMetrics() {
+    if (this.sqliteEngine && typeof (this.sqliteEngine as any).getUltraSoundMetrics === 'function') {
+      return (this.sqliteEngine as any).getUltraSoundMetrics();
+    }
+    const supply = this.getTotalSovSupply();
+    return {
+      maxLifetimeCapSov: 100_000_000,
+      genesisSupplySov: 30_000_000,
+      totalBurnedSov: 0,
+      circulatingSupplySov: supply.totalSystemAccountingSov,
+      totalSystemAccountingSov: supply.totalSystemAccountingSov,
+      isDeflationary: false,
+      gasFeeBurnPercent: 50,
+      adBurnPercent: 20,
+      invariantHolds: supply.totalSystemAccountingSov <= 100_000_000,
+      burnSinkAddress: 'sovra10000000000000000000000000000000000000dead',
+      burnSinkHex: '0x000000000000000000000000000000000000dead',
+      burnSinkDid: 'did:sov:burn:dead',
+    };
+  }
+
+  public burnToConsensusSink(amountSov: number, reason: any = 'DIRECT_BURN') {
+    if (this.sqliteEngine && typeof (this.sqliteEngine as any).burnToConsensusSink === 'function') {
+      return (this.sqliteEngine as any).burnToConsensusSink(amountSov, reason);
+    }
+    throw new Error('SQLite relational engine required for permanent consensus burn');
+  }
+
+  public processAdSpendSettlement(params: any) {
+    if (this.sqliteEngine && typeof (this.sqliteEngine as any).processAdSpendSettlement === 'function') {
+      return (this.sqliteEngine as any).processAdSpendSettlement(params);
+    }
+    throw new Error('SQLite relational engine required for ad spend settlement');
+  }
+
   public getTotalSovSupply() {
     if (this.sqliteEngine && typeof (this.sqliteEngine as any).getTotalSovSupply === 'function') {
       return (this.sqliteEngine as any).getTotalSovSupply();
@@ -2488,9 +2523,6 @@ export class SovraDatabaseEngine {
 
   public load(forceReload = false): DatabaseSchema {
     if (this.isLoaded && !forceReload) return this.db;
-    if (this.isLoaded && forceReload && (Date.now() - this.lastDiskLoadTime < 2000)) {
-      return this.db;
-    }
     this.lastDiskLoadTime = Date.now();
     if (this.pendingFlushes > 0 && this.saveDebounceTimer) {
       clearTimeout(this.saveDebounceTimer);

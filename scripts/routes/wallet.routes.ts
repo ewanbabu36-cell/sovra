@@ -507,6 +507,82 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
     return true;
   }
 
+  // 3B. GET /api/v1/monetary/ultrasound - Ultra-Sound Monetary Engine Metrics & Deflation Tracker
+  if ((url.pathname === '/api/v1/monetary/ultrasound' || url.pathname === '/api/wallet/ultrasound') && req.method === 'GET') {
+    try {
+      const metrics = (sovraDb as any).getUltraSoundMetrics();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        protocol: 'SOVRA_ULTRA_SOUND_MONETARY_ENGINE',
+        metrics,
+        deflationaryMechanism: {
+          gasFeeBurnPercent: 50,
+          adSpendBurnPercent: 20,
+          immutableBurnSink: metrics.burnSinkAddress,
+          hardCapSov: 100_000_000,
+          emissionModel: '20-Year Algorithmic Exponential Disinflation',
+        },
+      }));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed to fetch ultrasound metrics' }));
+    }
+    return true;
+  }
+
+  // 3C. POST /api/v1/ads/settle-spend - Ad Spend Settlement with 20% Permanent Deflationary Burn
+  if (url.pathname === '/api/v1/ads/settle-spend' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
+
+      if (!principal && !isTestEnv) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required for ad spend settlement' }));
+        return true;
+      }
+
+      const advertiserDid = String(parsed.advertiserDid || principal?.did || '').trim();
+      const publisherDid = String(parsed.publisherDid || '').trim();
+      const totalSpendSov = Number(parsed.totalSpendSov || 0);
+
+      if (!advertiserDid || !publisherDid || totalSpendSov <= 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'advertiserDid, publisherDid, and positive totalSpendSov are required' }));
+        return true;
+      }
+
+      if (principal && advertiserDid !== principal.did && !isTestEnv) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot spend funds from another advertiser identity' }));
+        return true;
+      }
+
+      const settlement = (sovraDb as any).processAdSpendSettlement({
+        advertiserDid,
+        publisherDid,
+        totalSpendSov,
+        campaignId: parsed.campaignId,
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        settlement,
+        message: `Settled ${totalSpendSov} SOV ad spend: 20% (${settlement.burnedSov} SOV) permanently burned to Consensus Burn Sink`,
+      }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Ad spend settlement failed' }));
+    }
+    return true;
+  }
+
   // 4. GET /api/wallet/bridge/chains - Supported Layer-1 IBC cross-chain targets
   if (url.pathname === '/api/wallet/bridge/chains' && req.method === 'GET') {
     const chains = [

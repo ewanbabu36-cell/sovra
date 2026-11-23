@@ -4936,6 +4936,15 @@ this.db.exec('COMMIT;');
         throw new Error(`Forbidden: DID '${adminDid}' does not possess 'ledger:transfer' or 'TREASURY_TRANSFER' permissions`);
       }
     }
+    if (
+      params.fromDid === SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID ||
+      params.fromDid === SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_ADDRESS ||
+      params.fromDid === SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_HEX ||
+      params.fromDid.startsWith('did:sov:burn:')
+    ) {
+      throw new Error('Consensus Burn Sink is immutable: tokens sent to burn sink are permanently destroyed and cannot be transferred or withdrawn');
+    }
+
     const feeSov = params.feeSov || 0.0;
     const amountSov = Math.round(Number(params.amountSov) * 100) / 100;
     if (amountSov <= 0) {
@@ -4960,7 +4969,17 @@ this.db.exec('COMMIT;');
       }
 
       let toBalance = 0;
-      if (params.toDid !== 'did:sov:treasury_burn' && !params.toDid.startsWith('did:sov:burn:')) {
+      if (
+        params.toDid === SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID ||
+        params.toDid === SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_ADDRESS ||
+        params.toDid === SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_HEX ||
+        params.toDid.startsWith('did:sov:burn:')
+      ) {
+        this.ensureConsensusBurnSinkAccount();
+        this.db.prepare('UPDATE users SET balance_sov = balance_sov + ?, updated_at = ? WHERE did = ?')
+          .run(amountSov, Date.now(), SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID);
+        toBalance = Number(this.getCumulativeBurnedSov());
+      } else if (params.toDid !== 'did:sov:treasury_burn') {
         const receiver = this.db.prepare('SELECT balance_sov FROM users WHERE did = ?').get(params.toDid) as any;
         if (!receiver) {
           throw new Error(`Receiver DID ${params.toDid} not found`);
@@ -4976,6 +4995,18 @@ this.db.exec('COMMIT;');
         INSERT INTO token_transfers (id, from_did, to_did, amount_sov, fee_sov, tx_type, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(txId, params.fromDid, params.toDid, amountSov, feeSov, params.txType || 'ADMIN_LEDGER_TRANSFER', now);
+
+      // Route 50% of gas fees permanently to Consensus Burn Sink (EIP-1559 Style Sound Money)
+      if (feeSov > 0) {
+        const gasBurnSov = Math.round((feeSov * 0.50) * 1000000) / 1000000;
+        this.ensureConsensusBurnSinkAccount();
+        this.db.prepare('UPDATE users SET balance_sov = balance_sov + ?, updated_at = ? WHERE did = ?')
+          .run(gasBurnSov, now, SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID);
+        this.db.prepare(`
+          INSERT INTO token_transfers (id, from_did, to_did, amount_sov, fee_sov, tx_type, created_at)
+          VALUES (?, ?, ?, ?, 0.0, 'GAS_FEE_BURN', ?)
+        `).run('tx_feeburn_' + txId, params.fromDid, SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID, gasBurnSov, now);
+      }
 
       // Verify 4-Column Double-Entry Solvency Invariant
       const audit = this.getTreasurySolvencyReport();
@@ -5004,6 +5035,7 @@ this.db.exec('COMMIT;');
       });
 
       return {
+        ok: true,
         txId,
         fromBalanceAfter: fromBalance,
         toBalanceAfter: toBalance,
@@ -5122,6 +5154,19 @@ this.db.exec('COMMIT;');
         status: 'CONFLICT',
         statusCode: 400,
         error: 'Invalid tip amount: must be positive finite number',
+      };
+    }
+
+    if (
+      params.fromDid === SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID ||
+      params.fromDid === SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_ADDRESS ||
+      params.fromDid === SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_HEX ||
+      params.fromDid.startsWith('did:sov:burn:')
+    ) {
+      return {
+        status: 'CONFLICT',
+        statusCode: 400,
+        error: 'Consensus Burn Sink is immutable: tokens sent to burn sink are permanently destroyed and cannot be transferred or withdrawn',
       };
     }
 
@@ -5279,6 +5324,18 @@ this.db.exec('COMMIT;');
         INSERT INTO token_transfers (id, from_did, to_did, amount_sov, fee_sov, tx_type, created_at, idempotency_key)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).run(txId, params.fromDid, params.toDid, amountSov, feeSov, params.txType || 'TIP', now, rawKey || null);
+
+      // Route 50% of gas fees permanently to Consensus Burn Sink (EIP-1559 Style Sound Money)
+      if (feeSov > 0) {
+        const gasBurnSov = Math.round((feeSov * 0.50) * 1000000) / 1000000;
+        this.ensureConsensusBurnSinkAccount();
+        this.db.prepare('UPDATE users SET balance_sov = balance_sov + ?, updated_at = ? WHERE did = ?')
+          .run(gasBurnSov, now, SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID);
+        this.db.prepare(`
+          INSERT INTO token_transfers (id, from_did, to_did, amount_sov, fee_sov, tx_type, created_at)
+          VALUES (?, ?, ?, ?, 0.0, 'GAS_FEE_BURN', ?)
+        `).run('tx_feeburn_' + txId, params.fromDid, SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID, gasBurnSov, now);
+      }
 
       // Verify solvency invariant
       const audit = this.getTreasurySolvencyReport();
@@ -6818,9 +6875,196 @@ this.db.exec('COMMIT;');
   }
 
   // ==========================================
-  // P0 WORKSTREAM 3: 100M SUPPLY CAP & AUDITED ADJUST-BALANCE
+  // P0 PHASE 3: ULTRA-SOUND MONETARY ENGINE & 100M HARD CAP
   // ==========================================
   public static readonly MAX_LIFETIME_SOV_CAP = 100_000_000;
+  public static readonly GENESIS_INITIAL_SUPPLY_SOV = 30_000_000;
+  public static readonly CONSENSUS_BURN_SINK_DID = 'did:sov:burn:dead';
+  public static readonly CONSENSUS_BURN_SINK_ADDRESS = 'sovra10000000000000000000000000000000000000dead';
+  public static readonly CONSENSUS_BURN_SINK_HEX = '0x000000000000000000000000000000000000dead';
+
+  /**
+   * Initializes and ensures the Consensus Burn Sink account exists in database.
+   */
+  public ensureConsensusBurnSinkAccount(): void {
+    try {
+      const existing = this.db.prepare('SELECT did FROM users WHERE did = ?').get(SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID);
+      if (!existing) {
+        const now = Date.now();
+        this.db.prepare(`
+          INSERT INTO users (did, handle, display_name, avatar, avatar_bg, balance_sov, device_type, created_at, updated_at)
+          VALUES (?, '@burn_sink', 'Consensus Burn Sink', '🔥', '#dc2626', 0.0, 'PROTOCOL', ?, ?)
+        `).run(SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID, now, now);
+      }
+    } catch (_) {}
+  }
+
+  /**
+   * Routes an amount of SOV to the immutable Consensus Burn Sink.
+   * Can be triggered by 50% gas fee burns, 20% ad-spend burns, or explicit burns.
+   */
+  public burnToConsensusSink(
+    amountSov: number,
+    reason: 'GAS_FEE_BURN' | 'AD_SPEND_BURN' | 'DIRECT_BURN' | 'PROTOCOL_DEFLATION' = 'DIRECT_BURN',
+    sourceTxId?: string
+  ): {
+    burnTxId: string;
+    burnedAmountSov: number;
+    cumulativeBurnedSov: number;
+  } {
+    if (amountSov <= 0) {
+      return { burnTxId: '', burnedAmountSov: 0, cumulativeBurnedSov: this.getCumulativeBurnedSov() };
+    }
+    this.ensureConsensusBurnSinkAccount();
+
+    const rounded = Math.round(amountSov * 1000000) / 1000000;
+    const now = Date.now();
+    const burnTxId = 'tx_burn_' + now + '_' + crypto.randomBytes(4).toString('hex');
+
+    this.db.prepare('UPDATE users SET balance_sov = balance_sov + ?, updated_at = ? WHERE did = ?')
+      .run(rounded, now, SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID);
+
+    this.db.prepare(`
+      INSERT INTO token_transfers (id, from_did, to_did, amount_sov, fee_sov, tx_type, created_at)
+      VALUES (?, 'system:burn_engine', ?, ?, 0.0, ?, ?)
+    `).run(burnTxId, SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID, rounded, reason, now);
+
+    return {
+      burnTxId,
+      burnedAmountSov: rounded,
+      cumulativeBurnedSov: this.getCumulativeBurnedSov(),
+    };
+  }
+
+  public getCumulativeBurnedSov(): number {
+    try {
+      this.ensureConsensusBurnSinkAccount();
+      const row = this.db.prepare('SELECT balance_sov FROM users WHERE did = ?').get(SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID) as any;
+      return Number(row?.balance_sov || 0);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /**
+   * Executes ad spend campaign settlement with strict 20% permanent deflationary burn.
+   * 20% permanently burned to Consensus Burn Sink.
+   * 80% credited to publisher/creator.
+   */
+  public processAdSpendSettlement(params: {
+    advertiserDid: string;
+    publisherDid: string;
+    totalSpendSov: number;
+    campaignId?: string;
+  }): {
+    ok: boolean;
+    advertiserDid: string;
+    publisherDid: string;
+    totalSpendSov: number;
+    burnedSov: number;
+    publisherNetSov: number;
+    burnTxId: string;
+    payoutTxId: string;
+  } {
+    const totalSpend = Math.round(Number(params.totalSpendSov) * 1000000) / 1000000;
+    if (totalSpend <= 0) throw new Error('Ad spend amount must be strictly positive');
+    if (!params.advertiserDid || !params.publisherDid) throw new Error('Both advertiserDid and publisherDid are required');
+
+    const advertiser = this.db.prepare('SELECT balance_sov FROM users WHERE did = ?').get(params.advertiserDid) as any;
+    if (!advertiser || Number(advertiser.balance_sov || 0) < totalSpend) {
+      throw new Error(`Insufficient advertiser balance: has ${advertiser?.balance_sov || 0} SOV, requires ${totalSpend} SOV`);
+    }
+
+    const burnAmount = Math.round((totalSpend * 0.20) * 1000000) / 1000000; // 20% permanent burn
+    const publisherNet = Math.round((totalSpend - burnAmount) * 1000000) / 1000000; // 80% net
+
+    this.ensureConsensusBurnSinkAccount();
+    const now = Date.now();
+    const burnTxId = 'tx_adburn_' + now + '_' + crypto.randomBytes(4).toString('hex');
+    const payoutTxId = 'tx_adpay_' + now + '_' + crypto.randomBytes(4).toString('hex');
+
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      // 1. Debit advertiser full spend
+      this.db.prepare('UPDATE users SET balance_sov = balance_sov - ?, updated_at = ? WHERE did = ?')
+        .run(totalSpend, now, params.advertiserDid);
+
+      // 2. Credit publisher 80%
+      this.db.prepare('UPDATE users SET balance_sov = balance_sov + ?, updated_at = ? WHERE did = ?')
+        .run(publisherNet, now, params.publisherDid);
+
+      // 3. Credit 20% to Consensus Burn Sink
+      this.db.prepare('UPDATE users SET balance_sov = balance_sov + ?, updated_at = ? WHERE did = ?')
+        .run(burnAmount, now, SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID);
+
+      // 4. Record transfers
+      this.db.prepare(`
+        INSERT INTO token_transfers (id, from_did, to_did, amount_sov, fee_sov, tx_type, created_at)
+        VALUES (?, ?, ?, ?, 0.0, 'AD_SPEND_BURN', ?)
+      `).run(burnTxId, params.advertiserDid, SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID, burnAmount, now);
+
+      this.db.prepare(`
+        INSERT INTO token_transfers (id, from_did, to_did, amount_sov, fee_sov, tx_type, created_at)
+        VALUES (?, ?, ?, ?, 0.0, 'AD_SPEND_PAYOUT', ?)
+      `).run(payoutTxId, params.advertiserDid, params.publisherDid, publisherNet, now);
+
+      this.db.exec('COMMIT');
+
+      return {
+        ok: true,
+        advertiserDid: params.advertiserDid,
+        publisherDid: params.publisherDid,
+        totalSpendSov: totalSpend,
+        burnedSov: burnAmount,
+        publisherNetSov: publisherNet,
+        burnTxId,
+        payoutTxId,
+      };
+    } catch (err: any) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  /**
+   * Ultra-Sound Money supply metrics:
+   * Proves that: circulatingSupplySov + totalBurnedSov == totalAccountingSupply <= 100M hard cap
+   */
+  public getUltraSoundMetrics(): {
+    maxLifetimeCapSov: number;
+    genesisSupplySov: number;
+    totalBurnedSov: number;
+    circulatingSupplySov: number;
+    totalSystemAccountingSov: number;
+    isDeflationary: boolean;
+    gasFeeBurnPercent: number;
+    adBurnPercent: number;
+    invariantHolds: boolean;
+    burnSinkAddress: string;
+    burnSinkHex: string;
+    burnSinkDid: string;
+  } {
+    const totalBurned = this.getCumulativeBurnedSov();
+    const supply = this.getTotalSovSupply();
+    // Circulating supply is total non-burned user balances + escrows + active treasury
+    const circulating = Math.max(0, Math.round((supply.totalSystemAccountingSov - totalBurned) * 1000) / 1000);
+    const invariantHolds = (circulating + totalBurned) <= SqliteSocialDatabaseEngine.MAX_LIFETIME_SOV_CAP;
+
+    return {
+      maxLifetimeCapSov: SqliteSocialDatabaseEngine.MAX_LIFETIME_SOV_CAP,
+      genesisSupplySov: SqliteSocialDatabaseEngine.GENESIS_INITIAL_SUPPLY_SOV,
+      totalBurnedSov: totalBurned,
+      circulatingSupplySov: circulating,
+      totalSystemAccountingSov: supply.totalSystemAccountingSov,
+      isDeflationary: totalBurned > 0,
+      gasFeeBurnPercent: 50, // 50% of gas fees permanently burned
+      adBurnPercent: 20,     // 20% of ad-spend permanently burned
+      invariantHolds,
+      burnSinkAddress: SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_ADDRESS,
+      burnSinkHex: SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_HEX,
+      burnSinkDid: SqliteSocialDatabaseEngine.CONSENSUS_BURN_SINK_DID,
+    };
+  }
 
   public getTotalSovSupply(): {
     totalUserBalancesSov: number;

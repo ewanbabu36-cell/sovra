@@ -33,6 +33,11 @@ const (
 	FeeCollectorName     = "fee_collector"
 	CommunityPoolName    = "community_pool"
 	SeederEscrowPoolName = "seeder_escrow"
+
+	// Consensus Permanent Burn Sink addresses
+	ConsensusBurnSinkAddress = "sovra10000000000000000000000000000000000000dead"
+	ConsensusBurnSinkHex     = "0x000000000000000000000000000000000000dead"
+	ConsensusBurnSinkDID     = "did:sov:burn:dead"
 )
 
 // PoolID identifies the origin pool for emissions

@@ -1,4 +1,4 @@
-import { verifyGroth16Proof, DEFAULT_SEMAPHORE_HUMANITY_VKEY } from '../../packages/crypto/src/zk.ts';
+import { verifyGroth16Proof, DEFAULT_SEMAPHORE_HUMANITY_VKEY, DEFAULT_RANGE_PROOF_VKEY } from '../../packages/crypto/src/zk.ts';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { sovraDb, type ZkAttestationRecord } from '../database-engine.ts';
@@ -227,17 +227,48 @@ export async function handleZkRoutes(
           return true;
         }
 
-        if (Array.isArray(publicSignals) && publicSignals.length === 4) {
-          const vResult = verifyGroth16Proof(proofObj, publicSignals, DEFAULT_SEMAPHORE_HUMANITY_VKEY);
-          isCryptographicallyVerified = vResult.valid;
-          if (isCryptographicallyVerified) {
-            proofRecordJson = JSON.stringify(proofObj);
+        if (Array.isArray(publicSignals)) {
+          if (publicSignals.length === 2) {
+            // Range proof verification (age >= threshold, balance >= escrow, kyc_tier >= required)
+            const vResult = verifyGroth16Proof(proofObj, publicSignals, DEFAULT_RANGE_PROOF_VKEY);
+            isCryptographicallyVerified = vResult.valid;
+            if (isCryptographicallyVerified) {
+              proofRecordJson = JSON.stringify(proofObj);
+            }
+          } else if (publicSignals.length === 4) {
+            // Semaphore identity/humanity membership proof
+            const vResult = verifyGroth16Proof(proofObj, publicSignals, DEFAULT_SEMAPHORE_HUMANITY_VKEY);
+            isCryptographicallyVerified = vResult.valid;
+            if (isCryptographicallyVerified) {
+              proofRecordJson = JSON.stringify(proofObj);
+            }
           }
         }
       }
 
+      if (requireProof && !isCryptographicallyVerified) {
+        sendJson(res, 422, {
+          ok: false,
+          error: 'ERR_UNPROVEN_CLAIM',
+          message: 'Supplied zero-knowledge proof failed cryptographic verification. Claim cannot be verified without an authentic zero-knowledge circuit proof.',
+        });
+        return true;
+      }
+
       const id = `zk_sd_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-      const nullifier = `nul_sd_${crypto.randomBytes(8).toString('hex')}`;
+      const nullifier = (isCryptographicallyVerified && Array.isArray(publicSignals) && publicSignals[1])
+        ? publicSignals[1].toString()
+        : `nul_sd_${crypto.randomBytes(8).toString('hex')}`;
+
+      // Check replay defense for verified proofs
+      if (isCryptographicallyVerified && sovraDb.getZkAttestationByNullifier(nullifier)) {
+        sendJson(res, 409, {
+          ok: false,
+          error: 'Nullifier hash already used; duplicate selective disclosure attestation rejected',
+        });
+        return true;
+      }
+
       const isSatisfied = claimValue !== undefined ? Number(claimValue) >= Number(threshold || 18) : true;
 
       const attestation: ZkAttestationRecord = {
