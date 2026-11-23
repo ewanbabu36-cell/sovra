@@ -139,3 +139,83 @@
   ```
 - **Regression Result**:
   Full security test suite (`tests/security/`) passes 65 out of 65 tests (100%). Zero regressions.
+
+---
+
+### FIX-06: Strict Client-Side E2EE Enforcement & Elimination of Plaintext Fallback (P0)
+- **Original Finding**: Task 1 [P0] E2EE Security Enforcement
+- **Severity**: **CRITICAL (CVSS v3.1: 9.3)**
+- **Root Cause**:
+  In `scripts/routes/chat.routes.ts`, if direct message payload lacked client-side ciphertext, server automatically encrypted plaintext using a server pepper or thread-derived deterministic key, falsely labeling it as genuine E2EE.
+- **Modified Files & Exact Lines**:
+  1. [`scripts/routes/chat.routes.ts:340-440`](file:///d:/Sovra/scripts/routes/chat.routes.ts) (Removed server-side plaintext fallback encryption; enforced required `ciphertextHex`, `ivHex`, `tagHex`; rejected plaintext DMs with `HTTP 422 Unprocessable Entity` `ERR_CLIENT_E2EE_REQUIRED`; added anti-replay detection `HTTP 409` and self-messaging prohibition `HTTP 400`).
+  2. [`scripts/database-engine.ts:3490-3530`](file:///d:/Sovra/scripts/database-engine.ts) (Eliminated deterministic key derivation `SOVRA_MSG_SEAL|${threadId}`).
+- **Before Behavior**:
+  Plaintext message `{ text: "Hello" }` sent to `/api/chat/send` was accepted, silently encrypted on server, and marked as `isE2ee: true`.
+- **After Behavior**:
+  Unencrypted direct messages are strictly rejected with `HTTP 422: Direct message requires client-side E2EE ciphertext, IV, and authentication tag`.
+- **Test Command**:
+  ```powershell
+  npx vitest run tests/security/target_e2ee_client_side_hardening.test.ts
+  ```
+- **Actual Execution Output**:
+  ```
+  ✓ tests/security/target_e2ee_client_side_hardening.test.ts (9 tests)
+  ```
+- **Regression Result**:
+  `tests/e2e/chat-realtime-two-sessions.test.ts` (9/9 passed) and `tests/security/adversarial-remediation-gate.test.ts` (25/25 passed). Zero regressions.
+
+---
+
+### FIX-07: Financial Ledger 6-State Machine & Zero Balance Leakage (P0)
+- **Original Finding**: Task 2 [P0] CometBFT Settlement & Financial Integrity
+- **Severity**: **CRITICAL (CVSS v3.1: 9.8)**
+- **Root Cause**:
+  In `scripts/routes/wallet.routes.ts`, balance deductions occurred prior to CometBFT finality, risking balance desynchronization and double-spend on RPC timeouts or node restarts.
+- **Modified Files & Exact Lines**:
+  1. [`scripts/database-sqlite.ts`](file:///d:/Sovra/scripts/database-sqlite.ts) (Added table `financial_settlement_intents` with 6 states: `CREATED`, `RESERVED`, `SUBMITTED`, `COMMITTED`, `FAILED`, `RECONCILIATION_REQUIRED`).
+  2. [`scripts/routes/wallet.routes.ts:930-1170`](file:///d:/Sovra/scripts/routes/wallet.routes.ts) (Wired state machine; atomic SQLite reservations; fail-closed automatic rollback on strict L1 failure; voucher Ed25519 signature verification and replay prevention).
+- **Before Behavior**:
+  Ledger balance was permanently debited before consensus was achieved; failing or delayed L1 broadcast resulted in permanent loss or inconsistency.
+- **After Behavior**:
+  Balance is atomically reserved. Strict L1 failures automatically execute compensation refund (`HTTP 503`), restoring sender balance with zero leakage. Replayed vouchers strictly return `HTTP 409 Conflict`.
+- **Test Command**:
+  ```powershell
+  npx vitest run tests/security/target_financial_settlement_state_machine.test.ts tests/security/target_a_wallet_voucher_hardening.test.ts
+  ```
+- **Actual Execution Output**:
+  ```
+  ✓ tests/security/target_financial_settlement_state_machine.test.ts (6 tests)
+  ✓ tests/security/target_a_wallet_voucher_hardening.test.ts (4 tests)
+  ```
+- **Regression Result**:
+  All financial and concurrency tests passed (`phase9-financial-concurrency.test.ts` 4/4 passed). Zero regressions.
+
+---
+
+### FIX-08: Session Token Security, HttpOnly Cookies, and Refresh Rotation (SEC-07)
+- **Original Finding ID**: `SEC-07`
+- **Severity**: **HIGH (CVSS v3.1: 7.2)**
+- **Root Cause**:
+  Session tokens and private seeds were persisted in client `localStorage`, exposing credentials to potential cross-site scripting or hostile browser extensions.
+- **Modified Files & Exact Lines**:
+  1. [`scripts/routes/auth.routes.ts:240-335, 1260-1290`](file:///d:/Sovra/scripts/routes/auth.routes.ts) (Issued `Set-Cookie` with `HttpOnly; SameSite=Strict; Secure; Path=/` for `sovra_session_token`, `sovra_session`, and `sovra_refresh_token`; added `/api/user/refresh` and `/api/auth/refresh` rotating token endpoints; cleared cookies on logout).
+  2. [`scripts/database-engine.ts:6360-6410, 12120-12250`](file:///d:/Sovra/scripts/database-engine.ts) (Added refresh token rotation, session fixation defense on login, and reuse detection compromise termination).
+  3. [`scripts/database-sqlite.ts:1330, 2520-2590`](file:///d:/Sovra/scripts/database-sqlite.ts) (Added SQLite schema migrations for `refresh_token` and `rotateSession`).
+  4. [`scripts/dev-server.ts:2735-2775, 3320-3330`](file:///d:/Sovra/scripts/dev-server.ts) (Enforced CSRF protection for cookie-authenticated mutating requests; origin validation; added CSRF headers to CORS allow list; preserved Bearer token backward compatibility for mobile/API).
+- **Before Behavior**:
+  Session token was stored in plaintext `localStorage`; no refresh token rotation or reuse defense existed.
+- **After Behavior**:
+  Browser sessions authenticate via HttpOnly, SameSite=Strict cookies; refresh tokens rotate on every refresh call; reuse of a consumed refresh token immediately terminates all sessions for the user; mobile/API clients authenticate seamlessly via `Authorization: Bearer <token>`.
+- **Test Command**:
+  ```powershell
+  npx vitest run --pool=forks tests/security/target_sec07_session_cookie_hardening.test.ts tests/security/sec07-session-security.test.ts
+  ```
+- **Actual Execution Output**:
+  ```
+  ✓ tests/security/target_sec07_session_cookie_hardening.test.ts (5 tests)
+  ✓ tests/security/sec07-session-security.test.ts (5 tests)
+  ```
+- **Regression Result**:
+  Zero regressions across authentication and session management.
+

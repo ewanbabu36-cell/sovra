@@ -134,6 +134,7 @@ export interface UserRecord {
   deviceType: 'Mobile' | 'Desktop';
   publicKey?: string;
   sessionToken?: string;
+  refreshToken?: string;
   balanceSov?: number; // Sovereign wallet balance in SOV (default: 500.00)
   balanceUsov?: string; // Integer micro-Sovra base units as string (e.g. "500000000" = 500 SOV)
   lockedUsov?: string; // Reserved micro-Sovra in active open orders
@@ -1418,6 +1419,8 @@ export interface UserSessionRecord {
   sessionId: string;
   userDid: string;
   token: string;
+  refreshToken?: string;
+  refreshTokenExpiresAt?: number;
   deviceName: string;
   deviceType: 'Desktop' | 'Mobile' | 'Tablet';
   ipAddress: string;
@@ -3240,6 +3243,7 @@ export class SovraDatabaseEngine {
 
     const now = Date.now();
     const sessionToken = user.sessionToken || ('stk_' + crypto.randomBytes(24).toString('hex'));
+    const refreshToken = (user as any).refreshToken || ('rtk_' + crypto.randomBytes(32).toString('hex'));
     const chosenPin = (user.securityPin && user.securityPin.trim()) ? user.securityPin.trim() : undefined;
     const rawRecoveryPhrase = user.recoveryPhrase || this.generateRecoveryPhrase();
     const { hash: recHash, salt: recSalt } = this.hashRecoveryPhrase(rawRecoveryPhrase);
@@ -3255,6 +3259,7 @@ export class SovraDatabaseEngine {
       deviceType: user.deviceType || 'Desktop',
       publicKey: user.publicKey,
       sessionToken,
+      refreshToken,
       balanceSov: typeof user.balanceSov === 'number' ? user.balanceSov : (process.env.NODE_ENV === 'test' ? 500.0 : 0.0),
       balance_sov: typeof user.balanceSov === 'number' ? user.balanceSov : (process.env.NODE_ENV === 'test' ? 500.0 : 0.0),
       securityPinHash: chosenPin ? this.hashSecurityPin(chosenPin) : undefined,
@@ -3290,6 +3295,7 @@ export class SovraDatabaseEngine {
     this.createSession({
       userDid: record.did,
       token: sessionToken,
+      refreshToken,
       deviceType: record.deviceType as any,
     });
 
@@ -3324,7 +3330,7 @@ export class SovraDatabaseEngine {
     try {
       this.sqliteEngine?.registerUser(record);
     } catch (_) {}
-    return { ok: true, user: record, recoveryPhrase: rawRecoveryPhrase };
+    return { ok: true, user: record, recoveryPhrase: rawRecoveryPhrase, sessionToken, refreshToken };
   }
 
   public createUser(user: Partial<UserRecord> & { did: string; handle: string; displayName: string }): UserRecord {
@@ -3564,28 +3570,17 @@ export class SovraDatabaseEngine {
       ? msg.recipientDid
       : this.getThreadId(msg.senderDid, msg.recipientDid);
 
-    // P0-01: Zero-knowledge encryption at rest
-    let ciphertextHex = msg.ciphertextHex || '';
-    let ivHex = msg.ivHex || '';
-    let tagHex = msg.tagHex || '';
-    let isE2EE = Boolean(msg.isE2EE || ciphertextHex);
+    // P0-01: Genuine Zero-Trust Client-Side E2EE Storage
+    // Server NEVER performs fallback encryption and NEVER derives keys from public thread IDs.
+    const ciphertextHex = String(msg.ciphertextHex || '').trim();
+    const ivHex = String(msg.ivHex || (msg as any).nonceHex || '').trim();
+    const tagHex = String(msg.tagHex || '').trim();
+    const isClientE2EE = Boolean(ciphertextHex && ivHex && tagHex);
+    const isE2EE = Boolean(isClientE2EE);
 
-    if (!ciphertextHex && msg.text && !msg.text.startsWith('🔒')) {
-      const threadKey = crypto.createHash('sha256').update(`SOVRA_MSG_SEAL|${threadId}`).digest();
-      const iv = crypto.randomBytes(12);
-      const cipher = crypto.createCipheriv('aes-256-gcm', threadKey, iv);
-      let enc = cipher.update(msg.text, 'utf8', 'hex');
-      enc += cipher.final('hex');
-      ciphertextHex = enc;
-      ivHex = iv.toString('hex');
-      tagHex = cipher.getAuthTag().toString('hex');
-      isE2EE = true;
-    }
-
-    const isClientE2EE = Boolean(msg.ciphertextHex || (isE2EE && !msg.text));
     const recordText = isClientE2EE
-      ? '🔒 [End-to-End Encrypted: Double Ratchet]'
-      : (isE2EE ? '🔒 [End-to-End Encrypted: AES-GCM-256]' : (msg.text || (msg.attachment ? msg.attachment.name : '')));
+      ? '🔒 [End-to-End Encrypted: Client-Side]'
+      : (msg.text || (msg.attachment ? msg.attachment.name : ''));
     const record: ChatMessageRecord = {
       id: msg.id || 'msg_' + now + '_' + crypto.randomBytes(8).toString('hex'),
       threadId,
@@ -3593,7 +3588,7 @@ export class SovraDatabaseEngine {
       recipientDid: msg.recipientDid,
       senderName: msg.senderName || 'Peer',
       text: recordText,
-      rawText: isE2EE ? undefined : msg.text,
+      rawText: isClientE2EE ? undefined : msg.text,
       attachment: msg.attachment,
       isAudio: Boolean(msg.isAudio),
       audioDurationSec: msg.audioDurationSec || 0,
@@ -3644,6 +3639,12 @@ export class SovraDatabaseEngine {
     );
     this.save(true);
     return record;
+  }
+
+  public findChatMessageById(messageId: string): ChatMessageRecord | null {
+    this.load();
+    if (!Array.isArray(this.db.chatMessages)) return null;
+    return this.db.chatMessages.find(m => m.id === messageId) || null;
   }
 
   public editChatMessage(messageId: string, requesterDid: string, newText: string): { ok: boolean; message?: ChatMessageRecord; error?: string } {
@@ -6371,22 +6372,29 @@ export class SovraDatabaseEngine {
   public createSession(session: {
     userDid: string;
     token: string;
+    refreshToken?: string;
     deviceName?: string;
     deviceType?: 'Desktop' | 'Mobile' | 'Tablet';
     ipAddress?: string;
     userAgent?: string;
     ttlMs?: number;
     expiresAt?: number;
+    refreshTokenTtlMs?: number;
+    refreshTokenExpiresAt?: number;
   }): UserSessionRecord {
     this.load();
     if (!this.db.user_sessions) this.db.user_sessions = [];
     const now = Date.now();
     const defaultTtlMs = 7 * 24 * 60 * 60 * 1000; // 7 days absolute session lifetime
+    const defaultRefreshTtlMs = 30 * 24 * 60 * 60 * 1000; // 30 days refresh lifetime
     const expiresAt = session.expiresAt || (session.ttlMs ? now + session.ttlMs : now + defaultTtlMs);
+    const refreshTokenExpiresAt = session.refreshTokenExpiresAt || (session.refreshTokenTtlMs ? now + session.refreshTokenTtlMs : now + defaultRefreshTtlMs);
     const sessionRecord: UserSessionRecord = {
       sessionId: 'ses_' + now + '_' + crypto.randomBytes(6).toString('hex'),
       userDid: session.userDid,
       token: session.token,
+      refreshToken: session.refreshToken,
+      refreshTokenExpiresAt,
       deviceName: session.deviceName || (session.deviceType === 'Mobile' ? 'Mobile Phone' : 'Workstation Desktop'),
       deviceType: session.deviceType || 'Desktop',
       ipAddress: session.ipAddress || '127.0.0.1',
@@ -6487,12 +6495,17 @@ export class SovraDatabaseEngine {
     if (Array.isArray(this.db.revoked_tokens) && this.db.revoked_tokens.some(r => r.token === token)) {
       return true;
     }
-    const session = (this.db.user_sessions || []).find(s => s.token === token);
+    const session = (this.db.user_sessions || []).find(s => s.token === token || s.refreshToken === token);
     if (session) {
       if (session.isRevoked) return true;
       if (session.expiresAt && session.expiresAt < Date.now()) return true;
+      if (session.refreshToken === token && session.refreshTokenExpiresAt && session.refreshTokenExpiresAt < Date.now()) return true;
     }
     return false;
+  }
+
+  public isTokenRevoked(token: string): boolean {
+    return this.isSessionRevoked(token);
   }
 
   public deleteUserAccount(userDid: string): { ok: boolean; error?: string } {
@@ -7372,13 +7385,21 @@ export class SovraDatabaseEngine {
 
   public setUserBalance(userDid: string, balance: number): number {
     this.load();
+    const cleanBal = Math.max(0, Math.round(balance * 100) / 100);
     const user = this.db.users.find(u => u.did === userDid);
     if (user) {
-      user.balanceSov = Math.max(0, Math.round(balance * 100) / 100);
+      user.balanceSov = cleanBal;
       this.save();
-      return user.balanceSov;
     }
-    return balance;
+    if (this.sqliteEngine) {
+      try {
+        const rawDb = (this.sqliteEngine as any).getRawDb ? (this.sqliteEngine as any).getRawDb() : (this.sqliteEngine as any).db;
+        if (rawDb) {
+          rawDb.prepare('UPDATE users SET balance_sov = ?, updated_at = ? WHERE did = ?').run(cleanBal, Date.now(), userDid);
+        }
+      } catch (_) {}
+    }
+    return cleanBal;
   }
 
   public executeUserP2PTransfer(params: {
@@ -7452,6 +7473,51 @@ export class SovraDatabaseEngine {
       statusCode: res.statusCode || 400,
       error: res.error || 'Transfer failed',
     };
+  }
+
+  public createSettlementIntent(params: any): any {
+    if (!this.sqliteEngine) {
+      return { ok: false, statusCode: 500, error: 'SQLite financial ledger unavailable' };
+    }
+    return (this.sqliteEngine as any).createSettlementIntent(params);
+  }
+
+  public markSettlementSubmitted(intentId: string): boolean {
+    if (!this.sqliteEngine) return false;
+    return (this.sqliteEngine as any).markSettlementSubmitted(intentId);
+  }
+
+  public commitSettlementIntent(params: any): any {
+    if (!this.sqliteEngine) {
+      return { ok: false, error: 'SQLite financial ledger unavailable' };
+    }
+    const res = (this.sqliteEngine as any).commitSettlementIntent(params);
+    this.save(true);
+    return res;
+  }
+
+  public failAndRefundSettlementIntent(params: any): any {
+    if (!this.sqliteEngine) {
+      return { ok: false, error: 'SQLite financial ledger unavailable' };
+    }
+    const res = (this.sqliteEngine as any).failAndRefundSettlementIntent(params);
+    this.save(true);
+    return res;
+  }
+
+  public markSettlementReconciliationRequired(params: any): any {
+    if (!this.sqliteEngine) return { ok: false };
+    return (this.sqliteEngine as any).markSettlementReconciliationRequired(params);
+  }
+
+  public getSettlementIntent(intentId: string): any {
+    if (!this.sqliteEngine) return null;
+    return (this.sqliteEngine as any).getSettlementIntent(intentId);
+  }
+
+  public getPendingSettlementIntents(): any[] {
+    if (!this.sqliteEngine) return [];
+    return (this.sqliteEngine as any).getPendingSettlementIntents();
   }
 
   public processTip(params: {
@@ -12075,22 +12141,124 @@ export class SovraDatabaseEngine {
       return { ok: false, error: 'Invalid credentials' };
     }
 
+    // Prevent session fixation: revoke previous sessionToken and refreshToken if user had one
+    if (user.sessionToken) {
+      this.revokeToken(user.sessionToken, 'Session rotation on re-login');
+    }
+    if (user.refreshToken) {
+      this.revokeToken(user.refreshToken, 'Session rotation on re-login');
+    }
+
     const token = 'stk_' + crypto.randomBytes(24).toString('hex');
+    const refreshToken = 'rtk_' + crypto.randomBytes(32).toString('hex');
     user.sessionToken = token;
+    user.refreshToken = refreshToken;
     user.updatedAt = Date.now();
     this.createSession({
       userDid: user.did,
       token,
+      refreshToken,
       deviceName: deviceName || 'Web Browser',
       ipAddress,
       userAgent,
     });
     this.save();
-    return { ok: true, user, sessionToken: token };
+    return { ok: true, user, sessionToken: token, refreshToken };
   }
 
   public logoutUser(token: string): boolean {
     return this.revokeToken(token, 'User logout');
+  }
+
+  public rotateUserSession(
+    currentRefreshToken: string,
+    ipAddress?: string,
+    userAgent?: string
+  ): { ok: boolean; user?: UserRecord; sessionToken?: string; refreshToken?: string; error?: string; isCompromised?: boolean } {
+    this.load();
+    if (!currentRefreshToken) {
+      return { ok: false, error: 'Refresh token is required' };
+    }
+
+    // Check if refresh token was already revoked (Reuse Detection)
+    if (this.isTokenRevoked(currentRefreshToken)) {
+      // Replay of consumed or revoked refresh token detected!
+      // Invalidate all active sessions for the affected user (session hijacking defense)
+      const compromisedSession = (this.db.user_sessions || []).find(
+        s => s.refreshToken === currentRefreshToken || s.token === currentRefreshToken
+      );
+      if (compromisedSession) {
+        const user = this.findUserByDid(compromisedSession.userDid);
+        if (user) {
+          (this.db.user_sessions || []).filter(s => s.userDid === user.did).forEach(s => {
+            this.revokeToken(s.token, 'Compromised refresh token reuse detected');
+            if (s.refreshToken) this.revokeToken(s.refreshToken, 'Compromised refresh token reuse detected');
+          });
+          user.sessionToken = undefined;
+          user.refreshToken = undefined;
+          this.save();
+        }
+      }
+      return {
+        ok: false,
+        error: 'Security alert: Refresh token has already been consumed or revoked. All active sessions terminated.',
+        isCompromised: true,
+      };
+    }
+
+    // Find active session matching this refresh token
+    const session = (this.db.user_sessions || []).find(s => s.refreshToken === currentRefreshToken && !s.isRevoked);
+    let targetUser: UserRecord | undefined = undefined;
+
+    if (session) {
+      if (session.refreshTokenExpiresAt && session.refreshTokenExpiresAt < Date.now()) {
+        return { ok: false, error: 'Refresh token has expired' };
+      }
+      targetUser = this.findUserByDid(session.userDid);
+    } else {
+      targetUser = this.db.users.find(u => u.refreshToken === currentRefreshToken);
+    }
+
+    if (!targetUser) {
+      return { ok: false, error: 'Invalid or expired refresh token' };
+    }
+
+    // Revoke old session and old refresh token
+    if (session) {
+      this.revokeToken(session.token, 'Session rotated');
+      this.revokeToken(currentRefreshToken, 'Refresh token rotated');
+    } else {
+      this.revokeToken(currentRefreshToken, 'Refresh token rotated');
+    }
+
+    // Generate new cryptographic random tokens
+    const newSessionToken = 'stk_' + crypto.randomBytes(24).toString('hex');
+    const newRefreshToken = 'rtk_' + crypto.randomBytes(32).toString('hex');
+    targetUser.sessionToken = newSessionToken;
+    targetUser.refreshToken = newRefreshToken;
+    targetUser.updatedAt = Date.now();
+
+    this.createSession({
+      userDid: targetUser.did,
+      token: newSessionToken,
+      refreshToken: newRefreshToken,
+      deviceName: session?.deviceName || 'Web Browser',
+      deviceType: session?.deviceType || 'Desktop',
+      ipAddress: ipAddress || session?.ipAddress,
+      userAgent: userAgent || session?.userAgent,
+    });
+    this.save();
+
+    try {
+      this.sqliteEngine?.rotateSession?.(currentRefreshToken, newSessionToken, newRefreshToken);
+    } catch (_) {}
+
+    return {
+      ok: true,
+      user: targetUser,
+      sessionToken: newSessionToken,
+      refreshToken: newRefreshToken,
+    };
   }
 
   // ==========================================

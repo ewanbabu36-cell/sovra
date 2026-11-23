@@ -2766,8 +2766,10 @@ async function startDevServer() {
                 } catch (_) {}
               }
 
-              if (!isSameOriginOrTrusted && secFetchSite === 'cross-site') {
-                return null; // CSRF blocked!
+              if (!isSameOriginOrTrusted) {
+                if (secFetchSite === 'cross-site' || (req.headers.origin && req.headers.origin !== 'null')) {
+                  return null; // CSRF blocked!
+                }
               }
             }
             return princ;
@@ -3324,7 +3326,7 @@ async function startDevServer() {
       // Never set Access-Control-Allow-Credentials with wildcard
     }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Sovra-Signature, X-Sovra-DID, X-Sovra-Nonce, X-Sovra-Timestamp, X-Sovra-Session-Token');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Sovra-Signature, X-Sovra-DID, X-Sovra-Nonce, X-Sovra-Timestamp, X-Sovra-Session-Token, X-CSRF-Token, X-Sovra-CSRF, X-Sovra-Refresh-Token, X-Requested-With');
 
     // Hardened Security Headers (OWASP Production Defense-in-Depth)
     res.setHeader('X-Content-Type-Options', 'nosniff');

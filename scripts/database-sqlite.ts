@@ -1331,6 +1331,9 @@ export class SqliteSocialDatabaseEngine {
       try { this.db.exec("ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0"); } catch (_) {}
       try { this.db.exec("ALTER TABLE users ADD COLUMN is_creator INTEGER DEFAULT 0"); } catch (_) {}
       try { this.db.exec("ALTER TABLE users ADD COLUMN monetization_status TEXT DEFAULT 'ACTIVE'"); } catch (_) {}
+      try { this.db.exec("ALTER TABLE users ADD COLUMN refresh_token TEXT;"); } catch (_) {}
+      try { this.db.exec("ALTER TABLE user_sessions ADD COLUMN refresh_token TEXT;"); } catch (_) {}
+      try { this.db.exec("CREATE INDEX IF NOT EXISTS idx_sessions_refresh ON user_sessions(refresh_token);"); } catch (_) {}
       try { this.db.exec("ALTER TABLE posts ADD COLUMN is_removed INTEGER DEFAULT 0"); } catch (_) {}
       try { this.db.exec("ALTER TABLE posts ADD COLUMN moderation_state TEXT DEFAULT 'ACTIVE'"); } catch (_) {}
       try { this.db.exec("ALTER TABLE posts ADD COLUMN moderation_reason TEXT"); } catch (_) {}
@@ -1524,6 +1527,36 @@ export class SqliteSocialDatabaseEngine {
         );
         CREATE INDEX IF NOT EXISTS idx_finkey_user ON financial_idempotency_keys(user_did);
         CREATE INDEX IF NOT EXISTS idx_finkey_created ON financial_idempotency_keys(created_at);
+      `);
+    } catch (_) {}
+    try {
+      this.db.exec(`
+        -- 30b-2. DURABLE FINANCIAL SETTLEMENT STATE MACHINE (L1 COMETBFT + SQLITE)
+        CREATE TABLE IF NOT EXISTS financial_settlement_intents (
+          id TEXT PRIMARY KEY,
+          idempotency_key TEXT UNIQUE,
+          sender_did TEXT NOT NULL,
+          recipient_did TEXT NOT NULL,
+          amount_sov REAL NOT NULL,
+          fee_sov REAL NOT NULL DEFAULT 0.0,
+          state TEXT NOT NULL CHECK(state IN ('CREATED', 'RESERVED', 'SUBMITTED', 'COMMITTED', 'FAILED', 'RECONCILIATION_REQUIRED')),
+          l1_tx_hash TEXT,
+          l1_block_height INTEGER,
+          retry_count INTEGER NOT NULL DEFAULT 0,
+          last_error TEXT,
+          memo TEXT,
+          ip_address TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          reserved_at INTEGER,
+          submitted_at INTEGER,
+          committed_at INTEGER,
+          failed_at INTEGER
+        );
+        CREATE INDEX IF NOT EXISTS idx_fsi_sender ON financial_settlement_intents(sender_did);
+        CREATE INDEX IF NOT EXISTS idx_fsi_state ON financial_settlement_intents(state);
+        CREATE INDEX IF NOT EXISTS idx_fsi_idempotency ON financial_settlement_intents(idempotency_key);
+        CREATE INDEX IF NOT EXISTS idx_fsi_created ON financial_settlement_intents(created_at);
       `);
     } catch (_) {}
     try {
@@ -2487,21 +2520,27 @@ this.db.exec('COMMIT;');
   public createSession(session: {
     userDid: string;
     token: string;
+    refreshToken?: string;
     deviceName?: string;
     deviceType?: 'Desktop' | 'Mobile' | 'Tablet';
     ipAddress?: string;
     userAgent?: string;
     ttlMs?: number;
     expiresAt?: number;
+    refreshTokenExpiresAt?: number;
   }): UserSessionRecord {
     const now = Date.now();
     const sessionId = 'ses_' + now + '_' + crypto.randomBytes(6).toString('hex');
     const defaultTtlMs = 7 * 24 * 60 * 60 * 1000;
+    const defaultRefreshTtlMs = 30 * 24 * 60 * 60 * 1000;
     const expiresAt = session.expiresAt || (session.ttlMs ? now + session.ttlMs : now + defaultTtlMs);
+    const refreshTokenExpiresAt = session.refreshTokenExpiresAt || (now + defaultRefreshTtlMs);
     const rec: UserSessionRecord = {
       sessionId,
       userDid: session.userDid,
       token: session.token,
+      refreshToken: session.refreshToken,
+      refreshTokenExpiresAt,
       deviceName: session.deviceName || (session.deviceType === 'Mobile' ? 'Mobile Phone' : 'Workstation Desktop'),
       deviceType: session.deviceType || 'Desktop',
       ipAddress: session.ipAddress || '127.0.0.1',
@@ -2512,17 +2551,50 @@ this.db.exec('COMMIT;');
       isRevoked: false,
     };
 
-    this.db.prepare(`
-      INSERT INTO user_sessions (
-        session_id, user_did, token, device_name, device_type,
-        ip_address, user_agent, created_at, last_active_at, expires_at, is_revoked
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      rec.sessionId, rec.userDid, rec.token, rec.deviceName, rec.deviceType,
-      rec.ipAddress, rec.userAgent, rec.createdAt, rec.lastActiveAt, rec.expiresAt, 0
-    );
+    try {
+      this.db.prepare(`
+        INSERT INTO user_sessions (
+          session_id, user_did, token, device_name, device_type,
+          ip_address, user_agent, created_at, last_active_at, expires_at, is_revoked, refresh_token
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        rec.sessionId, rec.userDid, rec.token, rec.deviceName, rec.deviceType,
+        rec.ipAddress, rec.userAgent, rec.createdAt, rec.lastActiveAt, rec.expiresAt, 0, rec.refreshToken || null
+      );
+    } catch (_) {
+      this.db.prepare(`
+        INSERT INTO user_sessions (
+          session_id, user_did, token, device_name, device_type,
+          ip_address, user_agent, created_at, last_active_at, expires_at, is_revoked
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        rec.sessionId, rec.userDid, rec.token, rec.deviceName, rec.deviceType,
+        rec.ipAddress, rec.userAgent, rec.createdAt, rec.lastActiveAt, rec.expiresAt, 0
+      );
+    }
 
     return rec;
+  }
+
+  public rotateSession(oldRefreshToken: string, newSessionToken: string, newRefreshToken: string): boolean {
+    try {
+      const sess = this.db.prepare('SELECT * FROM user_sessions WHERE refresh_token = ? AND is_revoked = 0').get(oldRefreshToken) as any;
+      if (!sess) return false;
+      this.db.prepare('UPDATE user_sessions SET is_revoked = 1 WHERE session_id = ?').run(sess.session_id);
+      this.createSession({
+        userDid: sess.user_did,
+        token: newSessionToken,
+        refreshToken: newRefreshToken,
+        deviceName: sess.device_name,
+        deviceType: sess.device_type,
+        ipAddress: sess.ip_address,
+        userAgent: sess.user_agent,
+      });
+      this.db.prepare('UPDATE users SET session_token = ?, refresh_token = ? WHERE did = ?').run(newSessionToken, newRefreshToken, sess.user_did);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   public getUserSessions(userDid: string): UserSessionRecord[] {
@@ -6884,6 +6956,317 @@ this.db.exec('COMMIT;');
         this.db.exec('ROLLBACK');
       } catch (_) {}
       throw err;
+    }
+  }
+
+  // =========================================================================
+  // ⛓️ DURABLE FINANCIAL SETTLEMENT STATE MACHINE (L1 COMETBFT + SQLITE)
+  // States: CREATED -> RESERVED -> SUBMITTED -> COMMITTED | FAILED | RECONCILIATION_REQUIRED
+  // =========================================================================
+
+  public createSettlementIntent(params: {
+    idempotencyKey?: string;
+    senderDid: string;
+    recipientDid: string;
+    amountSov: number;
+    feeSov?: number;
+    memo?: string;
+    ipAddress?: string;
+  }): {
+    ok: boolean;
+    intent?: any;
+    isReplay?: boolean;
+    statusCode?: number;
+    responsePayload?: any;
+    error?: string;
+  } {
+    const rawKey = params.idempotencyKey ? String(params.idempotencyKey).trim() : '';
+    const amountSov = Math.round(Number(params.amountSov) * 100) / 100;
+    const feeSov = Math.round(Number(params.feeSov || 0) * 100) / 100;
+
+    if (!Number.isFinite(amountSov) || amountSov <= 0) {
+      return { ok: false, statusCode: 400, error: 'Positive finite amount is required' };
+    }
+    if (params.senderDid === params.recipientDid) {
+      return { ok: false, statusCode: 400, error: 'Self-transfer prohibited: sender and recipient cannot be identical' };
+    }
+
+    const totalDeduction = amountSov + feeSov;
+    const now = Date.now();
+    const intentId = 'settle_' + now + '_' + crypto.randomUUID().slice(0, 8);
+
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      // 1. Idempotency check
+      if (rawKey) {
+        const existing = this.db.prepare('SELECT * FROM financial_settlement_intents WHERE idempotency_key = ?').get(rawKey) as any;
+        if (existing) {
+          if (existing.sender_did !== params.senderDid) {
+            this.db.exec('ROLLBACK');
+            return { ok: false, statusCode: 403, error: `Ownership violation: Idempotency key '${rawKey}' does not belong to sender` };
+          }
+          if (existing.state === 'COMMITTED') {
+            this.db.exec('ROLLBACK');
+            return {
+              ok: true,
+              isReplay: true,
+              statusCode: 200,
+              intent: existing,
+              responsePayload: {
+                ok: true,
+                txId: existing.id,
+                l1TxHash: existing.l1_tx_hash,
+                state: 'COMMITTED',
+                amount: existing.amount_sov,
+                message: 'Replay: Transfer already committed on Layer-1',
+              },
+            };
+          } else if (existing.state === 'RESERVED' || existing.state === 'SUBMITTED') {
+            if (now - existing.created_at < 30000) {
+              this.db.exec('ROLLBACK');
+              return { ok: false, statusCode: 409, error: 'Transaction already in-flight. Duplicate transfer rejected.' };
+            }
+          }
+        }
+      }
+
+      // 2. Sender balance & status check
+      let sender = this.db.prepare('SELECT balance_sov, status FROM users WHERE did = ?').get(params.senderDid) as any;
+      if (!sender && (this as any)._parentEngine?.db?.users) {
+        const memUser = (this as any)._parentEngine.db.users.find((u: any) => u.did === params.senderDid);
+        if (memUser) {
+          this.db.prepare(`
+            INSERT INTO users (did, handle, display_name, avatar, avatar_bg, balance_sov, device_type, created_at, updated_at)
+            VALUES (?, ?, ?, '👤', '#6366f1', ?, 'Desktop', ?, ?)
+          `).run(memUser.did, memUser.handle || `@user_${memUser.did.slice(-6)}`, memUser.displayName || 'User', Number(memUser.balanceSov || 500.0), now, now);
+          sender = { balance_sov: Number(memUser.balanceSov || 500.0), status: memUser.status || 'ACTIVE' };
+        }
+      }
+
+      if (!sender) {
+        this.db.exec('ROLLBACK');
+        return { ok: false, statusCode: 400, error: `Sender account '${params.senderDid}' not found` };
+      }
+      if (sender.status === 'SUSPENDED' || sender.status === 'BLOCKED' || sender.status === 'FROZEN') {
+        this.db.exec('ROLLBACK');
+        return { ok: false, statusCode: 403, error: `Sender account '${params.senderDid}' is ${sender.status}. Outgoing transfers are disabled.` };
+      }
+
+      const senderBal = Number(sender.balance_sov || 0);
+      if (senderBal < totalDeduction) {
+        this.db.exec('ROLLBACK');
+        return { ok: false, statusCode: 400, error: `Insufficient balance: sender has ${senderBal.toFixed(2)} SOV, required ${totalDeduction.toFixed(2)} SOV` };
+      }
+
+      // 3. Ensure recipient user row exists
+      let receiver = this.db.prepare('SELECT balance_sov FROM users WHERE did = ?').get(params.recipientDid) as any;
+      if (!receiver) {
+        this.db.prepare(`
+          INSERT INTO users (did, handle, display_name, avatar, avatar_bg, balance_sov, device_type, created_at, updated_at)
+          VALUES (?, ?, ?, '🎨', '#10b981', 0.0, 'BROWSER', ?, ?)
+        `).run(params.recipientDid, '@peer_' + params.recipientDid.slice(-6), 'Peer', now, now);
+      }
+
+      // 4. Reserve balance: Deduct from sender balance (held in escrow state)
+      this.db.prepare('UPDATE users SET balance_sov = balance_sov - ?, updated_at = ? WHERE did = ?')
+        .run(totalDeduction, now, params.senderDid);
+
+      // 5. Insert settlement intent in RESERVED state
+      this.db.prepare(`
+        INSERT INTO financial_settlement_intents (
+          id, idempotency_key, sender_did, recipient_did, amount_sov, fee_sov,
+          state, memo, ip_address, created_at, updated_at, reserved_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 'RESERVED', ?, ?, ?, ?, ?)
+      `).run(
+        intentId,
+        rawKey || null,
+        params.senderDid,
+        params.recipientDid,
+        amountSov,
+        feeSov,
+        params.memo || null,
+        params.ipAddress || '127.0.0.1',
+        now,
+        now,
+        now
+      );
+
+      this.db.exec('COMMIT');
+
+      const intent = this.db.prepare('SELECT * FROM financial_settlement_intents WHERE id = ?').get(intentId);
+      return { ok: true, intent };
+    } catch (err: any) {
+      try { this.db.exec('ROLLBACK'); } catch (_) {}
+      return { ok: false, statusCode: 500, error: err?.message || 'Database error during balance reservation' };
+    }
+  }
+
+  public markSettlementSubmitted(intentId: string): boolean {
+    const now = Date.now();
+    try {
+      this.db.prepare(`
+        UPDATE financial_settlement_intents
+        SET state = 'SUBMITTED', submitted_at = ?, updated_at = ?
+        WHERE id = ? AND state = 'RESERVED'
+      `).run(now, now, intentId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  public commitSettlementIntent(params: {
+    intentId: string;
+    l1TxHash?: string;
+    l1BlockHeight?: number;
+  }): { ok: boolean; fromBalance?: number; toBalance?: number; isReplay?: boolean; error?: string } {
+    const now = Date.now();
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const intent = this.db.prepare('SELECT * FROM financial_settlement_intents WHERE id = ?').get(params.intentId) as any;
+      if (!intent) {
+        this.db.exec('ROLLBACK');
+        return { ok: false, error: 'Settlement intent not found' };
+      }
+      if (intent.state === 'COMMITTED') {
+        this.db.exec('ROLLBACK');
+        const s = this.db.prepare('SELECT balance_sov FROM users WHERE did = ?').get(intent.sender_did) as any;
+        const r = this.db.prepare('SELECT balance_sov FROM users WHERE did = ?').get(intent.recipient_did) as any;
+        return { ok: true, isReplay: true, fromBalance: s?.balance_sov, toBalance: r?.balance_sov };
+      }
+
+      // Credit recipient
+      this.db.prepare('UPDATE users SET balance_sov = balance_sov + ?, updated_at = ? WHERE did = ?')
+        .run(intent.amount_sov, now, intent.recipient_did);
+
+      // Record double-entry ledger entry in token_transfers
+      this.db.prepare(`
+        INSERT INTO token_transfers (id, from_did, to_did, amount_sov, fee_sov, tx_type, created_at, idempotency_key)
+        VALUES (?, ?, ?, ?, ?, 'P2P_TRANSFER', ?, ?)
+      `).run(
+        intent.id,
+        intent.sender_did,
+        intent.recipient_did,
+        intent.amount_sov,
+        intent.fee_sov,
+        now,
+        intent.idempotency_key
+      );
+
+      // Mark COMMITTED
+      this.db.prepare(`
+        UPDATE financial_settlement_intents
+        SET state = 'COMMITTED', l1_tx_hash = ?, l1_block_height = ?, committed_at = ?, updated_at = ?
+        WHERE id = ?
+      `).run(
+        params.l1TxHash || intent.id,
+        params.l1BlockHeight || 0,
+        now,
+        now,
+        intent.id
+      );
+
+      // Record in financial_idempotency_keys if key exists
+      if (intent.idempotency_key) {
+        try {
+          this.db.prepare(`
+            INSERT OR REPLACE INTO financial_idempotency_keys (
+              idempotency_key, user_did, operation_type, payload_hash, payload_json, tx_id, status, status_code, created_at, updated_at
+            ) VALUES (?, ?, 'TRANSFER', 'canonical', '{}', ?, 'COMPLETED', 200, ?, ?)
+          `).run(intent.idempotency_key, intent.sender_did, intent.id, intent.created_at, now);
+        } catch (_) {}
+      }
+
+      this.db.exec('COMMIT');
+
+      const s = this.db.prepare('SELECT balance_sov FROM users WHERE did = ?').get(intent.sender_did) as any;
+      const r = this.db.prepare('SELECT balance_sov FROM users WHERE did = ?').get(intent.recipient_did) as any;
+      return { ok: true, fromBalance: s?.balance_sov, toBalance: r?.balance_sov };
+    } catch (err: any) {
+      try { this.db.exec('ROLLBACK'); } catch (_) {}
+      return { ok: false, error: err?.message || 'Database error committing settlement' };
+    }
+  }
+
+  public failAndRefundSettlementIntent(params: {
+    intentId: string;
+    errorReason: string;
+  }): { ok: boolean; refunded?: boolean; error?: string } {
+    const now = Date.now();
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const intent = this.db.prepare('SELECT * FROM financial_settlement_intents WHERE id = ?').get(params.intentId) as any;
+      if (!intent) {
+        this.db.exec('ROLLBACK');
+        return { ok: false, error: 'Settlement intent not found' };
+      }
+      if (intent.state === 'FAILED') {
+        this.db.exec('ROLLBACK');
+        return { ok: true, refunded: false };
+      }
+      if (intent.state === 'COMMITTED') {
+        this.db.exec('ROLLBACK');
+        return { ok: false, error: 'Cannot refund an already-committed transaction' };
+      }
+
+      // Refund sender the full reserved amount (amount + fee)
+      const totalRefund = Number(intent.amount_sov) + Number(intent.fee_sov || 0);
+      this.db.prepare('UPDATE users SET balance_sov = balance_sov + ?, updated_at = ? WHERE did = ?')
+        .run(totalRefund, now, intent.sender_did);
+
+      // Mark state = FAILED
+      this.db.prepare(`
+        UPDATE financial_settlement_intents
+        SET state = 'FAILED', last_error = ?, failed_at = ?, updated_at = ?
+        WHERE id = ?
+      `).run(params.errorReason, now, now, intent.id);
+
+      this.db.exec('COMMIT');
+      return { ok: true, refunded: true };
+    } catch (err: any) {
+      try { this.db.exec('ROLLBACK'); } catch (_) {}
+      return { ok: false, error: err?.message || 'Database error refunding settlement' };
+    }
+  }
+
+  public markSettlementReconciliationRequired(params: {
+    intentId: string;
+    errorReason: string;
+  }): { ok: boolean; state: string } {
+    const now = Date.now();
+    try {
+      this.db.prepare(`
+        UPDATE financial_settlement_intents
+        SET state = 'RECONCILIATION_REQUIRED', last_error = ?, updated_at = ?
+        WHERE id = ? AND state != 'COMMITTED' AND state != 'FAILED'
+      `).run(params.errorReason, now, params.intentId);
+      return { ok: true, state: 'RECONCILIATION_REQUIRED' };
+    } catch (_) {
+      return { ok: false, state: 'ERROR' };
+    }
+  }
+
+  public getSettlementIntent(intentId: string): any | null {
+    try {
+      return this.db.prepare('SELECT * FROM financial_settlement_intents WHERE id = ?').get(intentId) || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  public getPendingSettlementIntents(): any[] {
+    try {
+      return this.db.prepare("SELECT * FROM financial_settlement_intents WHERE state IN ('SUBMITTED', 'RECONCILIATION_REQUIRED') ORDER BY created_at ASC").all() || [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public getUser(did: string): any | null {
+    try {
+      return this.db.prepare('SELECT did, handle, display_name, balance_sov, status FROM users WHERE did = ?').get(did) || null;
+    } catch (_) {
+      return null;
     }
   }
 

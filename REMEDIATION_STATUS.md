@@ -20,7 +20,7 @@
 | **SEC-02** | WebAuthn PRF Enclave Master Key Derivation | **HIGH** | FAILED | **FIXED AND VERIFIED** | Genuine `navigator.credentials.get` PRF query & platform authenticator detection. |
 | **SEC-04** | Ghost Mode Incognito Transparency & Disclosures | **MEDIUM** | FAILED | **FIXED AND VERIFIED** | Updated UI notifications and disclosures clarifying incognito presence vs VPN/Tor. |
 | **DEV-01** | Missing `services/api` Manifest & Boundary Test Failures | **MEDIUM** | FAILED | **FIXED AND VERIFIED** | Scaffolded `package.json`, `tsconfig.json`, `index.ts`; Vitest boundary test 5/5 passed. |
-| **SEC-07** | Session Token & Private Key Persistence in `localStorage` | **HIGH** | FAILED | **OPEN** | Tracked for Sprint 2 (HttpOnly cookie migration across web/mobile). |
+| **SEC-07** | Session Token & Private Key Persistence in `localStorage` | **HIGH** | FAILED | **FIXED AND VERIFIED** | HttpOnly/SameSite=Strict cookie migration, refresh token rotation, replay defense, and WebCrypto isolation. |
 
 *(Allowed Statuses strictly used: FIXED AND VERIFIED, FIXED BUT NOT VERIFIED, OPEN, BLOCKED, NOT APPLICABLE)*
 

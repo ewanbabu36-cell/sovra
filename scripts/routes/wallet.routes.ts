@@ -918,39 +918,77 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         return true;
       }
 
-      // Execute atomic P2P transfer via SQLite double-entry ledger
-      const transferResult = (sovraDb as any).executeUserP2PTransfer({
-        fromDid: senderDid,
-        toDid: recipientDid,
+      // 1. Initiate settlement intent & reserve balance atomically in SQLite (State: RESERVED)
+      const reservation = (sovraDb as any).createSettlementIntent({
+        idempotencyKey,
+        senderDid,
+        recipientDid,
         amountSov,
         feeSov: 0.0,
-        txType: 'P2P_TRANSFER',
         memo,
-        idempotencyKey,
         ipAddress: req.socket?.remoteAddress || '127.0.0.1',
       });
 
-      if (!transferResult.ok) {
-        res.writeHead(transferResult.statusCode || 400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: transferResult.error || 'Transfer failed' }));
+      if (!reservation || !reservation.ok) {
+        res.writeHead(reservation?.statusCode || 400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: reservation?.error || 'Transfer failed' }));
         return true;
       }
 
-      // ⛓️ Layer-1 CometBFT Consensus Broadcast (Bitcoin/Tendermint On-Chain Settlement)
+      if (reservation.isReplay) {
+        if (parsed.voucher) {
+          res.writeHead(409, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Conflict: Voucher has already been redeemed' }));
+          return true;
+        }
+        // Return idempotency replay response without re-debiting
+        res.writeHead(reservation.statusCode || 200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(reservation.responsePayload || { ok: true, txId: reservation.intent?.id, isReplay: true }));
+        return true;
+      }
+
+      const markVoucherSettled = () => {
+        if (parsed.voucher) {
+          const voucherId = String(parsed.voucher.voucherId || parsed.voucher.id || parsed.voucher.nonce || '').trim();
+          if (voucherId) {
+            if (!(sovraDb as any)._redeemedVoucherIds) {
+              (sovraDb as any)._redeemedVoucherIds = new Set<string>();
+            }
+            (sovraDb as any)._redeemedVoucherIds.add(voucherId);
+            const dbVoucher = (sovraDb.db.offline_payment_vouchers || []).find((v: any) => v.voucherId === voucherId);
+            if (dbVoucher) {
+              dbVoucher.status = 'settled';
+              dbVoucher.settledAt = Date.now();
+              sovraDb.save();
+            }
+          }
+        }
+      };
+
+      const intentId = reservation.intent.id;
+
+      // 2. Transition state to SUBMITTED
+      (sovraDb as any).markSettlementSubmitted(intentId);
+
+      // 3. Broadcast to Layer-1 CometBFT Consensus Engine
+      const l1Available = await isL1RpcAvailable();
       let l1Committed = false;
-      let l1TxHash = transferResult.txId;
-      try {
-        if (await isL1RpcAvailable()) {
+      let l1TxHash = intentId;
+      let l1BlockHeight = 0;
+      let l1Error = '';
+
+      if (l1Available) {
+        try {
           const l1Tx = {
             Sender: senderDid,
             Recipient: recipientDid,
             Amount: String(BigInt(Math.round(amountSov * 1_000_000))),
             Fee: '0',
             PubKeyHex: parsed.pubKeyHex || '',
-            SigHex: parsed.signature || transferResult.txId,
+            SigHex: parsed.signature || intentId,
           };
           const controller = new AbortController();
-          const tId = setTimeout(() => controller.abort(), 1200);
+          const tId = setTimeout(() => controller.abort(), 2000);
           const l1Res = await fetch(`${PRIMARY_RPC}/broadcast_tx_commit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -958,62 +996,188 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
             signal: controller.signal,
           });
           clearTimeout(tId);
+
           if (l1Res.ok) {
             const l1Data = await l1Res.json();
-            l1Committed = true;
-            if (l1Data.tx_hash || l1Data.hash) {
-              l1TxHash = l1Data.tx_hash || l1Data.hash;
-            }
-          }
-        }
-      } catch (_) {}
+            const checkCode = l1Data.check_tx?.code ?? 0;
+            const deliverCode = l1Data.deliver_tx?.code ?? 0;
 
-      // In strict settlement mode, if L1 commit was required and failed, fail closed
-      if (req.headers['x-require-l1-settlement'] === 'true' && !l1Committed) {
-        res.writeHead(503, { 'Content-Type': 'application/json' });
+            if (checkCode === 0 && deliverCode === 0) {
+              l1Committed = true;
+              l1TxHash = l1Data.hash || l1Data.tx_hash || intentId;
+              l1BlockHeight = Number(l1Data.height || 0);
+            } else {
+              l1Error = `CometBFT CheckTx/DeliverTx rejection: check=${checkCode}, deliver=${deliverCode}`;
+            }
+          } else {
+            l1Error = `CometBFT RPC returned HTTP ${l1Res.status}`;
+          }
+        } catch (broadcastErr: any) {
+          l1Error = broadcastErr?.message || 'CometBFT broadcast network timeout/failure';
+        }
+      } else {
+        l1Error = 'CometBFT L1 RPC is offline or unreachable';
+      }
+
+      // 4. State Decision & Rollback Logic:
+      const requireL1 = Boolean(req.headers['x-require-l1-settlement'] === 'true');
+
+      if (l1Committed) {
+        // L1 consensus finalized: Commit SQLite recipient credit & finalize settlement intent (State: COMMITTED)
+        const commitResult = (sovraDb as any).commitSettlementIntent({
+          intentId,
+          l1TxHash,
+          l1BlockHeight,
+        });
+
+        // Sync in-memory users cache if present
+        if ((sovraDb as any).db?.users) {
+          const fromU = (sovraDb as any).db.users.find((u: any) => u.did === senderDid);
+          if (fromU && commitResult.fromBalance !== undefined) fromU.balanceSov = commitResult.fromBalance;
+          const toU = (sovraDb as any).db.users.find((u: any) => u.did === recipientDid);
+          if (toU && commitResult.toBalance !== undefined) toU.balanceSov = commitResult.toBalance;
+          (sovraDb as any).save?.(true);
+        }
+
+        // If this was a voucher redemption, record replay protection and update voucher status
+        markVoucherSettled();
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-          ok: false,
-          error: 'Layer-1 settlement failed: transaction could not be committed to CometBFT consensus engine',
-          l1Committed: false,
+          ok: true,
+          txHash: l1TxHash?.startsWith('0x') ? l1TxHash : ('0x' + crypto.createHash('sha256').update(String(l1TxHash || intentId)).digest('hex')),
+          txId: intentId,
+          senderDid,
+          recipientDid,
+          amount: amountSov,
+          l1Settled: true,
+          fromBalance: commitResult.fromBalance,
+          toBalance: commitResult.toBalance,
+          tokenSymbol,
+          status: 'confirmed',
+          state: 'COMMITTED',
+          l1Committed: true,
+          settlementTier: 'L1_CONSENSUS_FINALIZED',
+          isReplay: false,
+          timestamp: Date.now(),
         }));
         return true;
-      }
+      } else {
+        // L1 settlement did not commit:
+        // If requireL1 is true: ATOMICALLY ROLLBACK & REFUND RESERVED BALANCE!
+        if (requireL1) {
+          (sovraDb as any).failAndRefundSettlementIntent({
+            intentId,
+            errorReason: l1Error,
+          });
 
-      // If this was a voucher redemption, record replay protection and update voucher status
-      if (parsed.voucher) {
-        const voucherId = String(parsed.voucher.voucherId || parsed.voucher.id || parsed.voucher.nonce || '').trim();
-        if (voucherId) {
-          if (!(sovraDb as any)._redeemedVoucherIds) {
-            (sovraDb as any)._redeemedVoucherIds = new Set<string>();
+          // Sync in-memory users cache to restore refunded balance
+          const refundedUser = (sovraDb as any).getSqliteEngine?.()?.getUser(senderDid);
+          if ((sovraDb as any).db?.users && refundedUser) {
+            const fromU = (sovraDb as any).db.users.find((u: any) => u.did === senderDid);
+            if (fromU) fromU.balanceSov = refundedUser.balance_sov;
+            (sovraDb as any).save?.(true);
           }
-          (sovraDb as any)._redeemedVoucherIds.add(voucherId);
-          const dbVoucher = (sovraDb.db.offline_payment_vouchers || []).find((v: any) => v.voucherId === voucherId);
-          if (dbVoucher) {
-            dbVoucher.status = 'settled';
-            dbVoucher.settledAt = Date.now();
-            sovraDb.save();
+
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: false,
+            error: `Layer-1 settlement failed: ${l1Error}. Reserved balance was safely rolled back.`,
+            state: 'FAILED',
+            l1Committed: false,
+          }));
+          return true;
+        } else {
+          // L1 RPC network timeout / unreachable:
+          // Check if transaction actually committed on chain before deciding
+          let confirmedOnChain = false;
+          if (l1Available) {
+            try {
+              const queryRes = await fetch(`${PRIMARY_RPC}/tx?hash=${intentId}`);
+              if (queryRes.ok) {
+                const qData = await queryRes.json();
+                if (qData.result && (qData.result.tx_result?.code ?? 0) === 0) {
+                  confirmedOnChain = true;
+                  l1BlockHeight = Number(qData.result.height || 0);
+                }
+              }
+            } catch (_) {}
           }
+
+          if (confirmedOnChain) {
+            const commitResult = (sovraDb as any).commitSettlementIntent({
+              intentId,
+              l1TxHash: intentId,
+              l1BlockHeight,
+            });
+            markVoucherSettled();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              ok: true,
+              txHash: '0x' + crypto.createHash('sha256').update(intentId).digest('hex'),
+              txId: intentId,
+              senderDid,
+              recipientDid,
+              amount: amountSov,
+              l1Settled: true,
+              fromBalance: commitResult.fromBalance,
+              toBalance: commitResult.toBalance,
+              tokenSymbol,
+              status: 'confirmed',
+              state: 'COMMITTED',
+              l1Committed: true,
+              settlementTier: 'L1_CONSENSUS_FINALIZED',
+              timestamp: Date.now(),
+            }));
+            return true;
+          }
+
+          // In dev/testnet default mode without strict header, commit local ledger
+          // but preserve durable intent state for background recovery
+          const commitResult = (sovraDb as any).commitSettlementIntent({
+            intentId,
+            l1TxHash: intentId,
+            l1BlockHeight: 0,
+          });
+
+          // Sync in-memory users cache if present
+          if ((sovraDb as any).db?.users) {
+            const fromU = (sovraDb as any).db.users.find((u: any) => u.did === senderDid);
+            if (fromU && commitResult.fromBalance !== undefined) fromU.balanceSov = commitResult.fromBalance;
+            const toU = (sovraDb as any).db.users.find((u: any) => u.did === recipientDid);
+            if (toU && commitResult.toBalance !== undefined) toU.balanceSov = commitResult.toBalance;
+            (sovraDb as any).save?.(true);
+          }
+
+          (sovraDb as any).markSettlementReconciliationRequired({
+            intentId,
+            errorReason: l1Error,
+          });
+
+          markVoucherSettled();
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: true,
+            txHash: '0x' + crypto.createHash('sha256').update(intentId).digest('hex'),
+            txId: intentId,
+            senderDid,
+            recipientDid,
+            amount: amountSov,
+            l1Settled: false,
+            fromBalance: commitResult.fromBalance,
+            toBalance: commitResult.toBalance,
+            tokenSymbol,
+            status: 'confirmed',
+            state: 'RECONCILIATION_REQUIRED',
+            l1Committed: false,
+            settlementTier: 'LOCAL_LEDGER_PENDING_L1',
+            isReplay: false,
+            timestamp: Date.now(),
+          }));
+          return true;
         }
       }
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        ok: true,
-        txHash: l1TxHash?.startsWith('0x') ? l1TxHash : ('0x' + crypto.createHash('sha256').update(String(l1TxHash || transferResult.txId || Date.now())).digest('hex')),
-        txId: transferResult.txId,
-        senderDid,
-        recipientDid,
-        amount: amountSov,
-        l1Settled: l1Committed,
-        fromBalance: transferResult.fromBalance,
-        toBalance: transferResult.toBalance,
-        tokenSymbol,
-        status: 'confirmed',
-        l1Committed,
-        settlementTier: l1Committed ? 'L1_CONSENSUS_FINALIZED' : 'LOCAL_LEDGER_PENDING_L1',
-        isReplay: transferResult.isReplay || false,
-        timestamp: Date.now(),
-      }));
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err?.message || 'Transfer failed' }));

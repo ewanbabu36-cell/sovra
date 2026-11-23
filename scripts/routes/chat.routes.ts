@@ -271,10 +271,10 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
       );
     }
     const returnedMessages = messages.map(m => {
-      if (m.isE2EE && m.ciphertextHex && (!m.rawText || (m.text && m.text.includes('Double Ratchet')))) {
+      if (m.isE2EE && m.ciphertextHex) {
         return {
           ...m,
-          text: '🔒 [End-to-End Encrypted: Double Ratchet]',
+          text: '🔒 [End-to-End Encrypted: Client-Side]',
           ciphertextHex: m.ciphertextHex,
           ivHex: m.ivHex,
           tagHex: m.tagHex,
@@ -426,38 +426,89 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
         }
       }
 
-      let ciphertextHex = String(parsed.ciphertextHex || '');
-      let ivHex = String(parsed.nonceHex || parsed.ivHex || '');
-      let tagHex = String(parsed.tagHex || '');
-      const isClientE2EE = Boolean(ciphertextHex);
-      let isE2EE = Boolean(parsed.isE2EE || isClientE2EE);
+      const rawRecipient = String(parsed.recipientDid || parsed.recipient || '').trim();
+      const isDirectMessage = Boolean(rawRecipient && !rawRecipient.startsWith('channel:'));
 
-      // P0-01 ZERO-PLAINTEXT ENFORCEMENT:
-      // If client sent client-side Double Ratchet ciphertext, use it directly (server NEVER decrypts or derives keys)
-      if (isClientE2EE) {
-        isE2EE = true;
-      } else if (parsed.text && !String(parsed.text).startsWith('🔒')) {
-        // Fallback for legacy clients without Double Ratchet
-        const rawText = String(parsed.text);
-        const recipientDid = String(parsed.recipientDid || parsed.recipient || 'channel:local_mesh');
-        const peerPair = [principal.did, recipientDid].sort().join(':');
-        const storagePepper = process.env.SOVRA_MESSAGE_PEPPER || 'sovra_envelope_pepper_auth_secret_v1';
-        const threadSecret = crypto.createHmac('sha256', storagePepper).update(`SOVRA_VAULT_SEAL|${peerPair}`).digest();
-        const iv = crypto.randomBytes(12);
-        const cipher = crypto.createCipheriv('aes-256-gcm', threadSecret, iv);
-        let enc = cipher.update(rawText, 'utf8', 'hex');
-        enc += cipher.final('hex');
-        ciphertextHex = enc;
-        ivHex = iv.toString('hex');
-        tagHex = cipher.getAuthTag().toString('hex');
-        isE2EE = true;
+      if (isDirectMessage && rawRecipient === principal.did) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Direct messaging to oneself prohibited', code: 'ERR_SELF_DIRECT_MESSAGE' }));
+        return true;
       }
 
-      const safeText = isClientE2EE
-        ? '🔒 [End-to-End Encrypted: Double Ratchet]'
-        : (isE2EE
-          ? '🔒 [End-to-End Encrypted: AES-GCM-256]'
-          : String(parsed.text || ''));
+      const clientCiphertextHex = String(parsed.ciphertextHex || '').trim();
+      const clientIvHex = String(parsed.nonceHex || parsed.ivHex || '').trim();
+      const clientTagHex = String(parsed.tagHex || '').trim();
+      const isClientE2EE = Boolean(clientCiphertextHex);
+      const isE2EEClaimed = Boolean(parsed.isE2EE);
+      const isStrictE2EERequested = Boolean(
+        url.pathname === '/api/chat/e2ee/send' ||
+        req.headers['x-require-client-e2ee'] === 'true' ||
+        parsed.strictE2EE === true ||
+        (isDirectMessage && isE2EEClaimed)
+      );
+
+      // Replay attack prevention: message ID uniqueness
+      const incomingMsgId = String(parsed.id || '').trim();
+      if (incomingMsgId) {
+        const existingMsg = (sovraDb as any).findChatMessageById ? (sovraDb as any).findChatMessageById(incomingMsgId) : null;
+        if (existingMsg) {
+          res.writeHead(409, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: false,
+            error: `Conflict: Message with ID '${incomingMsgId}' has already been processed. Replay attack rejected.`,
+            code: 'ERR_MESSAGE_REPLAY_DETECTED'
+          }));
+          return true;
+        }
+      }
+
+      // P0-01 ZERO-PLAINTEXT ENFORCEMENT:
+      // If client sent client-side ciphertext, strictly validate hex encoding and AEAD metadata.
+      // Server NEVER performs fallback encryption and NEVER derives keys from public thread IDs.
+      let ciphertextHex = '';
+      let ivHex = '';
+      let tagHex = '';
+      let isE2EE = false;
+      let safeText = '';
+
+      if (isClientE2EE) {
+        const hexRegex = /^[0-9a-fA-F]+$/;
+        if (!hexRegex.test(clientCiphertextHex) || clientCiphertextHex.length % 2 !== 0) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Bad Request: Invalid ciphertextHex format (must be valid even hex string)', code: 'ERR_INVALID_CIPHERTEXT' }));
+          return true;
+        }
+        if (!clientIvHex || !hexRegex.test(clientIvHex) || clientIvHex.length < 16) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Bad Request: Invalid ivHex/nonceHex format (must be valid hex string of at least 8 bytes)', code: 'ERR_INVALID_IV' }));
+          return true;
+        }
+        if (!clientTagHex || !hexRegex.test(clientTagHex) || clientTagHex.length !== 32) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Bad Request: Invalid tagHex format (must be 32 hex characters for 128-bit AEAD tag)', code: 'ERR_INVALID_AUTH_TAG' }));
+          return true;
+        }
+
+        ciphertextHex = clientCiphertextHex;
+        ivHex = clientIvHex;
+        tagHex = clientTagHex;
+        isE2EE = true;
+        safeText = '🔒 [End-to-End Encrypted: Client-Side]';
+      } else if (isStrictE2EERequested) {
+        // Strict E2EE requested or direct message claimed isE2EE: true, but no client ciphertext was provided
+        res.writeHead(422, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: 'Unprocessable Entity: Plaintext direct messaging rejected. Client-side E2EE ciphertextHex, ivHex/nonceHex, and tagHex are required. Server-side encryption fallback is forbidden.',
+          code: 'ERR_CLIENT_E2EE_REQUIRED'
+        }));
+        return true;
+      } else {
+        // Legacy plaintext transport for channels or backward-compatible unencrypted messaging
+        // CRITICAL: Server NEVER fake-encrypts plaintext with server secrets and NEVER labels it as E2EE!
+        safeText = String(parsed.text || '');
+        isE2EE = false;
+      }
       const isViewOnceMsg = Boolean(parsed.isViewOnce || (validAttachment && validAttachment.isViewOnce));
       const record = sovraDb.appendMessage({
         id: parsed.id,
@@ -598,7 +649,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, message: { ...record, text: parsed.text || record.text } }));
+      res.end(JSON.stringify({ ok: true, message: { ...record, text: record.isE2EE ? record.text : (parsed.text || record.text) } }));
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));

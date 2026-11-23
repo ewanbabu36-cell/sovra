@@ -247,6 +247,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         'Set-Cookie': [
           `sovra_session=${encodeURIComponent(user.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureReg ? '; Secure' : ''}`,
           `sovra_session_token=${encodeURIComponent(user.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureReg ? '; Secure' : ''}`,
+          `sovra_refresh_token=${encodeURIComponent(regResult.refreshToken || '')}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureReg ? '; Secure' : ''}`,
         ],
       });
       res.end(JSON.stringify({
@@ -254,6 +255,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         user: toPublicUserDTO(user),
         sessionToken: user.sessionToken,
         token: user.sessionToken,
+        refreshToken: regResult.refreshToken,
         recoveryPhrase: regResult.recoveryPhrase,
       }));
     } catch (err: any) {
@@ -311,6 +313,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         'Set-Cookie': [
           `sovra_session_token=${encodeURIComponent(loginRes.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureLogin ? '; Secure' : ''}`,
           `sovra_session=${encodeURIComponent(loginRes.sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureLogin ? '; Secure' : ''}`,
+          `sovra_refresh_token=${encodeURIComponent((loginRes as any).refreshToken || '')}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecureLogin ? '; Secure' : ''}`,
         ],
       });
       res.end(JSON.stringify({
@@ -318,6 +321,74 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         user: toPublicUserDTO(loginRes.user),
         sessionToken: loginRes.sessionToken,
         token: loginRes.sessionToken,
+        refreshToken: (loginRes as any).refreshToken,
+      }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // 3b. Session Refresh & Token Rotation (SEC-07)
+  if ((url.pathname === '/api/user/refresh' || url.pathname === '/api/auth/refresh') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = body ? JSON.parse(body) : {};
+      let refreshToken = '';
+
+      // Check cookie first (browser client)
+      if (req.headers.cookie) {
+        const match = req.headers.cookie.match(/(?:^|;\s*)sovra_refresh_token=([^;]+)/);
+        if (match) {
+          refreshToken = decodeURIComponent(match[1]).trim();
+        }
+      }
+
+      // Fallback to body or header (mobile/API clients)
+      if (!refreshToken) {
+        if (parsed.refreshToken || parsed.token || parsed.sessionToken) {
+          refreshToken = String(parsed.refreshToken || parsed.token || parsed.sessionToken).trim();
+        } else if (req.headers['x-sovra-refresh-token']) {
+          refreshToken = String(req.headers['x-sovra-refresh-token']).trim();
+        } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+          refreshToken = req.headers.authorization.substring(7).trim();
+        }
+      }
+
+      if (!refreshToken) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Missing refresh token' }));
+        return true;
+      }
+
+      const rotateRes = sovraDb.rotateUserSession(refreshToken, clientIp, req.headers['user-agent'] as string);
+      if (!rotateRes.ok || !rotateRes.user) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: rotateRes.error || 'Invalid or expired refresh token',
+          isCompromised: rotateRes.isCompromised || false,
+        }));
+        return true;
+      }
+
+      const isSecure = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production');
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Set-Cookie': [
+          `sovra_session_token=${encodeURIComponent(rotateRes.sessionToken!)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecure ? '; Secure' : ''}`,
+          `sovra_session=${encodeURIComponent(rotateRes.sessionToken!)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecure ? '; Secure' : ''}`,
+          `sovra_refresh_token=${encodeURIComponent(rotateRes.refreshToken!)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecure ? '; Secure' : ''}`,
+        ],
+      });
+      res.end(JSON.stringify({
+        ok: true,
+        sessionToken: rotateRes.sessionToken,
+        token: rotateRes.sessionToken,
+        refreshToken: rotateRes.refreshToken,
+        user: toPublicUserDTO(rotateRes.user),
       }));
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -1191,8 +1262,19 @@ function resolveGuardianPubKey(guardianId: string, guardianUser?: any, explicitP
         const match = req.headers.cookie.match(/(?:^|;\s*)(?:sovra_session|sovra_session_token)=([^;]+)/);
         if (match) token = decodeURIComponent(match[1]).trim();
       }
+      let refreshToken = '';
+      if (parsed.refreshToken) {
+        refreshToken = String(parsed.refreshToken).trim();
+      }
+      if (!refreshToken && req.headers.cookie) {
+        const rtMatch = req.headers.cookie.match(/(?:^|;\s*)sovra_refresh_token=([^;]+)/);
+        if (rtMatch) refreshToken = decodeURIComponent(rtMatch[1]).trim();
+      }
       if (token) {
         sovraDb.logoutUser(token);
+      }
+      if (refreshToken) {
+        sovraDb.revokeToken(refreshToken, 'User logout');
       }
       const isSecureLogout = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production');
       res.writeHead(200, {
@@ -1200,6 +1282,7 @@ function resolveGuardianPubKey(guardianId: string, guardianUser?: any, explicitP
         'Set-Cookie': [
           `sovra_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${isSecureLogout ? '; Secure' : ''}`,
           `sovra_session_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${isSecureLogout ? '; Secure' : ''}`,
+          `sovra_refresh_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${isSecureLogout ? '; Secure' : ''}`,
         ],
       });
       res.end(JSON.stringify({ ok: true }));
