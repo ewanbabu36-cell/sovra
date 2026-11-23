@@ -103,6 +103,9 @@ export function ReelComposerModal({
     setIsPublishing(true);
     setError(null);
 
+    const previewHash = videoPreview ? Array.from(videoPreview.slice(0, 64)).reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0), 0) : Date.now();
+    const hexHash = Math.abs(previewHash).toString(16).padStart(8, '0');
+
     const newReel: MobileReelItem = {
       id: `reel_${Date.now()}`,
       creatorHandle: 'you',
@@ -112,8 +115,8 @@ export function ReelComposerModal({
       likesCount: 0,
       commentsCount: 0,
       bgGradient: 'linear-gradient(180deg, #1e1b4b 0%, #312e81 40%, #0f172a 100%)',
-      manifestCid: 'bafybeig' + Math.random().toString(36).substring(2, 12),
-      segment0Cid: 'bafkreic' + Math.random().toString(36).substring(2, 12),
+      manifestCid: `bafybeig_preview_${hexHash}`,
+      segment0Cid: `bafkreic_preview_${hexHash}`,
       videoUrl: videoPreview,
     };
 

@@ -19,6 +19,7 @@ const PRIMARY_RPC = process.env.SOVRA_L1_RPC || 'http://127.0.0.1:26657';
 
 let l1RpcAvailableCache: { available: boolean; timestamp: number } = { available: false, timestamp: 0 };
 const L1_PROBE_TTL_MS = 10_000;
+const processedFiatPaymentIds = new Set<string>();
 
 export async function isL1RpcAvailable(): Promise<boolean> {
   const now = Date.now();
@@ -251,7 +252,9 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
       let pool = dbAny.db.amm_pools.find((p: any) => p.tokenAddress === tokenAddress);
       if (!pool) {
         const knownCw20 = (dbAny.db.cw20_tokens || []).find((t: any) => t.contractAddress === tokenAddress);
-        if (knownCw20 || tokenAddress === 'sovra1wasm_test_creator_token_alice' || tokenAddress.startsWith('sovra1wasm_test_') || tokenAddress.startsWith('sovra1wasm')) {
+        const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
+        const isAllowedTestToken = isTestEnv && (tokenAddress === 'sovra1wasm_test_creator_token_alice' || tokenAddress.startsWith('sovra1wasm_test_') || tokenAddress.startsWith('sovra1wasm'));
+        if (knownCw20 || isAllowedTestToken) {
           pool = {
             tokenAddress,
             tokenSymbol: knownCw20?.symbol || 'FAN',
@@ -543,14 +546,32 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
     if (!ok) return true;
 
     try {
-      const parsed = JSON.parse(body);
-      const senderAddress = parsed.senderAddress || resolveUserAddress(ctx);
+      const parsed = JSON.parse(body || '{}');
+      const principal = ctx.resolvePrincipal(ctx.req);
+      const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
+
+      // In production, enforce authentication strictly
+      if (!principal && !isTestEnv) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required to execute cross-chain bridge transfer' }));
+        return true;
+      }
+
+      const userAddress = resolveUserAddress(ctx);
+      const senderAddress = (parsed.senderAddress ? String(parsed.senderAddress).trim() : userAddress);
+
+      // Ownership binding: Caller cannot debit arbitrary victim identities
+      if (principal && senderAddress !== userAddress && senderAddress !== principal.did) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot transfer assets from another identity' }));
+        return true;
+      }
+
       const targetChain = (parsed.targetChain || 'osmosis').toLowerCase();
       const targetAddress = (parsed.targetAddress || parsed.recipient || '').trim();
       const amount = String(parsed.amount || '0');
       const sourceAsset = (parsed.sourceAsset || 'SOV').toUpperCase();
       const destinationAsset = (parsed.destinationAsset || (targetChain === 'osmosis' ? 'OSMO' : (targetChain === 'cosmoshub' ? 'ATOM' : 'INJ'))).toUpperCase();
-      const principal = ctx.resolvePrincipal(ctx.req);
 
       if (!targetAddress || amount === '0' || Number(amount) <= 0) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -576,7 +597,7 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         transfer: transferRecord,
         txHash: transferRecord.txHash,
         stages: transferRecord.stages,
-        status: 'SETTLED',
+        status: transferRecord.status,
         receipt: {
           bridgeTxId: transferRecord.id,
           sourceChain: 'sovra-l1-mesh',
@@ -585,7 +606,7 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
           amountSent: amount + ' ' + sourceAsset,
           amountReceived: (Number(amount) * 0.98).toFixed(2) + ' ' + destinationAsset,
           relayerFee: '0.50 SOV',
-          settlementProof: 'ibc_merkle_packet_attestation_' + transferRecord.id,
+          settlementProof: transferRecord.stages?.[0]?.proof || ('simulated_ibc_' + transferRecord.id),
           completedAt: transferRecord.settledAt,
         },
       }));
@@ -822,6 +843,17 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         }
       } catch (_) {}
 
+      // In strict settlement mode, if L1 commit was required and failed, fail closed
+      if (req.headers['x-require-l1-settlement'] === 'true' && !l1Committed) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: 'Layer-1 settlement failed: transaction could not be committed to CometBFT consensus engine',
+          l1Committed: false,
+        }));
+        return true;
+      }
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         ok: true,
@@ -836,6 +868,7 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         tokenSymbol,
         status: 'confirmed',
         l1Committed,
+        settlementTier: l1Committed ? 'L1_CONSENSUS_FINALIZED' : 'LOCAL_LEDGER_PENDING_L1',
         isReplay: transferResult.isReplay || false,
         timestamp: Date.now(),
       }));
@@ -928,6 +961,9 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         USD: 0.12, // 1 SOV = $0.12 USD
       },
       updatedAt: Date.now(),
+      quoteSource: 'testnet_fixed_peg',
+      isOracleLive: false,
+      disclaimer: 'Testnet fixed reference rate, not live forex oracle feed',
     }));
     return true;
   }
@@ -939,11 +975,44 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
     try {
+      const webhookSecret = process.env.FIAT_WEBHOOK_SECRET || (process.env.NODE_ENV === 'test' ? 'sovra_test_webhook_secret_2026' : '');
+      const sigHeader = req.headers['x-webhook-signature'] || req.headers['x-provider-signature'];
+      const signatureStr = Array.isArray(sigHeader) ? sigHeader[0] : sigHeader;
+
+      let signatureValid = false;
+      if (webhookSecret && signatureStr) {
+        try {
+          const expectedSig = crypto.createHmac('sha256', webhookSecret).update(body || '').digest('hex');
+          const sigBuf = Buffer.from(signatureStr, 'utf8');
+          const expBuf = Buffer.from(expectedSig, 'utf8');
+          if (sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)) {
+            signatureValid = true;
+          }
+        } catch (_) {}
+      } else if (process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST)) {
+        // In local test suite execution without explicit secret headers, permit test mocks
+        signatureValid = true;
+      }
+
+      if (!signatureValid) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid or missing webhook signature' }));
+        return true;
+      }
+
       const payload = JSON.parse(body || '{}');
       const { paymentId, userDid, amountFiat, currency } = payload;
       if (!userDid || !amountFiat || amountFiat <= 0) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Invalid webhook payload (userDid, amountFiat required)' }));
+        return true;
+      }
+
+      // Idempotency: prevent replay attack on duplicate paymentId
+      const finalPaymentId = paymentId || `pay_${Date.now()}`;
+      if (paymentId && processedFiatPaymentIds.has(paymentId)) {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Duplicate paymentId: payment already processed', paymentId }));
         return true;
       }
 
@@ -955,6 +1024,10 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         return true;
       }
 
+      if (paymentId) {
+        processedFiatPaymentIds.add(paymentId);
+      }
+
       user.balanceSov = (user.balanceSov || 0) + sovToCredit;
       (sovraDb as any).save();
 
@@ -963,7 +1036,8 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         ok: true,
         creditedSov: sovToCredit,
         newBalance: user.balanceSov,
-        paymentId: paymentId || `pay_${Date.now()}`,
+        paymentId: finalPaymentId,
+        verifiedSignature: signatureValid,
       }));
       return true;
     } catch (err: any) {
@@ -1006,6 +1080,7 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
 
       const fiatPayoutAmount = Number((amountSov * 10).toFixed(2));
       const payoutReceiptId = `payout_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      const isPayoutGatewayLive = process.env.FIAT_PAYOUT_PROVIDER_ENABLED === 'true';
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
@@ -1018,6 +1093,10 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         targetAddress,
         remainingBalance: user.balanceSov,
         status: 'PROCESSED',
+        payoutExecuted: isPayoutGatewayLive,
+        payoutProvider: isPayoutGatewayLive ? 'configured_gateway' : 'none_configured',
+        settlementTier: isPayoutGatewayLive ? 'BANK_SETTLED' : 'TESTNET_SIMULATED_DEBIT',
+        note: isPayoutGatewayLive ? 'Payout dispatched to banking partner' : 'Testnet simulation: SOV debited from ledger; external banking payout queued for manual review',
       }));
       return true;
     } catch (err: any) {
@@ -1106,6 +1185,8 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
     try {
       bodyObj = body ? JSON.parse(body) : {};
     } catch {}
+
+    const principal = ctx.resolvePrincipal(req);
     const targetDid = bodyObj?.did || principal?.did || 'did:sovra:laptop_host';
     const dbAny = sovraDb as any;
 
@@ -1121,15 +1202,8 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         r.claimed = true;
       }
     } else {
-      claimableSov = 2.75;
-      dbAny.db.seeder_receipts.push({
-        id: 'rcpt_' + Date.now(),
-        seederDid: targetDid,
-        bytesRelayed: 55 * 1024 * 1024,
-        amountSov: 2.75,
-        claimed: true,
-        timestamp: Date.now()
-      });
+      // Zero-Trust: Never award fabricated unearned fallback yields
+      claimableSov = 0;
     }
 
     claimableSov = Math.round(claimableSov * 100) / 100;
@@ -1138,7 +1212,9 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
     let currentBal = 0;
     let user = sqlite?.prepare('SELECT balance_sov FROM users WHERE did = ?').get(targetDid) as any;
     if (user) {
-      sqlite?.prepare('UPDATE users SET balance_sov = balance_sov + ?, updated_at = ? WHERE did = ?').run(claimableSov, Date.now(), targetDid);
+      if (claimableSov > 0) {
+        sqlite?.prepare('UPDATE users SET balance_sov = balance_sov + ?, updated_at = ? WHERE did = ?').run(claimableSov, Date.now(), targetDid);
+      }
       currentBal = Number(user.balance_sov) + claimableSov;
     } else {
       currentBal = claimableSov;
@@ -1160,8 +1236,9 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
       ok: true,
       claimedSov: claimableSov,
       newBalanceSov: currentBal,
-      receiptsCount: Math.max(receipts.length, 1),
-      txId: 'tx_yield_' + Date.now()
+      receiptsCount: receipts.length,
+      txId: claimableSov > 0 ? ('tx_yield_' + Date.now()) : undefined,
+      message: claimableSov === 0 ? 'No unclaimed seeder receipts found' : 'Seeder bandwidth yield claimed successfully',
     }));
     return true;
   }

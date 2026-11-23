@@ -3268,15 +3268,12 @@ async function startDevServer() {
     const isRealtimeCallOrEvent = url.pathname.startsWith('/api/call/') || url.pathname.startsWith('/api/realtime/');
     const isBenchmarkRequest = isBenchmarkMode;
     const isLoopbackIp = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === 'localhost';
-    const isTestMode = process.env.NODE_ENV === 'test' ||
+    // Zero-Trust Hardening: Bypass headers are strictly disallowed in production
+    const isTestMode = (process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST)) && (
       req.headers['x-sovra-test-bypass'] === 'true' ||
       req.headers['x-sovra-test-fixture'] === 'true' ||
-      (isLoopbackIp && (
-        req.headers['user-agent']?.includes('vitest') ||
-        req.headers['user-agent']?.includes('node') ||
-        req.headers['user-agent']?.includes('undici') ||
-        process.env.NODE_ENV !== 'production'
-      ));
+      isLoopbackIp
+    );
     if (!isRealtimeCallOrEvent && !isBenchmarkRequest && !isTestMode && !rateLimiter.consume(rateLimitKey)) {
       res.writeHead(429, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Too Many Requests: Rate limit exceeded. Please back off.' }));

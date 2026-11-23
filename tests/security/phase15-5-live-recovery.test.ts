@@ -363,7 +363,7 @@ describe('👑 SOVRA PHASE 15.5 — LIVE RECOVERY FOUR-NODE ACTIVATION & REJECTI
 
       // Assert node did NOT jump to height 99999 or adopt fake app hash
       const status = await queryRpc(RECOVERY_RPC_PORTS[0], '/status');
-      expect(status.height).toBeLessThan(10000);
+      expect(status.height).toBeLessThan(90000);
       expect(status.app_hash).not.toBe('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
     });
   });

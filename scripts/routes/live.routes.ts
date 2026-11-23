@@ -241,7 +241,7 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
         if (parsed.senderDid) {
           senderDid = String(parsed.senderDid);
         } else {
-          const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST) || req.headers['x-sovra-test-bypass'] === 'true';
+          const isTestEnv = (process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST));
           if (isTestEnv) {
             senderDid = 'did:sovra:supporter_peer';
           } else {

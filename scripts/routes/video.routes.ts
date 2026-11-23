@@ -758,7 +758,7 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
     try {
-      const parsed = JSON.parse(body);
+      const parsed = JSON.parse(body || '{}');
       const videoId = parsed.videoId || 'video_unknown';
       const chunkHash = parsed.chunkHash || 'bafy_default';
       const bytesSeeded = Number(parsed.bytesSeeded) || 0;
@@ -768,6 +768,27 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
       if (!seederDid || bytesSeeded < 1024) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Valid seederDid and minimum 1KB bytesSeeded required' }));
+        return true;
+      }
+
+      // Maximum reasonable bandwidth claim per single batch (10 GB) to prevent overflow
+      if (bytesSeeded > 10 * 1024 * 1024 * 1024) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'bytesSeeded exceeds maximum allowed batch limit (10 GB)' }));
+        return true;
+      }
+
+      // Identity binding: caller must be authenticated as the seederDid in non-test mode
+      const principal = ctx.resolvePrincipal(req, parsed);
+      const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
+      if (principal && principal.did !== seederDid) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot claim bandwidth rewards on behalf of another seeder identity' }));
+        return true;
+      }
+      if (!principal && !isTestEnv) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required to claim seeder rewards' }));
         return true;
       }
 

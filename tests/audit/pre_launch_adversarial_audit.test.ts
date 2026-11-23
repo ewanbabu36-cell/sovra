@@ -407,12 +407,13 @@ describe('SOVRA INSTITUTIONAL PRE-LAUNCH FORENSIC AUDIT', () => {
     expect(sovraDb.getUserByDid(tempDid)).toBeDefined();
 
     // Perform account wipe
+    sovraDb.deleteUserAccount(tempDid);
     const allUsers = (sovraDb as any).db.users as any[];
     const idx = allUsers.findIndex(u => u.did === tempDid);
     if (idx >= 0) {
       allUsers.splice(idx, 1);
-      (sovraDb as any).save();
     }
+    (sovraDb as any).save();
 
     // Verify complete erasure
     expect(sovraDb.getUserByDid(tempDid)).toBeUndefined();

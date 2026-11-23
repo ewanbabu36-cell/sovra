@@ -13796,13 +13796,12 @@ export class SovraDatabaseEngine {
       destinationAsset: params.destinationAsset || 'OSMO',
       stages: [
         { name: 'Initiated', status: 'COMPLETED', timestamp: now, proof: '0x' + crypto.randomBytes(16).toString('hex') },
-        { name: 'Relayer Attested', status: 'COMPLETED', timestamp: now + 420, proof: 'ibc_merkle_packet_' + Math.floor(1000 + Math.random() * 9000) },
-        { name: 'Settled on Mesh', status: 'COMPLETED', timestamp: now + 850, proof: 'cw20_mesh_settlement_ack' },
+        { name: 'Relayer Queue', status: 'PENDING', timestamp: now, proof: 'ibc_packet_intent_' + now },
       ],
-      status: 'SETTLED',
+      status: 'PENDING_RELAY',
       relayerFee: params.relayerFee || '500000',
       createdAt: now,
-      settledAt: now + 850,
+      settledAt: undefined,
     };
 
     this.db.bridge_transfers.unshift(record);
@@ -13838,10 +13837,29 @@ export class SovraDatabaseEngine {
   }
 
   public compactStorage(): { ok: boolean; compactedMb: number; orphanedBlocksRemoved: number; completedAt: number } {
+    let sizeBefore = 0;
+    try {
+      if (fs.existsSync(this.dbFilePath)) {
+        sizeBefore = fs.statSync(this.dbFilePath).size;
+      }
+    } catch (_) {}
+
     this.checkpoint();
-    this.save();
-    const compactedMb = Number((1.2 + Math.random() * 2.8).toFixed(2));
-    const orphanedBlocksRemoved = Math.floor(12 + Math.random() * 24);
+    this.save(true);
+
+    try {
+      this.sqliteEngine?.getRawDb?.()?.exec('PRAGMA incremental_vacuum;');
+    } catch (_) {}
+
+    let sizeAfter = 0;
+    try {
+      if (fs.existsSync(this.dbFilePath)) {
+        sizeAfter = fs.statSync(this.dbFilePath).size;
+      }
+    } catch (_) {}
+
+    const compactedMb = Number(Math.max(0, (sizeBefore - sizeAfter) / (1024 * 1024)).toFixed(2));
+    const orphanedBlocksRemoved = 0; // Truthful measurement: 0 unless orphaned blocks found
 
     this.logAudit({
       type: 'SYSTEM_OP',

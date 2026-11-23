@@ -5,25 +5,25 @@
     {
       "height": 39998,
       "app_hash": "fb7b850770d50e4e0d36ceab353b4cfc401ace3054962a0736da99e77131c572",
-      "proposer": "sovra1ade587e680ef2beddfcbcb79dc3c31cb031a2aef",
+      "proposer": "sovra1979f90b1eff8b6a446b675046c91981abde80f45",
       "signers": [
         {
-          "validator_address": "sovra1ae83aea1b1f1ded68b65a4ea389fe70f4de78b92",
+          "validator_address": "sovra1422ec312dd5e83d30480ff8c86638dd1fa3cc5fa",
           "voting_power": 25,
           "validator_index": 0
         },
         {
-          "validator_address": "sovra1ade587e680ef2beddfcbcb79dc3c31cb031a2aef",
+          "validator_address": "sovra1979f90b1eff8b6a446b675046c91981abde80f45",
           "voting_power": 25,
           "validator_index": 1
         },
         {
-          "validator_address": "sovra1721dfe154e988c071d5c59aa2d0e765b9538eb6e",
+          "validator_address": "sovra1f184b34c0b604e1d9394ad23532b66337def406c",
           "voting_power": 25,
           "validator_index": 2
         },
         {
-          "validator_address": "sovra1770e232135853e17d7b7722cb7a4fad431f9bb8a",
+          "validator_address": "sovra1650a78cd66067841d8a717f697ecec848ef40ed9",
           "voting_power": 25,
           "validator_index": 3
         }
@@ -35,25 +35,25 @@
     {
       "height": 39999,
       "app_hash": "69a9a8b61e106ea23000b101e1fa0899d6544efc949f26079587c97a0ae63262",
-      "proposer": "sovra1721dfe154e988c071d5c59aa2d0e765b9538eb6e",
+      "proposer": "sovra1f184b34c0b604e1d9394ad23532b66337def406c",
       "signers": [
         {
-          "validator_address": "sovra1ae83aea1b1f1ded68b65a4ea389fe70f4de78b92",
+          "validator_address": "sovra1422ec312dd5e83d30480ff8c86638dd1fa3cc5fa",
           "voting_power": 25,
           "validator_index": 0
         },
         {
-          "validator_address": "sovra1ade587e680ef2beddfcbcb79dc3c31cb031a2aef",
+          "validator_address": "sovra1979f90b1eff8b6a446b675046c91981abde80f45",
           "voting_power": 25,
           "validator_index": 1
         },
         {
-          "validator_address": "sovra1721dfe154e988c071d5c59aa2d0e765b9538eb6e",
+          "validator_address": "sovra1f184b34c0b604e1d9394ad23532b66337def406c",
           "voting_power": 25,
           "validator_index": 2
         },
         {
-          "validator_address": "sovra1770e232135853e17d7b7722cb7a4fad431f9bb8a",
+          "validator_address": "sovra1650a78cd66067841d8a717f697ecec848ef40ed9",
           "voting_power": 25,
           "validator_index": 3
         }
@@ -65,25 +65,25 @@
     {
       "height": 40000,
       "app_hash": "fa745f10a6d0c5b3dd7b0019319f8d180b0821b1c8d3437a4d4d7c1186dc6dd5",
-      "proposer": "sovra1047815541e2191e17599b02a7dd7341f7ff4714f",
+      "proposer": "sovra178bf0783c910e769a1f1300da65a7767cbbc0f36",
       "signers": [
         {
-          "validator_address": "sovra18ea50eaae2075739dfb7031811dac54603f3134b",
+          "validator_address": "sovra1c4ab656e2019aece9b8628f05b7664c583176321",
           "voting_power": 25,
           "validator_index": 0
         },
         {
-          "validator_address": "sovra1b57ec2b88375a57a5937cd44a5e95cf09ef1aca7",
+          "validator_address": "sovra108ff6c9980d146b688c7c5847657754d5be0efe9",
           "voting_power": 25,
           "validator_index": 1
         },
         {
-          "validator_address": "sovra16fa8003e213519a61bd332df736555b1b2f3be30",
+          "validator_address": "sovra1bb93ddcfc9610ab31db6e570d99ef37cd7057835",
           "voting_power": 25,
           "validator_index": 2
         },
         {
-          "validator_address": "sovra1047815541e2191e17599b02a7dd7341f7ff4714f",
+          "validator_address": "sovra178bf0783c910e769a1f1300da65a7767cbbc0f36",
           "voting_power": 25,
           "validator_index": 3
         }
@@ -95,20 +95,20 @@
     {
       "height": 40001,
       "app_hash": "ac909a9193bb8ae178186a9ba973ae80fd15ec428fb3eb5400f7980d5fdee52e",
-      "proposer": "sovra18ea50eaae2075739dfb7031811dac54603f3134b",
+      "proposer": "sovra1c4ab656e2019aece9b8628f05b7664c583176321",
       "signers": [
         {
-          "validator_address": "sovra18ea50eaae2075739dfb7031811dac54603f3134b",
+          "validator_address": "sovra1c4ab656e2019aece9b8628f05b7664c583176321",
           "voting_power": 25,
           "validator_index": 0
         },
         {
-          "validator_address": "sovra1b57ec2b88375a57a5937cd44a5e95cf09ef1aca7",
+          "validator_address": "sovra108ff6c9980d146b688c7c5847657754d5be0efe9",
           "voting_power": 25,
           "validator_index": 1
         },
         {
-          "validator_address": "sovra16fa8003e213519a61bd332df736555b1b2f3be30",
+          "validator_address": "sovra1bb93ddcfc9610ab31db6e570d99ef37cd7057835",
           "voting_power": 25,
           "validator_index": 2
         }
@@ -120,20 +120,20 @@
     {
       "height": 40002,
       "app_hash": "f7de9f2dbd01c11fe360b6a909039938081791c9524ef23ff6e364aadf87f7df",
-      "proposer": "sovra1b57ec2b88375a57a5937cd44a5e95cf09ef1aca7",
+      "proposer": "sovra108ff6c9980d146b688c7c5847657754d5be0efe9",
       "signers": [
         {
-          "validator_address": "sovra18ea50eaae2075739dfb7031811dac54603f3134b",
+          "validator_address": "sovra1c4ab656e2019aece9b8628f05b7664c583176321",
           "voting_power": 25,
           "validator_index": 0
         },
         {
-          "validator_address": "sovra1b57ec2b88375a57a5937cd44a5e95cf09ef1aca7",
+          "validator_address": "sovra108ff6c9980d146b688c7c5847657754d5be0efe9",
           "voting_power": 25,
           "validator_index": 1
         },
         {
-          "validator_address": "sovra16fa8003e213519a61bd332df736555b1b2f3be30",
+          "validator_address": "sovra1bb93ddcfc9610ab31db6e570d99ef37cd7057835",
           "voting_power": 25,
           "validator_index": 2
         }
@@ -145,20 +145,20 @@
     {
       "height": 40003,
       "app_hash": "1ecd23d9c968b439c816c4f2b0f0ca96a541185c4c5d7fbe08062972da9f9281",
-      "proposer": "sovra16fa8003e213519a61bd332df736555b1b2f3be30",
+      "proposer": "sovra1bb93ddcfc9610ab31db6e570d99ef37cd7057835",
       "signers": [
         {
-          "validator_address": "sovra18ea50eaae2075739dfb7031811dac54603f3134b",
+          "validator_address": "sovra1c4ab656e2019aece9b8628f05b7664c583176321",
           "voting_power": 25,
           "validator_index": 0
         },
         {
-          "validator_address": "sovra1b57ec2b88375a57a5937cd44a5e95cf09ef1aca7",
+          "validator_address": "sovra108ff6c9980d146b688c7c5847657754d5be0efe9",
           "voting_power": 25,
           "validator_index": 1
         },
         {
-          "validator_address": "sovra16fa8003e213519a61bd332df736555b1b2f3be30",
+          "validator_address": "sovra1bb93ddcfc9610ab31db6e570d99ef37cd7057835",
           "voting_power": 25,
           "validator_index": 2
         }
@@ -170,20 +170,20 @@
     {
       "height": 40004,
       "app_hash": "b018da6fc866ba36b864464701341fa676c2ddc853d97af968ec17bd8a3a96cb",
-      "proposer": "sovra1047815541e2191e17599b02a7dd7341f7ff4714f",
+      "proposer": "sovra178bf0783c910e769a1f1300da65a7767cbbc0f36",
       "signers": [
         {
-          "validator_address": "sovra18ea50eaae2075739dfb7031811dac54603f3134b",
+          "validator_address": "sovra1c4ab656e2019aece9b8628f05b7664c583176321",
           "voting_power": 25,
           "validator_index": 0
         },
         {
-          "validator_address": "sovra1b57ec2b88375a57a5937cd44a5e95cf09ef1aca7",
+          "validator_address": "sovra108ff6c9980d146b688c7c5847657754d5be0efe9",
           "voting_power": 25,
           "validator_index": 1
         },
         {
-          "validator_address": "sovra16fa8003e213519a61bd332df736555b1b2f3be30",
+          "validator_address": "sovra1bb93ddcfc9610ab31db6e570d99ef37cd7057835",
           "voting_power": 25,
           "validator_index": 2
         }
@@ -195,20 +195,20 @@
     {
       "height": 40005,
       "app_hash": "484974881dd008520f4a3bb3ed70ffc7225f49f0f357e396552a419249bb6230",
-      "proposer": "sovra18ea50eaae2075739dfb7031811dac54603f3134b",
+      "proposer": "sovra1c4ab656e2019aece9b8628f05b7664c583176321",
       "signers": [
         {
-          "validator_address": "sovra18ea50eaae2075739dfb7031811dac54603f3134b",
+          "validator_address": "sovra1c4ab656e2019aece9b8628f05b7664c583176321",
           "voting_power": 25,
           "validator_index": 0
         },
         {
-          "validator_address": "sovra1b57ec2b88375a57a5937cd44a5e95cf09ef1aca7",
+          "validator_address": "sovra108ff6c9980d146b688c7c5847657754d5be0efe9",
           "voting_power": 25,
           "validator_index": 1
         },
         {
-          "validator_address": "sovra16fa8003e213519a61bd332df736555b1b2f3be30",
+          "validator_address": "sovra1bb93ddcfc9610ab31db6e570d99ef37cd7057835",
           "voting_power": 25,
           "validator_index": 2
         }

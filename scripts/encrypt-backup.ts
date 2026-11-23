@@ -10,9 +10,15 @@ if (!fs.existsSync(bundlePath)) {
   process.exit(1);
 }
 
+const encryptionKey = process.env.SOVRA_BACKUP_ENCRYPTION_KEY || (process.env.NODE_ENV === 'test' ? 'sovra-cold-backup-vault-key-test-only' : '');
+if (!encryptionKey) {
+  console.error('Error: SOVRA_BACKUP_ENCRYPTION_KEY environment variable is required to securely derive backup encryption key.');
+  process.exit(1);
+}
+
 const rawData = fs.readFileSync(bundlePath);
 const salt = crypto.randomBytes(32);
-const key = crypto.scryptSync('sovra-cold-backup-vault-key-2026', salt, 32, { N: 32768, r: 8, p: 1, maxmem: 128 * 1024 * 1024 });
+const key = crypto.scryptSync(encryptionKey, salt, 32, { N: 32768, r: 8, p: 1, maxmem: 128 * 1024 * 1024 });
 const iv = crypto.randomBytes(12);
 const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
 

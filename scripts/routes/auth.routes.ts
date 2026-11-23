@@ -113,15 +113,12 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
       const parsed = JSON.parse(body);
       const regIp = clientIp ? clientIp.replace(/^::ffff:/, '') : '127.0.0.1';
       const isLoopback = regIp === '127.0.0.1' || regIp === '::1' || regIp === 'localhost';
-      const isTestEnv = process.env.NODE_ENV === 'test' ||
+      // Zero-Trust Hardening: Public headers cannot bypass registration throttles in production
+      const isTestEnv = (process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST)) && (
         req.headers['x-sovra-test-bypass'] === 'true' ||
         req.headers['x-sovra-test-fixture'] === 'true' ||
-        (isLoopback && (
-          req.headers['user-agent']?.includes('vitest') ||
-          req.headers['user-agent']?.includes('node') ||
-          req.headers['user-agent']?.includes('undici') ||
-          process.env.NODE_ENV !== 'production'
-        ));
+        isLoopback
+      );
 
       if (!isTestEnv) {
         const now = Date.now();

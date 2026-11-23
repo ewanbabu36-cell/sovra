@@ -104,18 +104,14 @@ export function LiveBroadcasterModal({
     };
   }, [isOpen]);
 
-  // Duration timer & dynamic viewer simulation
+  // Duration timer & truthful active broadcast tracking
   useEffect(() => {
     if (!isBroadcasting) return;
     const timer = setInterval(() => {
       setBroadcastSeconds(s => s + 1);
     }, 1000);
-    const viewerInterval = setInterval(() => {
-      setViewersCount(v => Math.max(1, v + Math.floor(Math.random() * 3) - 1));
-    }, 4000);
     return () => {
       clearInterval(timer);
-      clearInterval(viewerInterval);
     };
   }, [isBroadcasting]);
 

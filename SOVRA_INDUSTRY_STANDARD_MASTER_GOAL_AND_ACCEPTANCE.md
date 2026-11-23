@@ -454,7 +454,8 @@ Release Impact: [BLOCKER | REQUIRED | ENHANCEMENT]
 * **AC-FIN-02 (100M SOV Hard Cap Invariant):**
   - *Requirement:* Total system supply must never exceed 100,000,000 SOV. Registration must not mint unbacked coins.
   - *Pass Condition:* Sum of all balances $\le 100,000,000\text{ SOV}$.
-  - *Severity:* CRITICAL | *Release Impact:* BLOCKER | *Status:* **FAILED (Open Conflict)**
+  - *Severity:* CRITICAL | *Release Impact:* BLOCKER | *Status:* **PASSED (Reconciled & Enforced)**
+  - *Evidence:* Default registration balance verified at 0.0 SOV; Layer-1 `GlobalLifetimeCap` strictly enforced in Go consensus keeper; Phase 15.6 mathematical audit confirmed zero unbacked minting.
 
 ### 18.3 Data Protection & Storage
 * **AC-DAT-01 (Account Deletion Cascade):**
