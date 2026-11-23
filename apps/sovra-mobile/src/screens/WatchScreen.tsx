@@ -109,11 +109,14 @@ export function LiveBroadcasterModal({
     if (!isBroadcasting) return;
     const timer = setInterval(() => {
       setBroadcastSeconds(s => s + 1);
+      if (activeStreamId) {
+        setViewersCount(v => Math.max(1, v));
+      }
     }, 1000);
     return () => {
       clearInterval(timer);
     };
-  }, [isBroadcasting]);
+  }, [isBroadcasting, activeStreamId]);
 
   const handleStartBroadcast = async () => {
     try {

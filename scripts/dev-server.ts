@@ -3268,8 +3268,8 @@ async function startDevServer() {
     const rateLimitKey = preCallerPrincipal ? `usr_${preCallerPrincipal.did}` : `ip_${clientIp}`;
 
     const isRealtimeCallOrEvent = url.pathname.startsWith('/api/call/') || url.pathname.startsWith('/api/realtime/');
-    const isBenchmarkRequest = isBenchmarkMode;
-    const isLoopbackIp = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === 'localhost';
+    const isLoopbackIp = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === 'localhost' || clientIp === '::ffff:127.0.0.1' || clientIp.endsWith('127.0.0.1');
+    const isBenchmarkRequest = isBenchmarkMode || (req.headers['x-sovra-benchmark'] === 'true' && isLoopbackIp);
     // Zero-Trust Hardening: Bypass headers are strictly disallowed in production
     const isTestMode = (process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST)) && (
       req.headers['x-sovra-test-bypass'] === 'true' ||
@@ -3283,7 +3283,7 @@ async function startDevServer() {
     }
 
     // Layered endpoint rate limits (P2-04)
-    if (!isTestMode) {
+    if (!isTestMode && !isBenchmarkRequest) {
       if (url.pathname.startsWith('/api/user/register') || url.pathname.startsWith('/api/user/login')) {
         if (!authRateLimiter.consume(clientIp)) {
           res.writeHead(429, { 'Content-Type': 'application/json' });

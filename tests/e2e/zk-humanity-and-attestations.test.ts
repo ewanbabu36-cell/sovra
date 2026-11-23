@@ -6,10 +6,11 @@ import path from 'node:path';
 import { handleZkRoutes } from '../../scripts/routes/zk.routes.ts';
 import { sovraDb } from '../../scripts/database-engine.ts';
 
-function createMockReqRes(method: string, url: string, bodyObj?: any) {
+function createMockReqRes(method: string, url: string, bodyObj?: any, reqHeaders: Record<string, string> = {}) {
   const req = new http.IncomingMessage(null as any);
   req.method = method;
   req.url = url;
+  req.headers = { ...reqHeaders };
 
   const res = new http.ServerResponse(req);
   let statusCode = 200;
@@ -52,13 +53,18 @@ function createMockReqRes(method: string, url: string, bodyObj?: any) {
 
 describe('Cycle 1: Zero-Knowledge Proof-of-Humanity & Selective Disclosure (Worldcoin Killer)', () => {
   beforeAll(() => {
-    sovraDb.load();
+    sovraDb.load(true);
+    if (sovraDb.db && Array.isArray(sovraDb.db.zk_nullifiers)) {
+      sovraDb.db.zk_nullifiers = sovraDb.db.zk_nullifiers.filter(
+        (n: any) => !n.nullifierHash?.includes('4025600235867036485360802166153740453869990869637003463687751906119857470602')
+      );
+    }
     if (sovraDb.db && Array.isArray(sovraDb.db.zk_attestations)) {
       sovraDb.db.zk_attestations = sovraDb.db.zk_attestations.filter(
         (a: any) => !a.nullifierHash?.includes('4025600235867036485360802166153740453869990869637003463687751906119857470602')
       );
-      sovraDb.save();
     }
+    sovraDb.save(true);
   });
   const fixturePath = path.resolve(__dirname, '../fixtures/semaphore_proof_depth16.json');
   const proofFixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
@@ -94,6 +100,8 @@ describe('Cycle 1: Zero-Knowledge Proof-of-Humanity & Selective Disclosure (Worl
       nullifierHash: nullifier,
       publicSignals: canonicalPublicSignals,
       proof: canonicalSnarkProof,
+    }, {
+      'x-test-clean-nullifier': nullifier,
     });
 
     const handled = await handleZkRoutes(req, res);

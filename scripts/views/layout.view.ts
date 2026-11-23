@@ -4473,7 +4473,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                       <span class="yt-live-dot">●</span> <span>4K UHD</span> <span class="yt-badge-sep">•</span> <span>HLS P2P</span>
                     </span>
                     <span class="yt-buffer-badge" id="bufferHealthBadge">
-                      ⚡ Buffer 9.4s
+                      ⚡ Buffer 0.0s
                     </span>
                   </div>
                   
@@ -4493,7 +4493,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     Chapter 1: Introduction to Sovereign P2P Streaming
                   </div>
                   <div class="yt-screen-swarm" id="ytScreenP2pStats">
-                    ● BitSwap Swarm: 14 Connected Seeders &bull; Sub-300ms
+                    ● BitSwap Swarm: Initializing...
                   </div>
                 </div>
               </div>
@@ -4528,10 +4528,10 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   <span style="color: #94a3b8;">Resolution / FPS:</span> <span id="nerdsRes">3840x2160@60fps</span>
                   <span style="color: #94a3b8;">Codecs:</span> <span id="nerdsCodec">vp09.00.51.08 / opus</span>
                   <span style="color: #94a3b8;">Viewport:</span> <span id="nerdsViewport">1280x720*1.50</span>
-                  <span style="color: #94a3b8;">Buffer Health:</span> <span id="nerdsBuffer" style="color: #34d399;">14.8 s</span>
-                  <span style="color: #94a3b8;">Network Speed:</span> <span id="nerdsSpeed" style="color: #38bdf8;">18.4 MB/s</span>
-                  <span style="color: #94a3b8;">Network Seeders:</span> <span id="nerdsSeeders" style="color: #a855f7;">14 Connected Seeders</span>
-                  <span style="color: #94a3b8;">Dropped Frames:</span> <span id="nerdsDropped">0 / 4820 (0.0%)</span>
+                  <span style="color: #94a3b8;">Buffer Health:</span> <span id="nerdsBuffer" style="color: #34d399;">0.0 s</span>
+                  <span style="color: #94a3b8;">Network Speed:</span> <span id="nerdsSpeed" style="color: #38bdf8;">0.0 MB/s</span>
+                  <span style="color: #94a3b8;">Network Seeders:</span> <span id="nerdsSeeders" style="color: #a855f7;">Initializing...</span>
+                  <span style="color: #94a3b8;">Dropped Frames:</span> <span id="nerdsDropped">0 / 0 (0.0%)</span>
                 </div>
               </div>
 
@@ -4858,16 +4858,13 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(15, 23, 42, 0.95); border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer;" onclick="toggleLiveSwarmChat()">
               <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 700; color: #f8fafc;">
                 <span>💬</span> <span>Live Swarm Chat</span>
-                <span style="font-size: 0.68rem; background: rgba(34, 197, 94, 0.2); color: #34d399; border: 1px solid rgba(34, 197, 94, 0.35); padding: 1px 6px; border-radius: 10px;">🟢 14 Local Seeders • 4K 60fps</span>
+                <span id="ytLiveSwarmBadge" style="font-size: 0.68rem; background: rgba(34, 197, 94, 0.2); color: #34d399; border: 1px solid rgba(34, 197, 94, 0.35); padding: 1px 6px; border-radius: 10px;">🟢 Live Swarm • Connected</span>
               </div>
               <button id="ytLiveSwarmChatToggleBtn" type="button" style="background: none; border: none; color: #94a3b8; font-size: 0.75rem; cursor: pointer; font-weight: 600;">Hide</button>
             </div>
             <div id="ytLiveSwarmChatBody" style="display: flex; flex-direction: column;">
               <div id="ytLiveSwarmChatMessages" style="height: 150px; overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 0.76rem;">
-                <div style="color: #94a3b8;"><span style="color: #38bdf8; font-weight: 700;">Alice (Seeder #4):</span> 4K 60fps stream is buttery smooth over BitSwap!</div>
-                <div style="color: #94a3b8;"><span style="color: #34d399; font-weight: 700;">Bob (Relay #12):</span> Sub-300ms peer latency confirmed. 0 dropped frames.</div>
-                <div style="color: #94a3b8;"><span style="color: #eab308; font-weight: 700;">Charlie:</span> BitSwap seed ratio 4.8x. Pinning to local blockstore.</div>
-                <div style="color: #94a3b8;"><span style="color: #c084fc; font-weight: 700;">Elena:</span> Ambient glow illumination looks incredible on OLED ✨</div>
+                <div id="ytLiveSwarmChatEmpty" style="color: #64748b; font-style: italic; padding: 12px 0; text-align: center;">No messages yet. Send a message to peers in this swarm!</div>
               </div>
               <div style="display: flex; gap: 6px; padding: 6px 10px; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.25);">
                 <input type="text" id="ytLiveSwarmChatInput" class="social-modal-input" placeholder="Chat with peer swarm..." onkeydown="if(event.key==='Enter') sendLiveSwarmChatMessage()" style="flex: 1; padding: 4px 8px; font-size: 0.76rem; border-radius: 6px;" />

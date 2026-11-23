@@ -47617,7 +47617,81 @@ _scheduleTargetContext: 'workspace',
       }
     }
 
+    function getRealVideoBufferHealth(videoEl) {
+      if (!videoEl || !videoEl.buffered || videoEl.buffered.length === 0) return 0;
+      const cur = videoEl.currentTime || 0;
+      let ahead = 0;
+      for (let i = 0; i < videoEl.buffered.length; i++) {
+        const start = videoEl.buffered.start(i);
+        const end = videoEl.buffered.end(i);
+        if (cur >= start && cur <= end) {
+          ahead = end - cur;
+          break;
+        }
+      }
+      if (ahead === 0 && videoEl.buffered.length > 0) {
+        const lastEnd = videoEl.buffered.end(videoEl.buffered.length - 1);
+        if (lastEnd > cur) ahead = lastEnd - cur;
+      }
+      return Math.max(0, ahead);
+    }
+
+    function updateBufferHealthBadge() {
+      const videoEl = document.getElementById('ytMainVideoElement') || document.getElementById('ytVideoPlayer');
+      const bufferBadge = document.getElementById('bufferHealthBadge');
+      if (!bufferBadge) return;
+      if (!videoEl) {
+        bufferBadge.innerText = '⚡ Buffer 0.0s';
+        bufferBadge.style.background = 'rgba(100, 116, 139, 0.25)';
+        bufferBadge.style.color = '#94a3b8';
+        return;
+      }
+      const aheadSec = getRealVideoBufferHealth(videoEl);
+      bufferBadge.innerText = '⚡ Buffer ' + aheadSec.toFixed(1) + 's';
+      if (aheadSec >= 6) {
+        bufferBadge.style.background = 'rgba(16, 185, 129, 0.25)';
+        bufferBadge.style.color = '#34d399';
+      } else if (aheadSec >= 2) {
+        bufferBadge.style.background = 'rgba(56, 189, 248, 0.25)';
+        bufferBadge.style.color = '#38bdf8';
+      } else {
+        bufferBadge.style.background = 'rgba(245, 158, 11, 0.25)';
+        bufferBadge.style.color = '#fbbf24';
+      }
+    }
+    window.updateBufferHealthBadge = updateBufferHealthBadge;
+
+    function updateScreenP2pStats() {
+      const el = document.getElementById('ytScreenP2pStats');
+      if (!el) return;
+      const peerCount = (window.sovraP2pMesh && typeof window.sovraP2pMesh.getConnectedPeerCount === 'function') 
+        ? window.sovraP2pMesh.getConnectedPeerCount() 
+        : (window._currentHlsInstance ? 1 : 0);
+      if (peerCount > 0) {
+        el.innerHTML = '● BitSwap Swarm: ' + peerCount + ' Active Seeders &bull; Sub-300ms SLA';
+      } else {
+        el.innerHTML = '● BitSwap Engine: Edge Direct Stream &bull; Ready';
+      }
+    }
+
+    function updateLiveSwarmBadge() {
+      const badge = document.getElementById('ytLiveSwarmBadge');
+      if (!badge) return;
+      const peerCount = (window.sovraP2pMesh && typeof window.sovraP2pMesh.getConnectedPeerCount === 'function') 
+        ? window.sovraP2pMesh.getConnectedPeerCount() 
+        : (window._currentHlsInstance ? 1 : 0);
+      if (peerCount > 0) {
+        badge.innerText = '🟢 ' + peerCount + ' Peer Seeders • Active';
+      } else {
+        badge.innerText = '🟢 Direct Stream • Ready';
+      }
+    }
+
     function updateNerdsTelemetry() {
+      const videoEl = document.getElementById('ytMainVideoElement') || document.getElementById('ytVideoPlayer');
+      if (videoEl) updateBufferHealthBadge();
+      updateScreenP2pStats();
+      updateLiveSwarmBadge();
       if (!ytStatsForNerdsVisible) return;
       const v = ytVideosCatalog[activeYtVideoIndex];
       if (!v) return;
@@ -47631,14 +47705,48 @@ _scheduleTargetContext: 'workspace',
       const drpEl = document.getElementById('nerdsDropped');
 
       if (cidEl) cidEl.innerText = v.cid;
-      if (resEl) resEl.innerText = (v.variants && v.variants[0] ? v.variants[0].resolution : '3840x2160') + '@60fps';
+      if (resEl) {
+        if (videoEl && videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+          resEl.innerText = videoEl.videoWidth + 'x' + videoEl.videoHeight + '@' + (videoEl.playbackRate || 1) + 'x';
+        } else {
+          resEl.innerText = (v.variants && v.variants[0] ? v.variants[0].resolution : '3840x2160') + '@60fps';
+        }
+      }
       if (codecEl) codecEl.innerText = 'vp09.00.51.08.01.01.01.01.00 / opus';
       const box = document.getElementById('ytPlayerBox');
-      if (vpEl && box) vpEl.innerText = box.clientWidth + 'x' + box.clientHeight + '*1.50';
-      if (bufEl) bufEl.innerText = (14.2 + Math.sin(ytCurrentTimeSec) * 2.1).toFixed(1) + ' s';
-      if (spdEl) spdEl.innerText = (18.4 + Math.cos(ytCurrentTimeSec) * 3.2).toFixed(1) + ' MB/s';
-      if (swmEl) swmEl.innerText = '14 Community Seeders';
-      if (drpEl) drpEl.innerText = '0 / ' + Math.floor(ytCurrentTimeSec * 60) + ' (0.0%)';
+      if (vpEl && box) vpEl.innerText = box.clientWidth + 'x' + box.clientHeight + ' (DPR: ' + (window.devicePixelRatio || 1).toFixed(2) + ')';
+      
+      const realBufferSec = videoEl ? getRealVideoBufferHealth(videoEl) : 0;
+      if (bufEl) bufEl.innerText = realBufferSec.toFixed(1) + ' s';
+
+      if (drpEl) {
+        if (videoEl && typeof videoEl.getVideoPlaybackQuality === 'function') {
+          const q = videoEl.getVideoPlaybackQuality();
+          const dropped = q.droppedVideoFrames || 0;
+          const total = q.totalVideoFrames || 0;
+          const pct = total > 0 ? ((dropped / total) * 100).toFixed(1) : '0.0';
+          drpEl.innerText = dropped + ' / ' + total + ' (' + pct + '%)';
+        } else {
+          drpEl.innerText = '0 / 0 (0.0%)';
+        }
+      }
+
+      if (spdEl) {
+        if (window.__lastFragLoadSpeedMbps && window.__lastFragLoadSpeedMbps > 0) {
+          spdEl.innerText = (window.__lastFragLoadSpeedMbps / 8).toFixed(1) + ' MB/s';
+        } else if (videoEl && !videoEl.paused && realBufferSec > 0) {
+          spdEl.innerText = 'Local / Direct HLS';
+        } else {
+          spdEl.innerText = '0.0 MB/s';
+        }
+      }
+
+      if (swmEl) {
+        const peerCount = (window.sovraP2pMesh && typeof window.sovraP2pMesh.getConnectedPeerCount === 'function') 
+          ? window.sovraP2pMesh.getConnectedPeerCount() 
+          : (window._currentHlsInstance ? 1 : 0);
+        swmEl.innerText = peerCount > 0 ? peerCount + ' Active Seeders' : 'Direct Edge Stream';
+      }
     }
 
     function openYtKeyboardShortcutsModal() {
@@ -47941,12 +48049,44 @@ _scheduleTargetContext: 'workspace',
 
             hls.on(Hls.Events.FRAG_LOADED, function(event, data) {
               try {
+                if (data && data.stats && data.stats.total && data.stats.loading) {
+                  const durationMs = (data.stats.loading.end - data.stats.loading.start) || 1;
+                  const speedBps = (data.stats.total * 8) / (durationMs / 1000);
+                  window.__lastFragLoadSpeedMbps = speedBps / 1_000_000;
+                }
+                if (typeof updateBufferHealthBadge === 'function') updateBufferHealthBadge();
+                if (typeof updateNerdsTelemetry === 'function') updateNerdsTelemetry();
                 if (window.caches && data && data.frag) {
                   window.caches.open('sovra-hls-cache').then(function(cache) {
                     if (data.frag.url) cache.add(data.frag.url).catch(function(){});
                   }).catch(function(){});
                 }
               } catch (_) {}
+            });
+
+            hls.on(Hls.Events.ERROR, function(event, data) {
+              if (data && data.fatal) {
+                switch(data.type) {
+                  case Hls.ErrorTypes.NETWORK_ERROR:
+                    console.warn('[SOVRA-HLS] Network error encountered, attempting auto-retry...', data);
+                    hls.startLoad();
+                    break;
+                  case Hls.ErrorTypes.MEDIA_ERROR:
+                    console.warn('[SOVRA-HLS] Media decode error encountered, attempting recovery...', data);
+                    hls.recoverMediaError();
+                    break;
+                  default:
+                    console.error('[SOVRA-HLS] Unrecoverable streaming error, falling back to edge HTTP stream', data);
+                    try { hls.destroy(); } catch (_) {}
+                    window._currentHlsInstance = null;
+                    if (videoEl && (v.videoUrl || v.mediaVideo)) {
+                      videoEl.src = v.videoUrl || v.mediaVideo;
+                      videoEl.load();
+                      videoEl.play().catch(function(){});
+                    }
+                    break;
+                }
+              }
             });
           } else if (videoEl.src !== mediaSrc && !videoEl.src.endsWith(mediaSrc)) {
             videoEl.src = mediaSrc;
@@ -47957,6 +48097,17 @@ _scheduleTargetContext: 'workspace',
           videoEl.playbackRate = ytPlaybackSpeed;
           videoEl.volume = ytVolume;
           videoEl.muted = ytIsMuted;
+
+          videoEl.onprogress = function() {
+            if (typeof updateBufferHealthBadge === 'function') updateBufferHealthBadge();
+            if (typeof updateNerdsTelemetry === 'function') updateNerdsTelemetry();
+          };
+          videoEl.onseeking = function() {
+            if (typeof updateBufferHealthBadge === 'function') updateBufferHealthBadge();
+          };
+          videoEl.onseeked = function() {
+            if (typeof updateBufferHealthBadge === 'function') updateBufferHealthBadge();
+          };
 
           videoEl.ontimeupdate = function() {
             if (!videoEl.duration || isNaN(videoEl.duration)) return;
@@ -48116,13 +48267,18 @@ _scheduleTargetContext: 'workspace',
       const progressBar = document.getElementById('ytProgressBar');
       if (progressBar) progressBar.style.width = '0%';
       const bufferBar = document.getElementById('ytBufferBar');
-      if (bufferBar) bufferBar.style.width = '24%';
+      if (bufferBar) bufferBar.style.width = '0%';
       const timecode = document.getElementById('ytTimecode');
       if (timecode) timecode.innerText = '00:00 / ' + v.duration;
 
       // Closed Captions & Stats for Nerds Telemetry Sync
       updateYtSubtitles();
       updateNerdsTelemetry();
+      updateBufferHealthBadge();
+      updateScreenP2pStats();
+      if (typeof pollLiveSwarmChat === 'function') {
+        pollLiveSwarmChat();
+      }
       if (typeof initYtStickyMiniplayer === 'function') {
         initYtStickyMiniplayer();
       }
@@ -48591,50 +48747,27 @@ _scheduleTargetContext: 'workspace',
       window.__sovraAbrContinuousAudio = true;
 
       const qualityBadge = document.getElementById('videoQualityBadge');
-      const bufferBadge = document.getElementById('bufferHealthBadge');
 
       let toastMsg = 'Switched to 4K UHD 60FPS • 0ms Audio Stutter';
       if (val === '360p') {
         if (qualityBadge) qualityBadge.innerText = '360p (Edge Direct Pull)';
-        if (bufferBadge) {
-          bufferBadge.innerText = 'Buffer: 1.8s (Edge Seeder Pull)';
-          bufferBadge.style.background = 'rgba(245, 158, 11, 0.25)';
-          bufferBadge.style.color = '#fbbf24';
-        }
         toastMsg = 'Switched to 360p SD • 0ms Audio Stutter';
       } else if (val === '480p') {
         if (qualityBadge) qualityBadge.innerText = '480p SD (1.5 Mbps)';
-        if (bufferBadge) {
-          bufferBadge.innerText = 'Buffer: 4.5s (P2P Swarm)';
-          bufferBadge.style.background = 'rgba(16, 185, 129, 0.25)';
-          bufferBadge.style.color = '#34d399';
-        }
         toastMsg = 'Switched to 480p SD • 0ms Audio Stutter';
       } else if (val === '720p') {
         if (qualityBadge) qualityBadge.innerText = '720p HD (4 Mbps)';
-        if (bufferBadge) {
-          bufferBadge.innerText = 'Buffer: 7.2s (P2P Swarm)';
-          bufferBadge.style.background = 'rgba(16, 185, 129, 0.25)';
-          bufferBadge.style.color = '#34d399';
-        }
         toastMsg = 'Switched to 720p HD • 0ms Audio Stutter';
       } else if (val === '1080p') {
         if (qualityBadge) qualityBadge.innerText = '1080p60 (8 Mbps)';
-        if (bufferBadge) {
-          bufferBadge.innerText = 'Buffer: 9.8s (P2P Swarm OK)';
-          bufferBadge.style.background = 'rgba(16, 185, 129, 0.25)';
-          bufferBadge.style.color = '#34d399';
-        }
         toastMsg = 'Switched to 1080p60 HD • 0ms Audio Stutter';
       } else {
         if (qualityBadge) qualityBadge.innerText = '4K UHD 60FPS (25 Mbps)';
-        if (bufferBadge) {
-          bufferBadge.innerText = 'Buffer: 11.4s (High Bandwidth Swarm)';
-          bufferBadge.style.background = 'rgba(16, 185, 129, 0.25)';
-          bufferBadge.style.color = '#34d399';
-        }
         toastMsg = 'Switched to 4K UHD 60FPS • 0ms Audio Stutter';
       }
+
+      if (typeof updateBufferHealthBadge === 'function') updateBufferHealthBadge();
+      if (typeof updateNerdsTelemetry === 'function') updateNerdsTelemetry();
 
       triggerQualityToast(toastMsg, false);
     }
@@ -49463,13 +49596,15 @@ _scheduleTargetContext: 'workspace',
     }
     window.toggleLiveSwarmChat = toggleLiveSwarmChat;
 
-    function sendLiveSwarmChatMessage() {
+    async function sendLiveSwarmChatMessage() {
       const input = document.getElementById('ytLiveSwarmChatInput');
       if (!input) return;
       const val = input.value.trim();
       if (!val) return;
       input.value = '';
       const list = document.getElementById('ytLiveSwarmChatMessages');
+      const emptyPrompt = document.getElementById('ytLiveSwarmChatEmpty');
+      if (emptyPrompt) emptyPrompt.remove();
       if (list) {
         const item = document.createElement('div');
         item.style.color = '#cbd5e1';
@@ -49477,8 +49612,47 @@ _scheduleTargetContext: 'workspace',
         list.appendChild(item);
         list.scrollTop = list.scrollHeight;
       }
+      try {
+        const v = ytVideosCatalog[activeYtVideoIndex];
+        const sessionId = v ? (v.id || v.cid) : 'swarm_main';
+        const senderHandle = (window.currentUser && window.currentUser.handle) || 'peer';
+        const senderName = (window.currentUser && window.currentUser.displayName) || 'Peer';
+        await fetch('/api/live/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId,
+            text: val,
+            senderHandle,
+            senderName,
+          })
+        });
+      } catch (_) {}
     }
     window.sendLiveSwarmChatMessage = sendLiveSwarmChatMessage;
+
+    async function pollLiveSwarmChat() {
+      try {
+        const v = ytVideosCatalog[activeYtVideoIndex];
+        const sessionId = v ? (v.id || v.cid) : 'swarm_main';
+        const res = await fetch('/api/live/chat?sessionId=' + encodeURIComponent(sessionId));
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.ok && Array.isArray(data.messages) && data.messages.length > 0) {
+          const list = document.getElementById('ytLiveSwarmChatMessages');
+          if (!list) return;
+          const emptyPrompt = document.getElementById('ytLiveSwarmChatEmpty');
+          if (emptyPrompt) emptyPrompt.remove();
+          list.innerHTML = data.messages.map(m => {
+            const author = m.senderName || m.senderHandle || 'Peer';
+            const isMod = m.isModerator ? ' <span style="font-size: 0.65rem; background: #eab308; color: #000; padding: 1px 4px; border-radius: 4px; font-weight: 800;">MOD</span>' : '';
+            return '<div style="color: #cbd5e1;"><span style="color: #38bdf8; font-weight: 700;">' + author.replace(/</g, '&lt;') + isMod + ':</span> ' + (m.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+          }).join('');
+          list.scrollTop = list.scrollHeight;
+        }
+      } catch (_) {}
+    }
+    window.pollLiveSwarmChat = pollLiveSwarmChat;
 
     function renderYtRecommendations() {
       const container = document.getElementById('ytRecommendationsList');

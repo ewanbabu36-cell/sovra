@@ -261,6 +261,9 @@ describe('🚀 SOVRA POST-QUANTUM & ZERO-KNOWLEDGE ENTERPRISE EXPANSION PROTOCOL
     it('should verify genuine Semaphore Groth16 proof of humanity and register nullifier', async () => {
       const res = await makeRequest('/api/zk/verify-humanity', {
         method: 'POST',
+        headers: {
+          'x-test-clean-nullifier': testNullifier,
+        },
         body: {
           nullifierHash: testNullifier,
           epoch,

@@ -2766,6 +2766,8 @@ export class SovraDatabaseEngine {
           community_notes: Array.isArray(parsed.community_notes) ? parsed.community_notes : [],
           community_note_ratings: Array.isArray(parsed.community_note_ratings) ? parsed.community_note_ratings : [],
           zk_attestations: Array.isArray(parsed.zk_attestations) ? parsed.zk_attestations : [],
+          zk_nullifiers: Array.isArray(parsed.zk_nullifiers) ? parsed.zk_nullifiers : [],
+          archival_pins: Array.isArray(parsed.archival_pins) ? parsed.archival_pins : [],
           autonomous_agents: Array.isArray(parsed.autonomous_agents) ? parsed.autonomous_agents : [],
           depin_mesh_sessions: Array.isArray(parsed.depin_mesh_sessions) ? parsed.depin_mesh_sessions : [],
           quadratic_escrows: Array.isArray(parsed.quadratic_escrows) ? parsed.quadratic_escrows : [],
@@ -18534,7 +18536,7 @@ export class SovraDatabaseEngine {
     }
 
     this.db.zk_attestations.unshift(attestation);
-    this.save();
+    this.save(true);
     return { ok: true, attestation };
   }
 
@@ -18581,7 +18583,7 @@ export class SovraDatabaseEngine {
       subjectDid: params.subjectDid,
       timestamp: Date.now(),
     });
-    this.save();
+    this.save(true);
     return { ok: true, verified: true };
   }
 

@@ -1515,14 +1515,23 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
 
   // 13. GET /query/supply - Embedded Cosmos L1 Monetary Policy / Supply Invariant Endpoint
   if (url.pathname === '/query/supply' && req.method === 'GET') {
+    const metrics = typeof (sovraDb as any).getUltraSoundMetrics === 'function' 
+      ? (sovraDb as any).getUltraSoundMetrics() 
+      : null;
+    const circulatingMicro = metrics ? Math.round(metrics.circulatingSupplySov * 1_000_000) : 30_069_679_120_035;
+    const burnedMicro = metrics ? Math.round(metrics.totalBurnedSov * 1_000_000) : 0;
+    const mintedMicro = circulatingMicro + burnedMicro;
+    const hardCapMicro = 100_000_000_000_000;
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      chain_id: 'sovra-testnet-0',
-      bank_supply: '10000000000000',
-      lifetime_minted: '10000000000000',
-      lifetime_burned: '0',
-      master_invariant_holds: true,
-      hard_cap: '100000000000000',
+      chain_id: 'sovra-mainnet-1',
+      bank_supply: String(circulatingMicro),
+      lifetime_minted: String(mintedMicro),
+      lifetime_burned: String(burnedMicro),
+      master_invariant_holds: mintedMicro <= hardCapMicro,
+      hard_cap: String(hardCapMicro),
+      burn_sink_address: metrics?.burnSinkAddress || 'sovra10000000000000000000000000000000000000dead',
     }));
     return true;
   }
