@@ -398,12 +398,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <span class="badge tcp-port-badge">TCP :${tcpPort}</span>
     </div>
 
-    <!-- 🔒 Quantum-Safe & ZK-Human Verified Security Badges -->
-    <div class="header-security-badges" style="display: flex; align-items: center; gap: 8px;">
-      <span id="pqcSecurityBadge" class="pqc-badge" title="Quantum-Safe NIST FIPS 204 ML-DSA Enclave Active">
+    <!-- 🔒 Quantum-Safe & ZK-Human Verified Security Badges (Conditionally rendered on verified attestation) -->
+    <div class="header-security-badges" id="headerSecurityBadges" style="display: flex; align-items: center; gap: 8px;">
+      <span id="pqcSecurityBadge" class="pqc-badge" style="display: none;" title="Post-Quantum Cryptography Hybrid Enclave (Prototype)">
         <span id="spacesPqcLock">🔒</span> Quantum-Safe
       </span>
-      <span id="zkVerifiedBadge" class="zk-badge" title="Zero-Knowledge Humanity Proof Attested">
+      <span id="zkVerifiedBadge" class="zk-badge" style="display: none;" title="Zero-Knowledge Humanity Attestation (Verified)">
         <span id="spacesZkShield">🛡️</span> ZK-Human Verified
       </span>
     </div>

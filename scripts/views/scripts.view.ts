@@ -57997,9 +57997,15 @@ _scheduleTargetContext: 'workspace',
       try {
         var res = await fetch('/api/zk/badge/' + encodeURIComponent(userDid));
         var data = await res.json();
-        var el = document.getElementById(targetElementId);
-        if (el && data.isVerifiedHuman) {
-          el.innerHTML = '<span class="zk-human-badge" style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 0.72rem; font-weight: 700;">🛡️ ZK-Human</span>';
+        if (targetElementId) {
+          var el = document.getElementById(targetElementId);
+          if (el && data.isVerifiedHuman) {
+            el.innerHTML = '<span class="zk-human-badge" style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 0.72rem; font-weight: 700;">🛡️ ZK-Human</span>';
+          }
+        }
+        var headerZkBadge = document.getElementById('zkVerifiedBadge');
+        if (headerZkBadge) {
+          headerZkBadge.style.display = data.isVerifiedHuman ? 'inline-flex' : 'none';
         }
       } catch (_) {}
     }

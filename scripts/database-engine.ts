@@ -18507,17 +18507,17 @@ export class SovraDatabaseEngine {
   }
 
   public getZkAttestationByNullifier(nullifier: string): ZkAttestationRecord | undefined {
-    this.load();
+    this.load(true);
     return (this.db.zk_attestations || []).find(a => a.nullifierHash === nullifier);
   }
 
   public getZkAttestationsForDid(did: string): ZkAttestationRecord[] {
-    this.load();
+    this.load(true);
     return (this.db.zk_attestations || []).filter(a => a.subjectDid === did);
   }
 
   public isVerifiedHuman(did: string): boolean {
-    this.load();
+    this.load(true);
     const list = this.getZkAttestationsForDid(did);
     return list.some(a => (a.attestationType === 'HUMANITY_VERIFIED' || a.attestationType === 'proof_of_humanity') && a.expiresAt > Date.now());
   }

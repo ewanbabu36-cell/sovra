@@ -197,21 +197,59 @@ export async function handleZkRoutes(
   if (method === 'POST' && url === '/api/zk/attest/selective-disclosure') {
     try {
       const body = await parseJsonBody(req);
-      const { subjectDid, claimType, threshold } = body;
+      const { subjectDid, claimType, threshold, claimValue, proof, proofSnarkJson, publicSignals, requireProof } = body;
 
       if (!subjectDid || !claimType) {
         sendJson(res, 400, { ok: false, error: 'subjectDid and claimType are required' });
         return true;
       }
 
+      // If client strictly requires cryptographic proof verification
+      if (requireProof && (!proof && !proofSnarkJson)) {
+        sendJson(res, 422, {
+          ok: false,
+          error: 'ERR_UNPROVEN_CLAIM',
+          message: 'Selective disclosure claims cannot be marked cryptographically verified without an authentic zero-knowledge circuit proof. Mock verification is strictly disabled.',
+        });
+        return true;
+      }
+
+      let isCryptographicallyVerified = false;
+      let proofRecordJson: string | null = null;
+
+      // If a proof is supplied, verify it strictly
+      if (proof || proofSnarkJson) {
+        let proofObj: any = null;
+        try {
+          proofObj = proof && typeof proof === 'object' ? proof : JSON.parse(proofSnarkJson);
+        } catch (_) {
+          sendJson(res, 400, { ok: false, error: 'Malformed proof object or JSON' });
+          return true;
+        }
+
+        if (Array.isArray(publicSignals) && publicSignals.length === 4) {
+          const vResult = verifyGroth16Proof(proofObj, publicSignals, DEFAULT_SEMAPHORE_HUMANITY_VKEY);
+          isCryptographicallyVerified = vResult.valid;
+          if (isCryptographicallyVerified) {
+            proofRecordJson = JSON.stringify(proofObj);
+          }
+        }
+      }
+
       const id = `zk_sd_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
       const nullifier = `nul_sd_${crypto.randomBytes(8).toString('hex')}`;
+      const isSatisfied = claimValue !== undefined ? Number(claimValue) >= Number(threshold || 18) : true;
 
       const attestation: ZkAttestationRecord = {
         id,
         subjectDid,
         attestationType: claimType,
-        proofSnarkJson: JSON.stringify({ claimType, threshold: threshold || 18, verified: true }),
+        proofSnarkJson: proofRecordJson || JSON.stringify({
+          claimType,
+          threshold: threshold || 18,
+          cryptographicallyVerified: isCryptographicallyVerified,
+          note: isCryptographicallyVerified ? 'Verified via Groth16' : 'Self-asserted; unverified by ZK proof'
+        }),
         issuerDid: 'did:sovra:selective_disclosure_issuer',
         nullifierHash: nullifier,
         expiresAt: Date.now() + 90 * 86400 * 1000,
@@ -225,11 +263,18 @@ export async function handleZkRoutes(
           id: attestation.id,
           subjectDid: attestation.subjectDid,
           claimType: attestation.attestationType,
-          satisfied: true,
+          satisfied: isSatisfied,
           nullifierHash: attestation.nullifierHash,
           expiresAt: attestation.expiresAt,
+          claimVerified: isCryptographicallyVerified,
+          cryptographicallyVerified: isCryptographicallyVerified,
         },
-        claimVerified: true,
+        claimVerified: isCryptographicallyVerified,
+        cryptographicallyVerified: isCryptographicallyVerified,
+        verificationStatus: isCryptographicallyVerified ? 'VERIFIED_GROTH16' : 'UNVERIFIED_SELF_ASSERTION',
+        verificationNotice: isCryptographicallyVerified
+          ? 'Cryptographically verified via Groth16 circuit.'
+          : 'Self-asserted claim only. Genuine ZK range proof is required for cryptographic verification.',
         claimType,
         attestation: result.attestation,
         disclosedAttributes: {},
@@ -241,7 +286,6 @@ export async function handleZkRoutes(
       return true;
     }
   }
-
   // 3. GET /api/zk/badge/:did - Checks if DID has active ZK Humanity badge
   const badgeMatch = url.match(/^\/api\/zk\/badge\/([^/?]+)$/);
   if (method === 'GET' && badgeMatch) {

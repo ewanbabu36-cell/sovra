@@ -3,7 +3,8 @@ import { sha256 } from '@noble/hashes/sha256';
 import { sha3_256, shake256 } from '@noble/hashes/sha3';
 import { hkdf } from '@noble/hashes/hkdf';
 import { bytesToHex, hexToBytes, randomBytes } from '@noble/hashes/utils';
-export class CryptoError extends Error {
+
+class CryptoError extends Error {
   code: string;
   constructor(message: string, code = 'ERR_CRYPTO_FAILURE') {
     super(message);
@@ -14,14 +15,34 @@ export class CryptoError extends Error {
 
 /**
  * ============================================================================
- * SOVRA POST-QUANTUM CRYPTOGRAPHY ENCLAVE (NIST FIPS 203 & FIPS 204 HYBRIDS)
+ * SOVRA POST-QUANTUM CRYPTOGRAPHY ENCLAVE (EXPERIMENTAL RESEARCH PROTOTYPES)
  * ============================================================================
- * Implements Module-Lattice-Based Post-Quantum Cryptography:
- * 1. ML-KEM-768 (Kyber768) + X25519 Hybrid Key Encapsulation (FIPS 203)
- * 2. ML-DSA-65 (Dilithium3) + Ed25519 Hybrid Dual-Signatures (FIPS 204)
- * 
- * Provides impenetrable quantum-computing resistance before global timelines.
+ * ⚠️ QUARANTINE WARNING & SECURITY STATUS:
+ * This module provides EXPERIMENTAL PROTOTYPES for post-quantum research:
+ * 1. ML-KEM-768 Prototype: Custom polynomial ring arithmetic over Z_3329.
+ *    Non-standard uncompressed wire format (1,568 bytes vs NIST 1,088 bytes).
+ *    NOT certified NIST FIPS 203.
+ * 2. ML-DSA-65 Prototype: Domain-separated classical Ed25519 (Curve25519) wrapper.
+ *    VULNERABLE to Shor's algorithm on a quantum computer.
+ *    NOT certified NIST FIPS 204.
+ *
+ * PRODUCTION POLICY:
+ * Quarantined from production financial settlements, consensus, and security
+ * claims. Requires SOVRA_ENABLE_EXPERIMENTAL_PQC=true to execute in production.
+ *
+ * MIGRATION SPECIFICATION:
+ * Production PQC must integrate official NIST FIPS 203 (ML-KEM-768) and FIPS 204
+ * (ML-DSA-65) through audited implementations (e.g. liboqs or @noble/post-quantum).
  */
+
+export function assertPqcPrototypeAllowed(caller: string): void {
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') {
+    throw new CryptoError(
+      `[PQC QUARANTINE] Experimental PQC prototype '${caller}' is quarantined and cannot be invoked in production. Non-standard prototypes are strictly prohibited in production.`,
+      'ERR_PQC_QUARANTINED'
+    );
+  }
+}
 
 // Ring constants for ML-KEM-768 (q = 3329, n = 256, k = 3)
 const KEM_Q = 3329;
@@ -144,6 +165,7 @@ export interface MlKem768Encapsulation {
 }
 
 export function generateMlKem768KeyPair(customSeed?: Uint8Array): MlKem768KeyPair {
+  assertPqcPrototypeAllowed('generateMlKem768KeyPair');
   const seed = customSeed || randomBytes(32);
   const matrixSeed = sha3_256(seed);
   const noiseSeed = shake256(seed, { dkLen: 64 });
@@ -203,6 +225,7 @@ export function generateMlKem768KeyPair(customSeed?: Uint8Array): MlKem768KeyPai
 }
 
 export function mlKem768Encapsulate(recipientPublicKey: Uint8Array): MlKem768Encapsulation {
+  assertPqcPrototypeAllowed('mlKem768Encapsulate');
   if (recipientPublicKey.length < 32 + KEM_K * KEM_N * 2) {
     throw new CryptoError('Invalid ML-KEM-768 public key size');
   }
@@ -288,6 +311,7 @@ export function mlKem768Encapsulate(recipientPublicKey: Uint8Array): MlKem768Enc
 }
 
 export function mlKem768Decapsulate(ciphertext: Uint8Array, privateKey: Uint8Array): { sharedSecret: Uint8Array; sharedSecretHex: string } {
+  assertPqcPrototypeAllowed('mlKem768Decapsulate');
   const expectedCtLen = KEM_K * KEM_N * 2 + 32;
   if (ciphertext.length < expectedCtLen) {
     throw new CryptoError('Invalid ML-KEM-768 ciphertext length');
@@ -466,6 +490,7 @@ export interface MlDsa65KeyPair {
 }
 
 export function generateMlDsa65KeyPair(customSeed?: Uint8Array): MlDsa65KeyPair {
+  assertPqcPrototypeAllowed('generateMlDsa65KeyPair');
   const seed = customSeed || randomBytes(32);
   const matrixSeed = sha3_256(seed);
 
@@ -497,6 +522,7 @@ export function mlDsa65Sign(
   privateKey: Uint8Array,
   publicKey?: Uint8Array
 ): Uint8Array {
+  assertPqcPrototypeAllowed('mlDsa65Sign');
   const msgBytes = typeof message === 'string' ? new TextEncoder().encode(message) : message;
   const msgHash = sha3_256(msgBytes);
 

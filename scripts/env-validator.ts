@@ -134,6 +134,11 @@ export function validateEnvironment(): EnvValidationResult {
     warnings.push('SOVRA_STORAGE_DIR is using development default path (.sovra-storage-dev) in production environment.');
   }
 
+  // 5. PQC QUARANTINE VALIDATION (Fail-safe production boundary)
+  if (isProduction && process.env.SOVRA_ENABLE_EXPERIMENTAL_PQC === 'true') {
+    errors.push('CRITICAL: SOVRA_ENABLE_EXPERIMENTAL_PQC cannot be enabled in production. Non-standard experimental PQC prototypes are quarantined and strictly prohibited in production.');
+  }
+
   return {
     valid: errors.length === 0,
     environment: env,

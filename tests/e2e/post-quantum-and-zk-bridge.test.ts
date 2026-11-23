@@ -179,9 +179,86 @@ describe('🚀 SOVRA POST-QUANTUM & ZERO-KNOWLEDGE ENTERPRISE EXPANSION PROTOCOL
   describe('Phase 2: Zero-Knowledge Proof-of-Humanity & Anti-Bot Shield', () => {
     const epoch = `epoch-${ts}`;
     const externalNullifier = 'spaces_hand_raise_stage_1';
-    const testNullifier = `0xnullifier_${ts}_${Math.random().toString(36).slice(2, 10)}`;
 
-    it('should verify a valid zero-knowledge proof of humanity and register nullifier', async () => {
+    const fixturePath = path.resolve(__dirname, '../fixtures/semaphore_proof_depth16.json');
+    const proofFixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+    const testNullifier = proofFixture.nullifierHash;
+
+    const canonicalPublicSignals = [
+      proofFixture.merkleTreeRoot,
+      proofFixture.nullifierHash,
+      '405095862423832484797768386705071309801502669987320414707879031139592615459',
+      '178012053046980844241059625537333166504617586244663939317393720226215395849',
+    ];
+
+    const canonicalSnarkProof = {
+      pi_a: [proofFixture.proof[0], proofFixture.proof[1], '1'],
+      pi_b: [
+        [proofFixture.proof[3], proofFixture.proof[2]],
+        [proofFixture.proof[5], proofFixture.proof[4]],
+        ['1', '0'],
+      ],
+      pi_c: [proofFixture.proof[6], proofFixture.proof[7], '1'],
+      protocol: 'groth16',
+      curve: 'bn128',
+    };
+
+    beforeAll(() => {
+      sovraDb.load();
+      if (sovraDb.db && Array.isArray(sovraDb.db.zk_nullifiers)) {
+        sovraDb.db.zk_nullifiers = sovraDb.db.zk_nullifiers.filter(
+          (n: any) => n.nullifierHash !== testNullifier
+        );
+      }
+      if (sovraDb.db && Array.isArray(sovraDb.db.zk_attestations)) {
+        sovraDb.db.zk_attestations = sovraDb.db.zk_attestations.filter(
+          (a: any) => a.nullifierHash !== testNullifier
+        );
+      }
+      sovraDb.save(true);
+    });
+
+    it('should strictly reject unproven/dummy submissions to /api/zk/verify-humanity with HTTP 400', async () => {
+      const res = await makeRequest('/api/zk/verify-humanity', {
+        method: 'POST',
+        body: {
+          nullifierHash: `0xdummy_${Date.now()}`,
+          epoch,
+          externalNullifier,
+          subjectDid: testCreatorDid,
+          proof: { protocol: 'groth16', circuit: 'mock_fake_circuit' },
+        },
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.data.ok).toBe(false);
+      expect(res.data.error).toContain('Cryptographic ZK-SNARK proof with genuine curve points');
+    });
+
+    it('should strictly reject forged Groth16 proofs to /api/zk/verify-humanity with HTTP 400', async () => {
+      const forgedNullifier = `0xforged_${Date.now()}`;
+      const res = await makeRequest('/api/zk/verify-humanity', {
+        method: 'POST',
+        body: {
+          nullifierHash: forgedNullifier,
+          epoch,
+          externalNullifier,
+          subjectDid: testCreatorDid,
+          publicSignals: ['123', forgedNullifier, '456', '789'],
+          proof: {
+            pi_a: ['1', '2', '1'],
+            pi_b: [['1', '2'], ['3', '4'], ['1', '0']],
+            pi_c: ['5', '6', '1'],
+          },
+        },
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.data.ok).toBe(false);
+      expect(res.data.error).toContain('Cryptographic ZK-SNARK proof verification failed');
+    });
+
+    it('should verify genuine Semaphore Groth16 proof of humanity and register nullifier', async () => {
       const res = await makeRequest('/api/zk/verify-humanity', {
         method: 'POST',
         body: {
@@ -189,7 +266,8 @@ describe('🚀 SOVRA POST-QUANTUM & ZERO-KNOWLEDGE ENTERPRISE EXPANSION PROTOCOL
           epoch,
           externalNullifier,
           subjectDid: testCreatorDid,
-          proof: { protocol: 'groth16', circuit: 'Semaphore-RLN' },
+          publicSignals: canonicalPublicSignals,
+          proof: canonicalSnarkProof,
         },
       });
 
@@ -208,6 +286,8 @@ describe('🚀 SOVRA POST-QUANTUM & ZERO-KNOWLEDGE ENTERPRISE EXPANSION PROTOCOL
           epoch,
           externalNullifier,
           subjectDid: testCreatorDid,
+          publicSignals: canonicalPublicSignals,
+          proof: canonicalSnarkProof,
         },
       });
 
@@ -216,7 +296,7 @@ describe('🚀 SOVRA POST-QUANTUM & ZERO-KNOWLEDGE ENTERPRISE EXPANSION PROTOCOL
       expect(duplicateRes.data.error).toContain('Double-action / Sybil attempt detected by ZK Nullifier');
     });
 
-    it('should serve "🛡️ ZK-Human Verified" shield icon in HTML', async () => {
+    it('should serve "🛡️ ZK-Human Verified" shield icon in HTML markup', async () => {
       const res = await makeRequest('/');
       expect(res.status).toBe(200);
       expect(res.rawText).toContain('zkVerifiedBadge');
@@ -383,7 +463,7 @@ describe('🚀 SOVRA POST-QUANTUM & ZERO-KNOWLEDGE ENTERPRISE EXPANSION PROTOCOL
       expect(successful.length).toBe(25);
     });
 
-    it('should sustain 25 parallel unique ZK proof nullifiers without false collisions', async () => {
+    it('should sustain 25 parallel unproven ZK attempts and strictly reject all with HTTP 400 (fail-closed concurrency)', async () => {
       const concurrentZkRuns = Array.from({ length: 25 }, async (_, i) => {
         return makeRequest('/api/zk/verify-humanity', {
           method: 'POST',
@@ -397,8 +477,8 @@ describe('🚀 SOVRA POST-QUANTUM & ZERO-KNOWLEDGE ENTERPRISE EXPANSION PROTOCOL
       });
 
       const results = await Promise.all(concurrentZkRuns);
-      const successful = results.filter(r => r.status === 200 && r.data.verified === true);
-      expect(successful.length).toBe(25);
+      const rejected = results.filter(r => r.status === 400 && r.data.ok === false);
+      expect(rejected.length).toBe(25);
     });
   });
 });

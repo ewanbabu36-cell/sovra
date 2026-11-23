@@ -17,11 +17,18 @@ import {
   hybridEncapsulate,
   hybridDecapsulate,
 } from '../../packages/crypto/src/pqc.ts';
+import {
+  verifyGroth16Proof,
+  DEFAULT_SEMAPHORE_HUMANITY_VKEY,
+} from '../../packages/crypto/src/zk.ts';
 
 // Server-side asymmetric key pairs for hybrid PQC prototype routes
 // Zero hardcoded HMAC fallback secrets - uses real asymmetric key enclaves
 function isPqcQuarantineActive(): boolean {
-  // PQC/KEM endpoints are quarantined and fail closed in production unless explicitly enabled
+  // In production, PQC prototype endpoints are strictly quarantined - no env variable can bypass this in production.
+  if (process.env.NODE_ENV === 'production') {
+    return true;
+  }
   if (process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST) || process.env.SOVRA_ENABLE_EXPERIMENTAL_PQC === 'true' || process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
     return false;
   }
@@ -1179,24 +1186,86 @@ export async function handleEnterpriseProtocolRoutes(
       const nullifierHash = String(body.nullifierHash || '').trim();
       const epoch = String(body.epoch || '');
       const externalNullifier = String(body.externalNullifier || '');
-      const subjectDid = String(body.subjectDid || '');
+      const subjectDid = String(body.subjectDid || '').trim();
 
-      if (!nullifierHash) {
-        sendJson(res, 400, { ok: false, error: 'nullifierHash is required' });
+      if (!nullifierHash || !subjectDid) {
+        sendJson(res, 400, { ok: false, error: 'nullifierHash and subjectDid are required' });
         return true;
       }
 
-      sovraDb.load();
+      sovraDb.load(true);
       if (!Array.isArray(sovraDb.db.zk_nullifiers)) {
         sovraDb.db.zk_nullifiers = [];
       }
 
-      // Check for double-action / Sybil attempt
-      const existing = sovraDb.db.zk_nullifiers.find(n => n && n.nullifierHash === nullifierHash);
-      if (existing) {
+      // Check for double-action / Sybil attempt across nullifiers and attestations
+      const existingNullifier = sovraDb.db.zk_nullifiers.find(n => n && n.nullifierHash === nullifierHash);
+      const existingAttestation = sovraDb.getZkAttestationByNullifier(nullifierHash);
+      if (existingNullifier || existingAttestation) {
         sendJson(res, 409, {
           ok: false,
           error: `Double-action / Sybil attempt detected by ZK Nullifier: ${nullifierHash}`,
+        });
+        return true;
+      }
+
+      // SEC-01-B: Client-controlled verification key override defense
+      if ('vKey' in body) {
+        sendJson(res, 400, {
+          ok: false,
+          error: 'Client-supplied verification keys are strictly forbidden. Sovereign canonical verification key is enforced.',
+        });
+        return true;
+      }
+
+      // Parse and strictly validate cryptographic Groth16 proof object
+      let proofObj: any = null;
+      try {
+        if (body.proof && typeof body.proof === 'object') {
+          proofObj = body.proof;
+        } else if (body.proofSnarkJson && typeof body.proofSnarkJson === 'string') {
+          proofObj = JSON.parse(body.proofSnarkJson);
+        }
+      } catch (e: any) {
+        sendJson(res, 400, {
+          ok: false,
+          error: 'Malformed proofSnarkJson: ' + e.message,
+        });
+        return true;
+      }
+
+      if (!proofObj || !proofObj.pi_a || !proofObj.pi_b || !proofObj.pi_c) {
+        sendJson(res, 400, {
+          ok: false,
+          error: 'Cryptographic ZK-SNARK proof with genuine curve points (pi_a, pi_b, pi_c) is required. Arbitrary nullifier-only submissions are strictly rejected.',
+        });
+        return true;
+      }
+
+      // Public inputs alignment: Semaphore v3 expects 4 public signals:
+      // [merkleTreeRoot, nullifierHash, signalHash, externalNullifierHash]
+      if (!Array.isArray(body.publicSignals) || body.publicSignals.length !== 4) {
+        sendJson(res, 400, {
+          ok: false,
+          error: 'Semaphore Groth16 proof requires exactly 4 public signals: [merkleTreeRoot, nullifierHash, signalHash, externalNullifierHash]',
+        });
+        return true;
+      }
+
+      if (body.publicSignals[1].toString() !== nullifierHash.toString()) {
+        sendJson(res, 400, {
+          ok: false,
+          error: 'Nullifier parameter does not match publicSignals[1] nullifierHash in proof',
+        });
+        return true;
+      }
+
+      // Mathematical bilinear pairing check on BN254 elliptic curve using canonical sovereign vKey
+      const verificationResult = verifyGroth16Proof(proofObj, body.publicSignals, DEFAULT_SEMAPHORE_HUMANITY_VKEY);
+      if (!verificationResult.valid) {
+        sendJson(res, 400, {
+          ok: false,
+          error: 'Cryptographic ZK-SNARK proof verification failed: ' + (verificationResult.reason || 'Invalid bilinear pairing'),
         });
         return true;
       }
@@ -1210,11 +1279,25 @@ export async function handleEnterpriseProtocolRoutes(
         subjectDid,
         verifiedAt: Date.now(),
       } as any);
+
+      // Register genuine attestation
+      const attestationId = `zk_att_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+      sovraDb.registerZkAttestation({
+        id: attestationId,
+        subjectDid,
+        attestationType: 'proof_of_humanity',
+        proofSnarkJson: JSON.stringify(proofObj),
+        issuerDid: body.issuerDid || 'did:sovra:zk_identity_authority',
+        nullifierHash,
+        expiresAt: Date.now() + 365 * 86400 * 1000,
+        createdAt: Date.now(),
+      });
       sovraDb.save(true);
 
       sendJson(res, 200, {
         ok: true,
         verified: true,
+        proofVerified: true,
         humanConfidence: 0.999,
         nullifierHash,
       });
