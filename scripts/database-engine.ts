@@ -18,6 +18,19 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { SqliteSocialDatabaseEngine } from './database-sqlite.ts';
 import { generateBip39RecoveryPhrase, validateBip39RecoveryPhrase, BIP39_ENGLISH_WORDLIST } from './bip39.ts';
+import {
+  evaluatePsiBlindedQueries,
+  evaluatePsiDirectoryTag,
+  normalizePhoneNumber,
+} from '../packages/identity/src/psi-discovery.ts';
+import { UserShardedStorageEngine } from '../packages/storage/src/sharded-storage.ts';
+import {
+  encodeGeohash,
+  decodeGeohash,
+  getGeohashesInRadius,
+  calculateHaversineDistanceKm,
+  fuzzCoordinates,
+} from '../packages/social/src/geohash.ts';
 
 // ==========================================
 // 1. DATA MODELS & SCHEMAS
@@ -1868,6 +1881,67 @@ export interface DatabaseSchema {
   mpc_recovery_vaults?: MpcRecoveryVaultRecord[];
   ai_agent_hires?: AiAgentHireRecord[];
   creator_customizations?: Record<string, any>;
+  marketplace_items?: MarketplaceItemRecord[];
+  marketplace_escrows?: MarketplaceEscrowRecord[];
+  local_groups?: LocalGroupRecord[];
+}
+
+export type MarketplaceItemCondition = 'new' | 'like_new' | 'good' | 'fair';
+export type MarketplaceItemStatus = 'active' | 'in_escrow' | 'sold' | 'cancelled';
+
+export interface MarketplaceItemRecord {
+  id: string;
+  sellerDid: string;
+  sellerHandle?: string;
+  sellerName?: string;
+  title: string;
+  description: string;
+  priceSov: number;
+  category: string;
+  geohash: string;
+  latitude: number;
+  longitude: number;
+  fuzzedLatitude: number;
+  fuzzedLongitude: number;
+  images: string[];
+  condition: MarketplaceItemCondition;
+  status: MarketplaceItemStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type EscrowStatus = 'RESERVED_IN_ESCROW' | 'DISPATCHED' | 'RELEASED_TO_SELLER' | 'DISPUTED' | 'REFUNDED';
+
+export interface MarketplaceEscrowRecord {
+  id: string;
+  itemId: string;
+  buyerDid: string;
+  sellerDid: string;
+  amountSov: number;
+  releaseHash: string; // sha256(deliverySecret)
+  status: EscrowStatus;
+  createdAt: number;
+  updatedAt: number;
+  disputeReason?: string;
+  releasedAt?: number;
+}
+
+export interface LocalGroupRecord {
+  id: string;
+  name: string;
+  description: string;
+  creatorDid: string;
+  creatorHandle?: string;
+  creatorName?: string;
+  geohash: string;
+  latitude: number;
+  longitude: number;
+  radiusKm: number;
+  memberCount: number;
+  category: string;
+  isPrivate: boolean;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface ArchivalPinRecord {
@@ -2200,6 +2274,7 @@ export class SovraDatabaseEngine {
   private pendingFlushes = 0;
   private lastDiskLoadTime = 0;
   private unknownDids = new Set<string>();
+  private shardedStorage?: UserShardedStorageEngine;
 
   constructor(customStorageDir?: string) {
     this.storageDir = customStorageDir || process.env.SOVRA_STORAGE_DIR || './.sovra-storage-dev';
@@ -2237,6 +2312,28 @@ export class SovraDatabaseEngine {
       tablesCount: this.sqliteEngine ? 10 : 1,
       path: this.sqliteEngine ? path.join(this.storageDir, 'sovra-social.sqlite') : this.dbFilePath,
     };
+  }
+
+  public getShardedStorage(): UserShardedStorageEngine {
+    if (!this.shardedStorage) {
+      this.shardedStorage = new UserShardedStorageEngine({
+        totalShards: 16,
+        flushIntervalMs: 50,
+      });
+    }
+    return this.shardedStorage;
+  }
+
+  public async writeUserShardedRecord(userDid: string, collection: string, record: Record<string, any>): Promise<any> {
+    return this.getShardedStorage().writeUserRecord(userDid, collection, record);
+  }
+
+  public readUserShardedRecord(userDid: string, collection: string, id: string): any {
+    return this.getShardedStorage().readUserRecord(userDid, collection, id);
+  }
+
+  public queryUserShardedRecords(userDid: string, collection: string, filter?: Record<string, any>): any[] {
+    return this.getShardedStorage().queryUserRecords(userDid, collection, filter);
   }
 
   // ==========================================
@@ -2339,6 +2436,299 @@ export class SovraDatabaseEngine {
     if (this.sqliteEngine && typeof (this.sqliteEngine as any).completeVideoUploadSession === 'function') {
       return (this.sqliteEngine as any).completeVideoUploadSession(uploadId, mediaCid);
     }
+  }
+
+  // ==========================================
+  // 🛍️ P2P ESCROW MARKETPLACE & GEO-SPATIAL DISCOVERY
+  // ==========================================
+  public getMarketplaceItems(params: {
+    geohash?: string;
+    latitude?: number;
+    longitude?: number;
+    radiusKm?: number;
+    category?: string;
+    limit?: number;
+  } = {}): MarketplaceItemRecord[] {
+    this.load();
+    let items = (this.db.marketplace_items || []).filter(item => item.status === 'active' || item.status === 'in_escrow');
+
+    if (params.category && params.category !== 'all') {
+      const catLower = params.category.toLowerCase().trim();
+      items = items.filter(i => (i.category || '').toLowerCase() === catLower);
+    }
+
+    if (params.latitude !== undefined && params.longitude !== undefined) {
+      const maxDistance = params.radiusKm || 25;
+      items = items
+        .map(item => {
+          const distanceKm = calculateHaversineDistanceKm(
+            params.latitude!,
+            params.longitude!,
+            item.latitude,
+            item.longitude
+          );
+          return { item, distanceKm };
+        })
+        .filter(entry => entry.distanceKm <= maxDistance)
+        .sort((a, b) => a.distanceKm - b.distanceKm)
+        .map(entry => entry.item);
+    } else if (params.geohash) {
+      const targetPrefix = params.geohash.toLowerCase().slice(0, 4);
+      items = items.filter(i => (i.geohash || '').toLowerCase().startsWith(targetPrefix));
+    }
+
+    const limit = Math.min(params.limit || 50, 100);
+    return items.slice(0, limit);
+  }
+
+  public createMarketplaceItem(params: {
+    sellerDid: string;
+    title: string;
+    description: string;
+    priceSov: number;
+    category: string;
+    latitude: number;
+    longitude: number;
+    images?: string[];
+    condition?: MarketplaceItemCondition;
+  }): MarketplaceItemRecord {
+    this.load();
+    const seller = this.findUserByDid(params.sellerDid);
+    if (!seller) {
+      throw new Error(`Seller DID not found: ${params.sellerDid}`);
+    }
+
+    if (!params.title || params.title.trim().length < 3) {
+      throw new Error('Listing title must be at least 3 characters long');
+    }
+
+    if (params.priceSov <= 0) {
+      throw new Error('Price must be greater than zero SOV');
+    }
+
+    const geohash = encodeGeohash(params.latitude, params.longitude, 6);
+    const fuzzed = fuzzCoordinates(params.latitude, params.longitude, 2.5);
+    const now = Date.now();
+
+    const item: MarketplaceItemRecord = {
+      id: `mkt_item_${now}_${crypto.randomBytes(4).toString('hex')}`,
+      sellerDid: params.sellerDid,
+      sellerHandle: seller.handle,
+      sellerName: seller.displayName || seller.name || seller.handle,
+      title: params.title.trim(),
+      description: (params.description || '').trim(),
+      priceSov: Math.round(params.priceSov * 100) / 100,
+      category: (params.category || 'general').toLowerCase(),
+      geohash,
+      latitude: params.latitude,
+      longitude: params.longitude,
+      fuzzedLatitude: fuzzed.latitude,
+      fuzzedLongitude: fuzzed.longitude,
+      images: Array.isArray(params.images) ? params.images : [],
+      condition: params.condition || 'good',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.db.marketplace_items = this.db.marketplace_items || [];
+    this.db.marketplace_items.push(item);
+    this.save();
+    return item;
+  }
+
+  public getMarketplaceItemById(id: string): MarketplaceItemRecord | undefined {
+    this.load();
+    return (this.db.marketplace_items || []).find(i => i.id === id);
+  }
+
+  public createMarketplaceEscrow(buyerDid: string, itemId: string): { escrow: MarketplaceEscrowRecord; deliverySecret: string } {
+    this.load();
+    const buyer = this.findUserByDid(buyerDid);
+    if (!buyer) throw new Error('Buyer DID not found');
+
+    const item = this.getMarketplaceItemById(itemId);
+    if (!item) throw new Error('Marketplace item not found');
+    if (item.status !== 'active') throw new Error(`Item cannot be purchased in status: ${item.status}`);
+    if (item.sellerDid === buyerDid) throw new Error('Buyer cannot purchase their own listing');
+
+    const buyerBalance = buyer.balanceSov || 0;
+    if (buyerBalance < item.priceSov) {
+      throw new Error(`Insufficient SOV balance: have ${buyerBalance} SOV, need ${item.priceSov} SOV`);
+    }
+
+    // Debit buyer balance and put into escrow
+    buyer.balanceSov -= item.priceSov;
+    buyer.updatedAt = Date.now();
+
+    // Generate physical delivery release secret
+    const deliverySecret = crypto.randomBytes(16).toString('hex');
+    const releaseHash = crypto.createHash('sha256').update(deliverySecret).digest('hex');
+    const now = Date.now();
+
+    const escrow: MarketplaceEscrowRecord = {
+      id: `escrow_${now}_${crypto.randomBytes(4).toString('hex')}`,
+      itemId: item.id,
+      buyerDid,
+      sellerDid: item.sellerDid,
+      amountSov: item.priceSov,
+      releaseHash,
+      status: 'RESERVED_IN_ESCROW',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    item.status = 'in_escrow';
+    item.updatedAt = now;
+
+    this.db.marketplace_escrows = this.db.marketplace_escrows || [];
+    this.db.marketplace_escrows.push(escrow);
+    this.save();
+
+    return { escrow, deliverySecret };
+  }
+
+  public dispatchMarketplaceEscrow(sellerDid: string, escrowId: string): MarketplaceEscrowRecord {
+    this.load();
+    const escrow = (this.db.marketplace_escrows || []).find(e => e.id === escrowId);
+    if (!escrow) throw new Error('Escrow not found');
+    if (escrow.sellerDid !== sellerDid) throw new Error('Unauthorized: only seller can dispatch');
+    if (escrow.status !== 'RESERVED_IN_ESCROW') {
+      throw new Error(`Cannot dispatch escrow in status: ${escrow.status}`);
+    }
+
+    escrow.status = 'DISPATCHED';
+    escrow.updatedAt = Date.now();
+    this.save();
+    return escrow;
+  }
+
+  public releaseMarketplaceEscrow(sellerDid: string, escrowId: string, deliverySecret: string): MarketplaceEscrowRecord {
+    this.load();
+    const escrow = (this.db.marketplace_escrows || []).find(e => e.id === escrowId);
+    if (!escrow) throw new Error('Escrow not found');
+    if (escrow.sellerDid !== sellerDid) throw new Error('Unauthorized: only seller can claim release');
+    if (escrow.status !== 'DISPATCHED' && escrow.status !== 'RESERVED_IN_ESCROW') {
+      throw new Error(`Cannot release escrow in status: ${escrow.status}`);
+    }
+
+    // Verify proof-of-delivery hash
+    const computedHash = crypto.createHash('sha256').update(deliverySecret).digest('hex');
+    if (computedHash !== escrow.releaseHash) {
+      throw new Error('Invalid delivery verification secret / QR proof mismatch');
+    }
+
+    const seller = this.findUserByDid(sellerDid);
+    if (!seller) throw new Error('Seller DID not found');
+
+    // Credit seller balance
+    seller.balanceSov = (seller.balanceSov || 0) + escrow.amountSov;
+    seller.updatedAt = Date.now();
+
+    const now = Date.now();
+    escrow.status = 'RELEASED_TO_SELLER';
+    escrow.releasedAt = now;
+    escrow.updatedAt = now;
+
+    const item = this.getMarketplaceItemById(escrow.itemId);
+    if (item) {
+      item.status = 'sold';
+      item.updatedAt = now;
+    }
+
+    this.save();
+    return escrow;
+  }
+
+  public disputeMarketplaceEscrow(userDid: string, escrowId: string, reason: string): MarketplaceEscrowRecord {
+    this.load();
+    const escrow = (this.db.marketplace_escrows || []).find(e => e.id === escrowId);
+    if (!escrow) throw new Error('Escrow not found');
+    if (escrow.buyerDid !== userDid && escrow.sellerDid !== userDid) {
+      throw new Error('Unauthorized: only buyer or seller can dispute an escrow');
+    }
+    if (escrow.status === 'RELEASED_TO_SELLER' || escrow.status === 'REFUNDED') {
+      throw new Error(`Cannot dispute an already finalized escrow (${escrow.status})`);
+    }
+
+    escrow.status = 'DISPUTED';
+    escrow.disputeReason = reason;
+    escrow.updatedAt = Date.now();
+    this.save();
+    return escrow;
+  }
+
+  public getNearbyLocalGroups(params: {
+    geohash?: string;
+    latitude?: number;
+    longitude?: number;
+    radiusKm?: number;
+  } = {}): LocalGroupRecord[] {
+    this.load();
+    let groups = this.db.local_groups || [];
+
+    if (params.latitude !== undefined && params.longitude !== undefined) {
+      const maxDistance = params.radiusKm || 25;
+      return groups
+        .map(grp => {
+          const dist = calculateHaversineDistanceKm(
+            params.latitude!,
+            params.longitude!,
+            grp.latitude,
+            grp.longitude
+          );
+          return { grp, dist };
+        })
+        .filter(entry => entry.dist <= maxDistance)
+        .sort((a, b) => a.dist - b.dist)
+        .map(entry => entry.grp);
+    } else if (params.geohash) {
+      const prefix = params.geohash.toLowerCase().slice(0, 4);
+      return groups.filter(g => (g.geohash || '').toLowerCase().startsWith(prefix));
+    }
+
+    return groups;
+  }
+
+  public createLocalGroup(params: {
+    name: string;
+    description: string;
+    creatorDid: string;
+    latitude: number;
+    longitude: number;
+    radiusKm?: number;
+    category?: string;
+    isPrivate?: boolean;
+  }): LocalGroupRecord {
+    this.load();
+    const creator = this.findUserByDid(params.creatorDid);
+    if (!creator) throw new Error('Creator DID not found');
+
+    const geohash = encodeGeohash(params.latitude, params.longitude, 6);
+    const now = Date.now();
+
+    const group: LocalGroupRecord = {
+      id: `local_grp_${now}_${crypto.randomBytes(4).toString('hex')}`,
+      name: params.name.trim(),
+      description: (params.description || '').trim(),
+      creatorDid: params.creatorDid,
+      creatorHandle: creator.handle,
+      creatorName: creator.displayName || creator.name || creator.handle,
+      geohash,
+      latitude: params.latitude,
+      longitude: params.longitude,
+      radiusKm: params.radiusKm || 10,
+      memberCount: 1,
+      category: (params.category || 'community').toLowerCase(),
+      isPrivate: Boolean(params.isPrivate),
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.db.local_groups = this.db.local_groups || [];
+    this.db.local_groups.push(group);
+    this.save();
+    return group;
   }
 
   public checkpoint(): void {
@@ -2518,6 +2908,9 @@ export class SovraDatabaseEngine {
       governance_proposals: [],
       group_e2ee_epochs: [],
       creator_customizations: {},
+      marketplace_items: [],
+      marketplace_escrows: [],
+      local_groups: [],
     };
   }
 
@@ -2836,6 +3229,9 @@ export class SovraDatabaseEngine {
     if (!Array.isArray(this.db.zk_nullifiers)) this.db.zk_nullifiers = [];
     if (!Array.isArray(this.db.governance_proposals)) this.db.governance_proposals = [];
     if (!Array.isArray(this.db.group_e2ee_epochs)) this.db.group_e2ee_epochs = [];
+    if (!Array.isArray(this.db.marketplace_items)) this.db.marketplace_items = [];
+    if (!Array.isArray(this.db.marketplace_escrows)) this.db.marketplace_escrows = [];
+    if (!Array.isArray(this.db.local_groups)) this.db.local_groups = [];
     if (!this.db.creator_customizations || typeof this.db.creator_customizations !== 'object') this.db.creator_customizations = {};
 
     if (!Object.prototype.hasOwnProperty.call(this.db, 'liveSuperChatPins')) {
@@ -5700,6 +6096,51 @@ export class SovraDatabaseEngine {
       }
     }
     return matches;
+  }
+
+  public registerUserPhoneForPsi(userDid: string, rawPhone: string): { ok: boolean; normalizedPhone?: string; phoneHash?: string } {
+    this.load();
+    const user = (this.db.users || []).find(u => u.did === userDid);
+    if (!user) return { ok: false };
+    const norm = normalizePhoneNumber(rawPhone);
+    if (!norm) return { ok: false };
+    (user as any).phoneNumber = norm;
+    const phoneHash = crypto.createHash('sha256').update(norm).digest('hex');
+    if (!user.contactHashes) user.contactHashes = [];
+    if (!user.contactHashes.includes(phoneHash)) {
+      user.contactHashes.push(phoneHash);
+    }
+    this.save(true);
+    return { ok: true, normalizedPhone: norm, phoneHash };
+  }
+
+  public evaluatePsiContactDiscovery(blindedElements: string[]): {
+    evaluatedQueries: string[];
+    directory: Array<{ tagHex: string; did: string; handle: string; displayName?: string; avatar?: string }>;
+  } {
+    this.load();
+    if (!(this as any)._psiServerKeyHex) {
+      (this as any)._psiServerKeyHex = 'e4a899bc2133481289deff771a28394958102948290384029482938491029384';
+    }
+    const serverKey = (this as any)._psiServerKeyHex;
+    const evaluatedQueries = evaluatePsiBlindedQueries(blindedElements, serverKey);
+
+    const directory: Array<{ tagHex: string; did: string; handle: string; displayName?: string; avatar?: string }> = [];
+    for (const u of this.db.users || []) {
+      if (u.isBanned || u.status === 'BLOCKED') continue;
+      const phone = (u as any).phoneNumber;
+      if (phone) {
+        const tagHex = evaluatePsiDirectoryTag(phone, serverKey);
+        directory.push({
+          tagHex,
+          did: u.did,
+          handle: u.handle,
+          displayName: u.displayName || u.name,
+          avatar: u.avatarDataUrl || u.avatar,
+        });
+      }
+    }
+    return { evaluatedQueries, directory };
   }
 
   public saveUser(user: any): UserRecord {

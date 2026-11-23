@@ -375,6 +375,9 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <button type="button" class="header-nav-btn" id="navTabDApps" onclick="switchTab('dapps')" title="Sovereign Mini-DApps">
         <span class="hnav-icon">🎮</span> <span>DApps</span>
       </button>
+      <button type="button" class="header-nav-btn" id="navTabMarketplace" onclick="openMarketplaceDrawer()" title="P2P Local Marketplace">
+        <span class="hnav-icon">🛍️</span> <span>Market</span>
+      </button>
       <!-- Hidden buttons preserved for JS & test compatibility -->
       <button type="button" class="header-nav-btn" id="navTabCreate" onclick="openUniversalCreateModal(event)" style="display: none !important;" title="Create"><span class="hnav-icon">➕</span> <span>Create</span></button>
       <button type="button" class="header-nav-btn" id="navTabChats" onclick="switchTab('chat')" style="display: none !important;" title="Chats"><span class="hnav-icon">💬</span> <span>Chats</span></button>
@@ -771,6 +774,10 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <button class="rail-nav-item" id="tab-me" data-action="switch-tab" data-tab="vault" onclick="switchTab('vault')" title="Vault (Identity, Wallet & Studio)">
           <span class="rail-icon">👤</span>
           <span class="rail-label">Vault</span>
+        </button>
+        <button class="rail-nav-item" id="tab-marketplace" data-action="switch-tab" data-tab="marketplace" onclick="openMarketplaceDrawer()" title="P2P Local Marketplace">
+          <span class="rail-icon">🛍️</span>
+          <span class="rail-label">Market</span>
         </button>
 
         <!-- Contextual & Backwards-Compatible Anchors (Preserved for tests & deep links) -->
@@ -15993,6 +16000,109 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <button id="claimEarningsBtn" onclick="claimCreatorEarnings()" class="btn btn-primary" style="padding: 8px 16px; border-radius: 10px; font-weight: 700;">⚡ Claim My Earnings</button>
       </div>
       <button type="button" class="btn btn-secondary" onclick="document.getElementById('creatorAnalyticsModal').style.display='none'">Close</button>
+    </div>
+  </div>
+
+  <!-- P2P Local Marketplace & Neighborhood Groups Drawer -->
+  <div id="marketplaceDrawer" style="display: none; position: fixed; inset: 0; z-index: 99990; background: rgba(5, 7, 15, 0.85); backdrop-filter: blur(20px);">
+    <div style="position: absolute; right: 0; top: 0; bottom: 0; width: 100%; max-width: 640px; background: #0b1120; border-left: 1px solid rgba(255, 255, 255, 0.12); display: flex; flex-direction: column; box-shadow: -10px 0 30px rgba(0,0,0,0.7);">
+      <!-- Drawer Header -->
+      <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.5rem;">🛍️</span>
+          <div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: #fff;">Local P2P Marketplace</div>
+            <div style="font-size: 0.72rem; color: #38bdf8; font-weight: 600;">Trustless Escrow in SOV • Geohash Privacy Radius</div>
+          </div>
+        </div>
+        <button type="button" onclick="closeMarketplaceDrawer()" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer; padding: 4px 8px;">✕</button>
+      </div>
+
+      <!-- Controls & Subtabs Bar -->
+      <div style="padding: 0.85rem 1.5rem; background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; gap: 8px;">
+          <button type="button" id="mktSubtabItems" onclick="switchMarketplaceSubtab('items')" class="btn" style="flex: 1; padding: 7px 12px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; background: #0284c7; color: #fff; border: none; cursor: pointer;">🛍️ Local Items</button>
+          <button type="button" id="mktSubtabGroups" onclick="switchMarketplaceSubtab('groups')" class="btn" style="flex: 1; padding: 7px 12px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; background: rgba(255, 255, 255, 0.05); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer;">🏘️ Neighborhood Groups</button>
+          <button type="button" onclick="openCreateListingModal()" style="padding: 7px 14px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; background: #10b981; color: #fff; border: none; cursor: pointer;">➕ Sell Item</button>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="text" id="mktSearchInput" placeholder="Search nearby items or neighborhood groups..." oninput="handleMarketplaceSearch(this.value)" style="flex: 1; padding: 7px 12px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255, 255, 255, 0.14); color: #fff; font-size: 0.82rem; outline: none;" />
+          <select id="mktRadiusSelect" onchange="handleMarketplaceFilterChange()" style="padding: 7px 10px; border-radius: 8px; background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.14); color: #38bdf8; font-size: 0.8rem; font-weight: 700; outline: none; cursor: pointer;">
+            <option value="5">📍 5 km</option>
+            <option value="10" selected>📍 10 km</option>
+            <option value="25">📍 25 km</option>
+            <option value="50">📍 50 km</option>
+          </select>
+          <select id="mktCategorySelect" onchange="handleMarketplaceFilterChange()" style="padding: 7px 10px; border-radius: 8px; background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.14); color: #fff; font-size: 0.8rem; outline: none; cursor: pointer;">
+            <option value="all">All Categories</option>
+            <option value="electronics">Electronics</option>
+            <option value="vehicles">Vehicles</option>
+            <option value="furniture">Furniture</option>
+            <option value="clothing">Clothing</option>
+            <option value="services">Services</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Drawer Body Content -->
+      <div style="flex: 1; overflow-y: auto; padding: 1.25rem 1.5rem;">
+        <div id="mktItemsView" style="display: flex; flex-direction: column; gap: 12px;">
+          <div id="marketplaceItemsContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <div id="mktGroupsView" style="display: none; flex-direction: column; gap: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 0.88rem; font-weight: 700; color: #fff;">Neighborhood Circles Nearby</span>
+            <button type="button" onclick="openCreateGroupModal()" style="font-size: 0.76rem; padding: 4px 10px; border-radius: 6px; background: #6366f1; border: none; color: #fff; font-weight: 700; cursor: pointer;">➕ Create Local Circle</button>
+          </div>
+          <div id="marketplaceGroupsContainer" style="display: flex; flex-direction: column; gap: 10px;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Listing Modal -->
+  <div id="mktCreateListingModal" style="display: none; position: fixed; inset: 0; z-index: 99995; background: rgba(0,0,0,0.8); backdrop-filter: blur(16px); align-items: center; justify-content: center;">
+    <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.18); border-radius: 20px; padding: 1.75rem; max-width: 480px; width: 90%;">
+      <div style="font-size: 1.15rem; font-weight: 800; color: #fff; margin-bottom: 1rem;">List Item for Sale (SOV Escrow)</div>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.25rem;">
+        <input type="text" id="listingTitleInput" placeholder="Item title (e.g. MacBook Pro M2, Bicycle)" style="padding: 9px 12px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); color: #fff; font-size: 0.85rem; outline: none;" />
+        <textarea id="listingDescInput" placeholder="Description, specs, condition details..." rows="3" style="padding: 9px 12px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); color: #fff; font-size: 0.85rem; outline: none; resize: none;"></textarea>
+        <div style="display: flex; gap: 10px;">
+          <input type="number" id="listingPriceInput" placeholder="Price in SOV" step="0.1" min="0.1" style="flex: 1; padding: 9px 12px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); color: #38bdf8; font-weight: 700; font-size: 0.9rem; outline: none;" />
+          <select id="listingCategoryInput" style="padding: 9px 12px; border-radius: 8px; background: #1e293b; border: 1px solid rgba(255,255,255,0.12); color: #fff; font-size: 0.85rem; outline: none;">
+            <option value="electronics">Electronics</option>
+            <option value="vehicles">Vehicles</option>
+            <option value="furniture">Furniture</option>
+            <option value="clothing">Clothing</option>
+            <option value="services">Services</option>
+          </select>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" onclick="closeCreateListingModal()" class="btn btn-secondary" style="padding: 8px 16px; border-radius: 8px; font-weight: 600;">Cancel</button>
+        <button type="button" onclick="submitCreateListing()" class="btn btn-primary" style="padding: 8px 20px; border-radius: 8px; font-weight: 700; background: #10b981; border: none; color: #fff;">Post Listing</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Escrow QR Handover Modal (Buyer View) -->
+  <div id="mktEscrowQrModal" style="display: none; position: fixed; inset: 0; z-index: 99996; background: rgba(0,0,0,0.85); backdrop-filter: blur(20px); align-items: center; justify-content: center;">
+    <div style="background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 24px; padding: 2rem; max-width: 440px; width: 90%; text-align: center;">
+      <div style="font-size: 1.2rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;">Physical Handover QR Code</div>
+      <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 1.5rem;">Show this QR code to the seller when you inspect and receive the item in person. Upon scanning, escrow funds are instantly released to the seller.</div>
+      <div id="mktEscrowQrBox" style="background: #fff; padding: 1.25rem; border-radius: 16px; display: inline-block; margin-bottom: 1.25rem;">
+        <div id="mktQrPlaceholder" style="font-family: monospace; font-size: 0.85rem; color: #000; word-break: break-all; max-width: 260px;">QR CODE PAYLOAD</div>
+      </div>
+      <div style="background: rgba(255,255,255,0.05); padding: 0.75rem 1rem; border-radius: 10px; margin-bottom: 1.5rem; font-family: monospace; font-size: 0.82rem; color: #38bdf8;">
+        Release Secret: <span id="mktEscrowSecretDisplay" style="font-weight: 700;">...</span>
+      </div>
+      <button type="button" onclick="closeEscrowQrModal()" class="btn btn-secondary" style="width: 100%; padding: 10px; border-radius: 10px; font-weight: 700;">Done</button>
     </div>
   </div>
 

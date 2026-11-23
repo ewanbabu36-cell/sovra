@@ -314,3 +314,5 @@ export class SearchWorker {
     });
   }
 }
+
+export * from './vector-search.js';

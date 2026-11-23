@@ -12,3 +12,4 @@ export * from './ssim.js';
 export * from './incubator.js';
 export * from './reels.js';
 export * from './webrtc-bitswap.js';
+export * from './sharded-storage.js';

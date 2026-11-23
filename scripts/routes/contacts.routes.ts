@@ -130,5 +130,70 @@ export async function handleContactsRoutes(ctx: ContactsRouteContext): Promise<b
     return true;
   }
 
+  // 4. POST /api/identity/contacts/psi-match & /api/contacts/psi-match - Private Set Intersection (OPRF)
+  if ((url.pathname === '/api/identity/contacts/psi-match' || url.pathname === '/api/contacts/psi-match') && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 512 * 1024);
+    if (!ok) return true;
+
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const blindedElements = Array.isArray(parsed.blindedElements) ? parsed.blindedElements : [];
+
+      if (!Array.isArray(blindedElements) || blindedElements.length === 0) {
+        sendJson(res, 400, { ok: false, error: 'blindedElements array is required' });
+        return true;
+      }
+
+      // Bound query count to 1,000 to prevent DoS
+      const bounded = blindedElements.slice(0, 1000).filter(el => typeof el === 'string' && /^[0-9a-fA-F]+$/.test(el));
+      const { evaluatedQueries, directory } = sovraDb.evaluatePsiContactDiscovery(bounded);
+
+      sendJson(res, 200, {
+        ok: true,
+        evaluatedQueries,
+        directory,
+        totalEvaluated: evaluatedQueries.length,
+      });
+      return true;
+    } catch {
+      sendJson(res, 400, { ok: false, error: 'Malformed JSON payload' });
+      return true;
+    }
+  }
+
+  // 5. POST /api/identity/contacts/register-phone - Link verified phone for PSI discovery
+  if ((url.pathname === '/api/identity/contacts/register-phone' || url.pathname === '/api/contacts/register-phone') && req.method === 'POST') {
+    const principal = enforceAuth(req, res);
+    if (!principal) return true;
+
+    const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
+    if (!ok) return true;
+
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const phone = String(parsed.phoneNumber || parsed.phone || '').trim();
+      if (!phone) {
+        sendJson(res, 400, { ok: false, error: 'phoneNumber is required' });
+        return true;
+      }
+
+      const regResult = sovraDb.registerUserPhoneForPsi(principal.did, phone);
+      if (!regResult.ok) {
+        sendJson(res, 400, { ok: false, error: 'Failed to normalize or register phone number' });
+        return true;
+      }
+
+      sendJson(res, 200, {
+        ok: true,
+        phoneHash: regResult.phoneHash,
+        normalizedPhone: regResult.normalizedPhone,
+      });
+      return true;
+    } catch {
+      sendJson(res, 400, { ok: false, error: 'Malformed JSON payload' });
+      return true;
+    }
+  }
+
   return false;
 }

@@ -63262,6 +63262,228 @@ _scheduleTargetContext: 'workspace',
     window.nominateGuardianPrompt = function() { console.log('Nominate guardian'); };
     window.testMpcRecoveryPrompt = function() { console.log('Test MPC recovery'); };
 
+    // ==========================================
+    // 🛍️ SOVRA TRUSTLESS P2P ESCROW MARKETPLACE & NEIGHBORHOOD GROUPS
+    // ==========================================
+    window.SovraMarketplace = {
+      currentItems: [],
+      currentGroups: [],
+      currentTab: 'items',
+      userLat: 37.7749,
+      userLon: -122.4194,
+
+      openDrawer: function() {
+        const el = document.getElementById('marketplaceDrawer');
+        if (el) el.style.display = 'block';
+        this.loadItems();
+      },
+
+      closeDrawer: function() {
+        const el = document.getElementById('marketplaceDrawer');
+        if (el) el.style.display = 'none';
+      },
+
+      switchTab: function(tab) {
+        this.currentTab = tab;
+        const btnItems = document.getElementById('mktSubtabItems');
+        const btnGroups = document.getElementById('mktSubtabGroups');
+        const viewItems = document.getElementById('mktItemsView');
+        const viewGroups = document.getElementById('mktGroupsView');
+
+        if (tab === 'items') {
+          if (btnItems) { btnItems.style.background = '#0284c7'; btnItems.style.color = '#fff'; }
+          if (btnGroups) { btnGroups.style.background = 'rgba(255,255,255,0.05)'; btnGroups.style.color = '#94a3b8'; }
+          if (viewItems) viewItems.style.display = 'flex';
+          if (viewGroups) viewGroups.style.display = 'none';
+          this.loadItems();
+        } else {
+          if (btnItems) { btnItems.style.background = 'rgba(255,255,255,0.05)'; btnItems.style.color = '#94a3b8'; }
+          if (btnGroups) { btnGroups.style.background = '#0284c7'; btnGroups.style.color = '#fff'; }
+          if (viewItems) viewItems.style.display = 'none';
+          if (viewGroups) viewGroups.style.display = 'flex';
+          this.loadGroups();
+        }
+      },
+
+      loadItems: async function() {
+        const radius = document.getElementById('mktRadiusSelect') ? document.getElementById('mktRadiusSelect').value : 10;
+        const cat = document.getElementById('mktCategorySelect') ? document.getElementById('mktCategorySelect').value : 'all';
+        const container = document.getElementById('marketplaceItemsContainer');
+        if (!container) return;
+
+        try {
+          const res = await fetch('/api/marketplace/items?lat=' + this.userLat + '&lon=' + this.userLon + '&radius=' + radius + '&category=' + cat);
+          const data = await res.json();
+          this.currentItems = data.items || [];
+          this.renderItems(this.currentItems);
+        } catch (err) {
+          console.warn('[Marketplace] Fetch items failed:', err);
+        }
+      },
+
+      renderItems: function(items) {
+        const container = document.getElementById('marketplaceItemsContainer');
+        if (!container) return;
+        if (!items || items.length === 0) {
+          container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: #94a3b8; font-size: 0.85rem;">No local items listed in this radius yet. Be the first to list an item!</div>';
+          return;
+        }
+
+        container.innerHTML = items.map(function(item) {
+          return '<div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">' +
+            '<div style="font-weight: 700; color: #fff; font-size: 0.95rem;">' + (item.title || 'Item') + '</div>' +
+            '<div style="font-size: 0.78rem; color: #94a3b8; line-height: 1.3;">' + (item.description || 'No description provided') + '</div>' +
+            '<div style="display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">' +
+              '<div style="font-size: 1.05rem; font-weight: 800; color: #38bdf8;">' + (item.priceSov || 0) + ' SOV</div>' +
+              '<button type="button" data-id="' + item.id + '" onclick="buyItemWithEscrow(this.dataset.id)" style="padding: 5px 12px; border-radius: 8px; background: #10b981; border: none; color: #fff; font-size: 0.76rem; font-weight: 700; cursor: pointer;">Buy with Escrow</button>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      },
+
+      loadGroups: async function() {
+        const radius = document.getElementById('mktRadiusSelect') ? document.getElementById('mktRadiusSelect').value : 10;
+        const container = document.getElementById('marketplaceGroupsContainer');
+        if (!container) return;
+
+        try {
+          const res = await fetch('/api/groups/nearby?lat=' + this.userLat + '&lon=' + this.userLon + '&radius=' + radius);
+          const data = await res.json();
+          this.currentGroups = data.groups || [];
+          this.renderGroups(this.currentGroups);
+        } catch (err) {
+          console.warn('[Marketplace] Fetch groups failed:', err);
+        }
+      },
+
+      renderGroups: function(groups) {
+        const container = document.getElementById('marketplaceGroupsContainer');
+        if (!container) return;
+        if (!groups || groups.length === 0) {
+          container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #94a3b8; font-size: 0.85rem;">No neighborhood circles found in this radius yet.</div>';
+          return;
+        }
+
+        container.innerHTML = groups.map(function(grp) {
+          return '<div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">' +
+            '<div>' +
+              '<div style="font-weight: 700; color: #fff; font-size: 0.92rem;">' + (grp.name || 'Neighborhood Group') + '</div>' +
+              '<div style="font-size: 0.74rem; color: #94a3b8;">' + (grp.description || '') + ' • ' + (grp.memberCount || 1) + ' members</div>' +
+            '</div>' +
+            '<button type="button" style="padding: 5px 14px; border-radius: 8px; background: #6366f1; border: none; color: #fff; font-size: 0.76rem; font-weight: 700; cursor: pointer;">Join</button>' +
+          '</div>';
+        }).join('');
+      }
+    };
+
+    window.openMarketplaceDrawer = function() { window.SovraMarketplace.openDrawer(); };
+    window.closeMarketplaceDrawer = function() { window.SovraMarketplace.closeDrawer(); };
+    window.switchMarketplaceSubtab = function(tab) { window.SovraMarketplace.switchTab(tab); };
+    window.handleMarketplaceFilterChange = function() {
+      if (window.SovraMarketplace.currentTab === 'items') window.SovraMarketplace.loadItems();
+      else window.SovraMarketplace.loadGroups();
+    };
+    window.handleMarketplaceSearch = function(query) {
+      const q = (query || '').toLowerCase().trim();
+      if (!q) {
+        if (window.SovraMarketplace.currentTab === 'items') window.SovraMarketplace.renderItems(window.SovraMarketplace.currentItems);
+        else window.SovraMarketplace.renderGroups(window.SovraMarketplace.currentGroups);
+        return;
+      }
+      if (window.SovraMarketplace.currentTab === 'items') {
+        const filtered = window.SovraMarketplace.currentItems.filter(function(i) {
+          return (i.title || '').toLowerCase().includes(q) || (i.description || '').toLowerCase().includes(q);
+        });
+        window.SovraMarketplace.renderItems(filtered);
+      } else {
+        const filtered = window.SovraMarketplace.currentGroups.filter(function(g) {
+          return (g.name || '').toLowerCase().includes(q) || (g.description || '').toLowerCase().includes(q);
+        });
+        window.SovraMarketplace.renderGroups(filtered);
+      }
+    };
+
+    window.openCreateListingModal = function() {
+      const modal = document.getElementById('mktCreateListingModal');
+      if (modal) modal.style.display = 'flex';
+    };
+    window.closeCreateListingModal = function() {
+      const modal = document.getElementById('mktCreateListingModal');
+      if (modal) modal.style.display = 'none';
+    };
+
+    window.submitCreateListing = async function() {
+      const title = document.getElementById('listingTitleInput') ? document.getElementById('listingTitleInput').value : '';
+      const desc = document.getElementById('listingDescInput') ? document.getElementById('listingDescInput').value : '';
+      const price = document.getElementById('listingPriceInput') ? parseFloat(document.getElementById('listingPriceInput').value) : 0;
+      const cat = document.getElementById('listingCategoryInput') ? document.getElementById('listingCategoryInput').value : 'general';
+
+      if (!title || price <= 0) {
+        alert('Please provide a valid title and price in SOV');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/marketplace/items', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + (window.__SOVRA_SESSION ? window.__SOVRA_SESSION.token : '')
+          },
+          body: JSON.stringify({
+            title: title,
+            description: desc,
+            priceSov: price,
+            category: cat,
+            latitude: window.SovraMarketplace.userLat,
+            longitude: window.SovraMarketplace.userLon
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          window.closeCreateListingModal();
+          window.SovraMarketplace.loadItems();
+        } else {
+          alert('Listing error: ' + (data.error || 'Failed'));
+        }
+      } catch (err) {
+        alert('Listing error: ' + err.message);
+      }
+    };
+
+    window.buyItemWithEscrow = async function(itemId) {
+      if (!confirm('Lock funds in Trustless P2P Escrow for this item?')) return;
+      try {
+        const res = await fetch('/api/marketplace/escrow/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + (window.__SOVRA_SESSION ? window.__SOVRA_SESSION.token : '')
+          },
+          body: JSON.stringify({ itemId: itemId })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          const qrModal = document.getElementById('mktEscrowQrModal');
+          const secretDisplay = document.getElementById('mktEscrowSecretDisplay');
+          const qrBox = document.getElementById('mktQrPlaceholder');
+          if (secretDisplay) secretDisplay.textContent = data.deliverySecret;
+          if (qrBox) qrBox.textContent = 'SOVRA-ESCROW:' + data.escrow.id + ':' + data.deliverySecret;
+          if (qrModal) qrModal.style.display = 'flex';
+          window.SovraMarketplace.loadItems();
+        } else {
+          alert('Escrow failed: ' + (data.error || 'Insufficient funds or item unavailable'));
+        }
+      } catch (err) {
+        alert('Escrow error: ' + err.message);
+      }
+    };
+
+    window.closeEscrowQrModal = function() {
+      const qrModal = document.getElementById('mktEscrowQrModal');
+      if (qrModal) qrModal.style.display = 'none';
+    };
+
 </script>
 `;
 }

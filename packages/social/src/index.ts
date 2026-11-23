@@ -13,5 +13,6 @@ export * from './portable-graph.js';
 export * from './reputation.js';
 export * from './knowledge-graph.js';
 export * from './governance.js';
+export * from './geohash.js';
 
 

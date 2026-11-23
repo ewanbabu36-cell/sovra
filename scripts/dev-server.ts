@@ -102,7 +102,7 @@ import {
   createSignedReactionEvent,
   createSignedShortPost,
 } from '../packages/social/dist/index.js';
-import { SearchWorker, type IndexedDocument } from '../services/search/dist/index.js';
+import { SearchWorker, SemanticVectorIndex, type IndexedDocument } from '../services/search/dist/index.js';
 import { ModerationWorker } from '../services/moderation-worker/dist/index.js';
 import { TranscoderWorker } from '../services/transcoder/dist/index.js';
 import { renderAdminHtml, renderAdminLoginHtml } from './admin-console.ts';
@@ -127,6 +127,7 @@ import { handleWalletRoutes } from './routes/wallet.routes.ts';
 import { handleTradingRoutes } from './routes/trading.routes.ts';
 import { handleReferralRoutes } from './routes/referral.routes.ts';
 import { handleContactsRoutes } from './routes/contacts.routes.ts';
+import { handleMarketplaceRoutes } from './routes/marketplace.routes.ts';
 import { handleMediaTokenGatedRoutes } from './routes/media.routes.ts';
 import { handleDAppRoutes } from './routes/dapp.routes.ts';
 import { handleAiRoutes } from './routes/ai.routes.ts';
@@ -249,6 +250,7 @@ if (!fs.existsSync(MEDIA_DIR)) {
 const localMediaDriver = new LocalDiskMediaDriver(MEDIA_DIR);
 
 const searchWorker = new SearchWorker();
+const semanticVectorIndex = new SemanticVectorIndex();
 const moderationWorker = new ModerationWorker();
 const transcoderWorker = new TranscoderWorker();
 
@@ -283,6 +285,11 @@ function indexUserInSearch(u: UserRecord | PublicUserDTO) {
       authorDid: u.did,
       createdAt: u.createdAt || Date.now(),
     });
+    semanticVectorIndex.addDocument({
+      id: `user:${u.did}`,
+      text: `${u.handle} ${u.displayName || ''} ${u.bio || ''}`,
+      metadata: { type: 'PROFILE', did: u.did, handle: u.handle, name: u.displayName },
+    });
   } catch {}
 }
 
@@ -297,6 +304,11 @@ function indexPostInSearch(p: DbFeedPostRecord) {
       authorDid: p.authorDid,
       createdAt: p.createdAt || Date.now(),
     });
+    semanticVectorIndex.addDocument({
+      id: `post:${p.id}`,
+      text: `${p.caption || ''} ${Array.isArray(p.tags) ? p.tags.join(' ') : ''}`,
+      metadata: { type: 'POST', id: p.id, authorDid: p.authorDid },
+    });
   } catch {}
 }
 
@@ -309,6 +321,11 @@ function indexChannelInSearch(c: { id: string; name: string; desc?: string; hand
       text: `${c.name} ${c.handle || ''} ${c.desc || ''}`,
       tags: [],
       createdAt: Date.now(),
+    });
+    semanticVectorIndex.addDocument({
+      id: `channel:${c.id}`,
+      text: `${c.name} ${c.handle || ''} ${c.desc || ''}`,
+      metadata: { type: 'CHANNEL', id: c.id, handle: c.handle },
     });
   } catch {}
 }
@@ -7405,6 +7422,20 @@ async function startDevServer() {
     }
 
     // ==========================================
+    // 🛍️ TRUSTLESS P2P ESCROW MARKETPLACE & LOCAL GROUPS
+    // ==========================================
+    if (await handleMarketplaceRoutes({
+      req,
+      res,
+      url,
+      readBoundedBody,
+      resolvePrincipal,
+      enforceAuth,
+    })) {
+      return;
+    }
+
+    // ==========================================
     // 🔒 TOKEN-GATED MEDIA & EXCLUSIVE CONTENT API
     // ==========================================
     if (await handleMediaTokenGatedRoutes({
@@ -9210,6 +9241,41 @@ async function startDevServer() {
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, suggestions: suggestions.slice(0, 10) }));
+      return;
+    }
+
+    // ==========================================
+    // 🧠 ON-DEVICE SEMANTIC VECTOR SEARCH API
+    // ==========================================
+    if (url.pathname === '/api/search/semantic' && req.method === 'GET') {
+      const q = (url.searchParams.get('q') || '').trim();
+      const limitStr = url.searchParams.get('limit');
+      const limit = limitStr ? parseInt(limitStr, 10) : 10;
+      const minScoreStr = url.searchParams.get('minScore');
+      const minScore = minScoreStr ? parseFloat(minScoreStr) : 0.05;
+
+      if (!q) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, query: '', results: [], count: 0 }));
+        return;
+      }
+
+      const results = semanticVectorIndex.search(q, limit, minScore);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        query: q,
+        results: results.map(r => ({
+          id: r.id,
+          score: r.score,
+          document: {
+            id: r.document.id,
+            text: r.document.text,
+            metadata: r.document.metadata,
+          },
+        })),
+        count: results.length,
+      }));
       return;
     }
 
