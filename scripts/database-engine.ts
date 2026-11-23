@@ -4629,7 +4629,7 @@ export class SovraDatabaseEngine {
       }
     }
 
-    return sourcePosts.filter(p => {
+    const filtered = sourcePosts.filter(p => {
       if (p.moderationState === 'HIDDEN' || p.moderationState === 'REMOVED') return false;
       if (Array.isArray(p.hiddenByDids) && p.hiddenByDids.includes(viewerDid)) return false;
       if (viewerBlockedDids.has(p.authorDid)) return false;
@@ -4648,6 +4648,21 @@ export class SovraDatabaseEngine {
       }
       return true;
     });
+
+    // Cold-Start Elimination: If user's visible feed has fewer than 5 posts,
+    // seamlessly blend in high-reputation sovereign seed posts so new users never face an empty room.
+    if (filtered.length < 5) {
+      const existingIds = new Set(filtered.map(p => p.id));
+      const seeds = this.getSeedPosts();
+      for (const s of seeds) {
+        if (!existingIds.has(s.id) && !viewerBlockedDids.has(s.authorDid)) {
+          filtered.push(s);
+          existingIds.add(s.id);
+        }
+      }
+    }
+
+    return filtered;
   }
 
   public getPost(postId: string, viewerDid?: string): { ok: boolean; post?: FeedPostRecord; error?: string } {

@@ -451,6 +451,78 @@ export async function handlePushRoutes(ctx: PushRouteContext): Promise<boolean> 
     return true;
   }
 
+  // Dedicated Zero-Knowledge Blind Push Dispatcher
+  if (url.pathname === '/api/push/blind-dispatch' && req.method === 'POST') {
+    try {
+      const { body: reqBody, ok: bodyOk } = await readBoundedBody(req, res);
+      if (!bodyOk) return true;
+      const parsed = reqBody ? JSON.parse(reqBody) : {};
+      let blindChannelId = parsed.blindChannelId;
+      if (!blindChannelId && parsed.recipientDid) {
+        blindChannelId = crypto.createHash('sha256').update(String(parsed.recipientDid)).digest('hex');
+      }
+      if (!blindChannelId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Missing blindChannelId or recipientDid' }));
+        return true;
+      }
+
+      const opaqueWakeupHint = String(parsed.opaqueWakeupHint || crypto.randomBytes(16).toString('hex'));
+      const priority = parsed.priority === 'normal' ? 'normal' : 'high';
+      const dispatchRes = await blindPushRelay.dispatchBlindSignal({
+        blindChannelId: String(blindChannelId),
+        opaqueWakeupHint,
+        priority,
+        timestamp: Date.now(),
+      });
+
+      let webPushCount = 0;
+      const didTokens = parsed.recipientDid ? getPushTokensForDid(parsed.recipientDid) : [];
+      const channelTokens = Array.from(pushTokensByChannel.get(blindChannelId) ?? []);
+      const uniqueTokens = Array.from(new Set([...didTokens, ...channelTokens]));
+
+      for (const token of uniqueTokens) {
+        if (token && token.startsWith('http')) {
+          try {
+            await sendWebPush(token, {
+              type: 'blind_wakeup',
+              title: '⚡ Sovra Wakeup',
+              body: 'Encrypted message received in background',
+              data: {
+                blindChannelId,
+                opaqueWakeupHint,
+                timestamp: Date.now(),
+              },
+            });
+            webPushCount++;
+          } catch (_) {}
+        }
+      }
+
+      sendNativePushNotification({
+        userDid: parsed.recipientDid || blindChannelId,
+        title: 'Sovra Wakeup',
+        body: 'Encrypted sovereign payload pending',
+        data: { blindChannelId, opaqueWakeupHint },
+      }).catch(() => {});
+
+      const totalDispatched = (dispatchRes.ok ? dispatchRes.value.length : 0) + webPushCount;
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        blindChannelId,
+        dispatchedCount: totalDispatched,
+        relayMatches: dispatchRes.ok ? dispatchRes.value.length : 0,
+        webPushDispatched: webPushCount,
+      }));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Blind push dispatch failed' }));
+    }
+    return true;
+  }
+
   // Blind Push Gateway: Status
   if (url.pathname === '/api/push/status' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });

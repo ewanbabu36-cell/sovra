@@ -448,6 +448,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
           avatar: '⚡',
           avatarBg: '#6366f1',
           role: 'peer',
+          balanceSov: 5.0,
           sessionToken: 'stk_' + crypto.randomBytes(24).toString('hex'),
           webauthnCredentials: [verifyRes.credential],
         });
@@ -516,6 +517,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
           avatar: '⚡',
           avatarBg: '#6366f1',
           role: 'peer',
+          balanceSov: 5.0,
           sessionToken: 'stk_' + crypto.randomBytes(24).toString('hex'),
           deviceToken: effectiveDeviceToken,
           deviceType: req.headers['user-agent']?.includes('Mobile') ? 'Mobile' : 'Desktop',
@@ -546,6 +548,57 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err?.message || 'Universal touch error' }));
+    }
+    return true;
+  }
+
+  // 5c. Frictionless 1-Click Passkey Quick Register (Instant FaceID/TouchID Onboarding)
+  if (url.pathname === '/api/auth/passkey/quick-register' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const autoHex = crypto.randomBytes(3).toString('hex').toLowerCase();
+      const autoHandle = parsed.handle ? (String(parsed.handle).startsWith('@') ? String(parsed.handle) : '@' + String(parsed.handle)) : `@sovra_${autoHex}`;
+      const autoDid = parsed.did || `did:key:z6Mko${crypto.randomBytes(16).toString('hex')}`;
+      const cleanName = parsed.displayName || autoHandle.replace(/^@/, '');
+      const user = sovraDb.createUser({
+        did: autoDid,
+        handle: autoHandle,
+        name: cleanName,
+        displayName: cleanName,
+        bio: 'Sovereign Peer Node (Passkey)',
+        avatar: '⚡',
+        avatarBg: '#6366f1',
+        role: 'peer',
+        balanceSov: 5.0,
+        sessionToken: 'stk_' + crypto.randomBytes(24).toString('hex'),
+        webauthnCredentials: parsed.credential ? [parsed.credential] : undefined,
+      });
+
+      const deviceName = String(parsed.device || 'Passkey Device');
+      const loginRes = sovraDb.loginUser(user.handle, deviceName, clientIp, req.headers['user-agent'] as string, { webauthnVerified: true });
+      const sessionToken = (loginRes.ok && loginRes.sessionToken) ? loginRes.sessionToken : user.sessionToken;
+
+      const isSecure = Boolean((req.socket as any)?.encrypted || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production');
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Set-Cookie': [
+          `sovra_session=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecure ? '; Secure' : ''}`,
+          `sovra_session_token=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${isSecure ? '; Secure' : ''}`,
+        ],
+      });
+      res.end(JSON.stringify({
+        ok: true,
+        user: toPublicUserDTO(user),
+        sessionToken,
+        token: sessionToken,
+        starterGas_uSOV: 5.0,
+        message: '1-Click Sovereign Passkey account created with starter gas!',
+      }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Quick passkey registration failed' }));
     }
     return true;
   }

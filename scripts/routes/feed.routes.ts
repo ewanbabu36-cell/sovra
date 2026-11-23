@@ -231,6 +231,66 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
     return true;
   }
 
+  // 7b. Sovereign Cold-Start Discovery Feed API (Eliminates Empty Room Syndrome)
+  if ((url.pathname === '/api/feed/discovery' || url.pathname === '/api/feed/cold-start') && req.method === 'GET') {
+    const principal = resolvePrincipal(req);
+    const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 20;
+    const posts = sovraDb.getFeedPosts(principal?.did);
+
+    const recommendedChannels = [
+      {
+        id: 'channel_sovra_core',
+        name: 'Sovra Core Protocol',
+        handle: '@sovra_core',
+        avatar: '⚡',
+        subscribersCount: 14200,
+        description: 'Official sovereign mesh architecture, CometBFT consensus updates, and cryptography research.',
+      },
+      {
+        id: 'channel_p2p_mesh',
+        name: 'Decentralized P2P Mesh',
+        handle: '@p2p_mesh',
+        avatar: '🌐',
+        subscribersCount: 8900,
+        description: 'Local neighborhood Wi-Fi Direct, WebRTC mesh relays, and zero-cloud topology.',
+      },
+      {
+        id: 'channel_ambient_radio',
+        name: 'Ambient P2P Radio',
+        handle: '@ambient_radio',
+        avatar: '📻',
+        subscribersCount: 6540,
+        description: 'Decentralized 24/7 lossless audio streams powered by BitSwap micro-chunks.',
+      },
+    ];
+
+    const trendingTopics = [
+      { tag: '#sovra', count: 1840, category: 'Protocol' },
+      { tag: '#p2p', count: 1220, category: 'Networking' },
+      { tag: '#zeroalgorithms', count: 980, category: 'Privacy' },
+      { tag: '#depin', count: 750, category: 'Storage' },
+    ];
+
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+    });
+    res.end(JSON.stringify({
+      ok: true,
+      feedType: 'sovereign_discovery',
+      posts: posts.slice(0, limit),
+      count: Math.min(posts.length, limit),
+      recommendedChannels,
+      trendingTopics,
+      federation: {
+        activityPubReady: true,
+        nostrBridge: true,
+        protocol: 'w3c-did-ed25519',
+      },
+    }));
+    return true;
+  }
+
   // 8. Instagram-Grade Visual Explore Mosaic Grid API
   if (url.pathname === '/api/explore/grid' && req.method === 'GET') {
     const category = (url.searchParams.get('category') || 'all').toLowerCase();

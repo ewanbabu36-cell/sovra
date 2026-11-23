@@ -6,6 +6,7 @@ import {
 import { CID } from './cid.js';
 import { Blockstore } from './blockstore.js';
 import { decodeDAGPBNode } from './unixfs.js';
+import { ColdPeerFallbackEngine } from './cold-peer-fallback.js';
 import {
   ContentNotFoundError,
   IntegrityVerificationError,
@@ -200,6 +201,10 @@ export class BitSwapEngine {
   private readonly pendingRequests = new Map<string, PendingRequest[]>();
   private readonly peerPresences = new Map<string, Set<string>>(); // cid -> Set<peerId>
   private network?: BitSwapNetworkAdapter | undefined;
+  private coldPeerFallback?: ColdPeerFallbackEngine | undefined;
+
+  public readonly blockstore: Blockstore;
+  public readonly defaultTimeoutMs: number;
 
   private _totalBlocksSent = 0;
   private _totalBlocksReceived = 0;
@@ -207,15 +212,27 @@ export class BitSwapEngine {
   private _totalBytesReceived = 0;
 
   constructor(
-    public readonly blockstore: Blockstore,
+    blockstore: Blockstore,
     network?: BitSwapNetworkAdapter | undefined,
-    public readonly defaultTimeoutMs: number = 5000,
+    defaultTimeoutMs: number = 5000,
+    coldPeerFallback?: ColdPeerFallbackEngine | undefined,
   ) {
+    this.blockstore = blockstore;
     this.network = network;
+    this.defaultTimeoutMs = defaultTimeoutMs;
+    this.coldPeerFallback = coldPeerFallback;
   }
 
   public setNetwork(network: BitSwapNetworkAdapter): void {
     this.network = network;
+  }
+
+  public setColdPeerFallback(fallback: ColdPeerFallbackEngine): void {
+    this.coldPeerFallback = fallback;
+  }
+
+  public getColdPeerFallback(): ColdPeerFallbackEngine | undefined {
+    return this.coldPeerFallback;
   }
 
   public getStats(): BitSwapStats {
@@ -390,6 +407,16 @@ export class BitSwapEngine {
     }
 
     if (!this.network) {
+      if (this.coldPeerFallback) {
+        const timeout = options?.timeoutMs ?? this.defaultTimeoutMs;
+        const coldBlock = await this.coldPeerFallback.resolveColdBlock(cidStr, { timeoutMs: timeout });
+        if (coldBlock) {
+          await this.blockstore.put(cidObj, coldBlock);
+          this._totalBlocksReceived += 1;
+          this._totalBytesReceived += coldBlock.length;
+          return coldBlock;
+        }
+      }
       throw new ContentNotFoundError(cidStr, {
         reason: 'No network adapter configured in BitSwap engine',
       });
@@ -412,8 +439,18 @@ export class BitSwapEngine {
     }
 
     if (targetPeers.length === 0) {
+      if (this.coldPeerFallback) {
+        const timeout = options?.timeoutMs ?? this.defaultTimeoutMs;
+        const coldBlock = await this.coldPeerFallback.resolveColdBlock(cidStr, { timeoutMs: timeout });
+        if (coldBlock) {
+          await this.blockstore.put(cidObj, coldBlock);
+          this._totalBlocksReceived += 1;
+          this._totalBytesReceived += coldBlock.length;
+          return coldBlock;
+        }
+      }
       throw new ContentNotFoundError(cidStr, {
-        reason: 'No connected peers or DHT providers available to fetch block',
+        reason: 'No connected peers, DHT providers, or cold fallback gateways available to fetch block',
       });
     }
 
@@ -448,7 +485,25 @@ export class BitSwapEngine {
         // Send cancel message
         this.cancelWants([cidStr], targetPeers).catch(() => {});
 
-        reject(new BitSwapTimeoutError(cidStr, timeoutMs));
+        if (this.coldPeerFallback) {
+          this.coldPeerFallback
+            .resolveColdBlock(cidStr, { timeoutMs: Math.min(2000, timeoutMs) })
+            .then(async (coldBlock) => {
+              if (coldBlock) {
+                await this.blockstore.put(cidObj, coldBlock);
+                this._totalBlocksReceived += 1;
+                this._totalBytesReceived += coldBlock.length;
+                resolve(coldBlock);
+                return;
+              }
+              reject(new BitSwapTimeoutError(cidStr, timeoutMs));
+            })
+            .catch(() => {
+              reject(new BitSwapTimeoutError(cidStr, timeoutMs));
+            });
+        } else {
+          reject(new BitSwapTimeoutError(cidStr, timeoutMs));
+        }
       }, timeoutMs);
 
       const request: PendingRequest = {
