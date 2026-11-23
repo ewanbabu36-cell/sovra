@@ -1092,7 +1092,7 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         payoutTarget,
         targetAddress,
         remainingBalance: user.balanceSov,
-        status: 'PROCESSED',
+        status: isPayoutGatewayLive ? 'PROCESSED' : 'SIMULATED_TESTNET_DEBIT',
         payoutExecuted: isPayoutGatewayLive,
         payoutProvider: isPayoutGatewayLive ? 'configured_gateway' : 'none_configured',
         settlementTier: isPayoutGatewayLive ? 'BANK_SETTLED' : 'TESTNET_SIMULATED_DEBIT',

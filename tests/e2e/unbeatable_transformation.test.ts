@@ -371,6 +371,6 @@ describe('SOVRA UNBEATABLE ARCHITECTURE & ZERO-FRICTION UX HARNESS', () => {
     expect(withdrawData.debitedSov).toBe(30);
     expect(withdrawData.fiatPayoutAmount).toBe(300);
     expect(withdrawData.payoutTarget).toBe('UPI');
-    expect(withdrawData.status).toBe('PROCESSED');
+    expect(withdrawData.status).toBe('SIMULATED_TESTNET_DEBIT');
   });
 });

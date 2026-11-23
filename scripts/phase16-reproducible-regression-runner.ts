@@ -46,6 +46,7 @@ const TEST_SUITES = [
   'tests/security/phase15-4-live-consensus-transition.test.ts',
   'tests/security/phase15-5-live-recovery.test.ts',
   'tests/security/phase15-6-adversarial-audit.test.ts',
+  'packages/crypto/test/pqc.test.ts',
   'tests/security/phase16-sanitization-quarantine.test.ts',
 ];
 
@@ -77,7 +78,8 @@ async function runAllSuites() {
     }
 
     const fileHash = computeSha256(fullPath);
-    const cmd = `npx vitest run ${testFile}`;
+    const jsonOutFile = path.resolve(`.tmp-vitest-report-${i}.json`);
+    const cmd = `npx vitest run ${testFile} --reporter=json --outputFile=${jsonOutFile}`;
     console.log(`\n[${i + 1}/${TEST_SUITES.length}] Running: ${testFile}`);
     console.log(`Command: ${cmd}`);
 
@@ -101,37 +103,53 @@ async function runAllSuites() {
     const durationMs = Date.now() - t0;
     const outputHash = crypto.createHash('sha256').update(stdout).digest('hex');
 
-    // Parse test counts from output
-    // Looking for "Tests  13 passed (13)" or "Tests  1 failed | 12 passed (13)"
+    // Parse exact test counts from Vitest JSON report
     let total = 0;
     let passed = 0;
     let failed = 0;
     let skipped = 0;
     let todo = 0;
 
-    const testsMatch = stdout.match(/Tests\s+([\d\w\s|]+)/);
-    if (testsMatch) {
-      const line = testsMatch[1];
-      const pMatch = line.match(/(\d+)\s+passed/);
-      const fMatch = line.match(/(\d+)\s+failed/);
-      const sMatch = line.match(/(\d+)\s+skipped/);
-      const tMatch = line.match(/(\d+)\s+todo/);
-      const totMatch = line.match(/\((\d+)\)/);
+    if (fs.existsSync(jsonOutFile)) {
+      try {
+        const rawJson = fs.readFileSync(jsonOutFile, 'utf-8');
+        const parsed = JSON.parse(rawJson);
+        total = parsed.numTotalTests ?? 0;
+        passed = parsed.numPassedTests ?? 0;
+        failed = parsed.numFailedTests ?? 0;
+        skipped = parsed.numPendingTests ?? 0;
+        todo = parsed.numTodoTests ?? 0;
+        fs.unlinkSync(jsonOutFile);
+      } catch (err) {
+        console.warn(`[WARN] Failed to parse JSON report for ${testFile}:`, err);
+      }
+    }
 
-      if (pMatch) passed = parseInt(pMatch[1], 10);
-      if (fMatch) failed = parseInt(fMatch[1], 10);
-      if (sMatch) skipped = parseInt(sMatch[1], 10);
-      if (tMatch) todo = parseInt(tMatch[1], 10);
-      if (totMatch) total = parseInt(totMatch[1], 10);
-      else total = passed + failed + skipped + todo;
-    } else {
-      // Fallback
-      if (exitCode === 0) {
-        passed = 1;
-        total = 1;
+    // Secondary fallback: parse stdout regex if json report was unavailable
+    if (total === 0) {
+      const testsMatch = stdout.match(/Tests\s+([\d\w\s|]+)/);
+      if (testsMatch) {
+        const line = testsMatch[1];
+        const pMatch = line.match(/(\d+)\s+passed/);
+        const fMatch = line.match(/(\d+)\s+failed/);
+        const sMatch = line.match(/(\d+)\s+skipped/);
+        const tMatch = line.match(/(\d+)\s+todo/);
+        const totMatch = line.match(/\((\d+)\)/);
+
+        if (pMatch) passed = parseInt(pMatch[1], 10);
+        if (fMatch) failed = parseInt(fMatch[1], 10);
+        if (sMatch) skipped = parseInt(sMatch[1], 10);
+        if (tMatch) todo = parseInt(tMatch[1], 10);
+        if (totMatch) total = parseInt(totMatch[1], 10);
+        else total = passed + failed + skipped + todo;
       } else {
-        failed = 1;
-        total = 1;
+        if (exitCode === 0) {
+          passed = 1;
+          total = 1;
+        } else {
+          failed = 1;
+          total = 1;
+        }
       }
     }
 

@@ -9,10 +9,24 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { sovraDb, type ArchivalPinRecord } from '../database-engine.ts';
 import { reconstructSecretMpc } from '../../packages/crypto/src/mpc.ts';
+import {
+  generateHybridSignKeyPair,
+  signHybrid,
+  verifyHybrid,
+  generateHybridKEMKeyPair,
+  hybridEncapsulate,
+  hybridDecapsulate,
+} from '../../packages/crypto/src/pqc.ts';
 
-const PQC_ED25519_SECRET = process.env.SOVRA_PQC_ED_SECRET || 'sovra_quantum_safe_ed25519_master_seed_2026';
-const PQC_MLDSA_SECRET = process.env.SOVRA_PQC_MLDSA_SECRET || 'sovra_quantum_safe_mldsa65_fips204_seed_2026';
-const KEM_MASTER_SECRET = process.env.SOVRA_KEM_SECRET || 'sovra_ml_kem_768_kyber_master_secret_2026';
+// Server-side asymmetric key pairs for hybrid PQC prototype routes
+// Zero hardcoded HMAC fallback secrets - uses real asymmetric key enclaves
+function isPqcQuarantineActive(): boolean {
+  // PQC/KEM endpoints are quarantined and fail closed in production unless explicitly enabled
+  if (process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST) || process.env.SOVRA_ENABLE_EXPERIMENTAL_PQC === 'true' || process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
+    return false;
+  }
+  return true;
+}
 
 const activeKemSessions = new Map<string, string>();
 const mpcGuardianStore = new Map<string, { guardianDid: string; guardianName: string; encryptedShareHex: string; shareId: number; nominatedAt: number }>();
@@ -58,24 +72,10 @@ function parseJsonBody(req: http.IncomingMessage, maxBytes = 2 * 1024 * 1024): P
   });
 }
 
-function getPqcPublicKeys() {
-  const ed25519Pk = crypto.createHash('sha256').update(PQC_ED25519_SECRET + ':pub').digest('hex'); // 64 hex chars
-  const part1 = crypto.createHash('sha512').update(PQC_MLDSA_SECRET + ':pub1').digest('hex'); // 128
-  const part2 = crypto.createHash('sha256').update(PQC_MLDSA_SECRET + ':pub2').digest('hex').slice(0, 32); // 32
-  const mlDsaPk = (part1 + part2).slice(0, 160); // 160 hex chars
-  return { ed25519Pk, mlDsaPk };
-}
-
-function generateHybridSignature(message: string) {
-  const sig128 = crypto.createHmac('sha512', PQC_ED25519_SECRET).update(message).digest('hex'); // 128 hex chars
-  const m1 = crypto.createHmac('sha512', PQC_MLDSA_SECRET + ':1').update(message).digest('hex'); // 128
-  const m2 = crypto.createHmac('sha512', PQC_MLDSA_SECRET + ':2').update(message).digest('hex'); // 128
-  const m3 = crypto.createHmac('sha256', PQC_MLDSA_SECRET + ':3').update(message).digest('hex'); // 64
-  const sig320 = (m1 + m2 + m3).slice(0, 320); // 320 hex chars
-  const signatureHex = `sovra-pqc-sig:v1:${sig128}.${sig320}`;
-  const { ed25519Pk, mlDsaPk } = getPqcPublicKeys();
-  return { signatureHex, ed25519Pk, mlDsaPk, sig128, sig320 };
-}
+// Server-side hybrid asymmetric key enclaves from packages/crypto/src/pqc.ts
+// Eliminates legacy HMAC mock implementations and hardcoded secret keys
+const serverHybridSignKp = generateHybridSignKeyPair();
+const serverHybridKemKp = generateHybridKEMKeyPair();
 
 export async function handleEnterpriseProtocolRoutes(
   req: http.IncomingMessage,
@@ -561,30 +561,36 @@ export async function handleEnterpriseProtocolRoutes(
       (sovraDb.db.messages?.length || 0) +
       (sovraDb.db.offline_payments?.length || 0);
 
+    const totalTips = ((sovraDb.db as any).transactions || [])
+      .filter((t: any) => t && t.type === 'tip')
+      .reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
+
+    const totalNullifiers = (sovraDb.db.zk_nullifiers?.length || 0);
+
     const metricsText = [
       '# HELP sovra_p2p_active_peers_total Current number of discovered active P2P mesh peers',
       '# TYPE sovra_p2p_active_peers_total gauge',
-      'sovra_p2p_active_peers_total 42',
+      'sovra_p2p_active_peers_total 0',
       '',
       '# HELP sovra_pqc_signatures_verified_total Total NIST FIPS 204 ML-DSA-65 post-quantum signatures verified',
       '# TYPE sovra_pqc_signatures_verified_total counter',
-      'sovra_pqc_signatures_verified_total 128',
+      'sovra_pqc_signatures_verified_total 0',
       '',
       '# HELP sovra_zk_nullifiers_total Total Zero-Knowledge humanity nullifiers anchored',
       '# TYPE sovra_zk_nullifiers_total counter',
-      `sovra_zk_nullifiers_total ${(sovraDb.db.zk_nullifiers?.length || 0) + 64}`,
+      `sovra_zk_nullifiers_total ${totalNullifiers}`,
       '',
       '# HELP sovra_spaces_active_total Active decentralized audio Spaces',
       '# TYPE sovra_spaces_active_total gauge',
-      'sovra_spaces_active_total 5',
+      'sovra_spaces_active_total 0',
       '',
       '# HELP sovra_creator_tips_settled_sov Total SOV creator tips settled on ledger',
       '# TYPE sovra_creator_tips_settled_sov counter',
-      'sovra_creator_tips_settled_sov 892.5',
+      `sovra_creator_tips_settled_sov ${totalTips.toFixed(1)}`,
       '',
       '# HELP sovra_db_records_total Total SQLite & WAL persistent records',
       '# TYPE sovra_db_records_total gauge',
-      `sovra_db_records_total ${Math.max(1024, totalDbRecords)}`,
+      `sovra_db_records_total ${totalDbRecords}`,
       ''
     ].join('\n');
 
@@ -1017,20 +1023,35 @@ export async function handleEnterpriseProtocolRoutes(
   }
 
   // =========================================================================
-  // 1. POST /api/crypto/pqc/sign-hybrid - Generate NIST FIPS 204 hybrid signature
+  // 1. POST /api/crypto/pqc/sign-hybrid - Generate hybrid signature (QUARANTINED)
   // =========================================================================
   if (method === 'POST' && pathname === '/api/crypto/pqc/sign-hybrid') {
+    if (isPqcQuarantineActive()) {
+      sendJson(res, 503, {
+        ok: false,
+        error: 'PQC_ENDPOINTS_QUARANTINED',
+        message: 'NIST FIPS 203/204 endpoints quarantined pending formal standards-vector review. Production use is disabled per independent audit.',
+        isQuarantined: true,
+        fipsCertified: false,
+        productionReady: false,
+      });
+      return true;
+    }
+
     try {
       const body = await parseJsonBody(req);
       const message = String(body.message || '');
-      const { signatureHex, ed25519Pk, mlDsaPk } = generateHybridSignature(message);
+      const hybridSig = signHybrid(message, serverHybridSignKp.ed25519PrivateKey, serverHybridSignKp.mlDsaPrivateKey);
       sendJson(res, 200, {
         ok: true,
         algorithm: 'ed25519+ml-dsa-65',
-        standard: 'NIST FIPS 204',
-        signatureHex,
-        ed25519Pk,
-        mlDsaPk,
+        standard: 'EXPERIMENTAL_PROTOTYPE_QUARANTINED',
+        fipsCertified: false,
+        productionReady: false,
+        quarantineNotice: 'Prototype simulation only; non-FIPS compliant.',
+        signatureHex: hybridSig.signatureHex,
+        ed25519Pk: Buffer.from(serverHybridSignKp.ed25519PublicKey).toString('hex'),
+        mlDsaPk: Buffer.from(serverHybridSignKp.mlDsaPublicKey).toString('hex'),
       });
     } catch (err: any) {
       sendJson(res, 400, { ok: false, error: err?.message || 'Failed to sign hybrid PQC message' });
@@ -1039,33 +1060,38 @@ export async function handleEnterpriseProtocolRoutes(
   }
 
   // =========================================================================
-  // 2. POST /api/crypto/pqc/verify - Verify hybrid dual-signature
+  // 2. POST /api/crypto/pqc/verify - Verify hybrid dual-signature (QUARANTINED)
   // =========================================================================
   if (method === 'POST' && pathname === '/api/crypto/pqc/verify') {
+    if (isPqcQuarantineActive()) {
+      sendJson(res, 503, {
+        ok: false,
+        error: 'PQC_ENDPOINTS_QUARANTINED',
+        message: 'NIST FIPS 203/204 endpoints quarantined pending formal standards-vector review. Production use is disabled per independent audit.',
+        isQuarantined: true,
+        fipsCertified: false,
+        productionReady: false,
+      });
+      return true;
+    }
+
     try {
       const body = await parseJsonBody(req);
       const message = String(body.message || '');
       const signatureHex = String(body.signatureHex || '');
+      const ed25519Pk = String(body.ed25519Pk || Buffer.from(serverHybridSignKp.ed25519PublicKey).toString('hex'));
+      const mlDsaPk = String(body.mlDsaPk || Buffer.from(serverHybridSignKp.mlDsaPublicKey).toString('hex'));
 
-      const match = signatureHex.match(/^sovra-pqc-sig:v1:([0-9a-f]{128})\.([0-9a-f]{320})$/);
-      if (!match) {
-        sendJson(res, 200, {
-          ok: true,
-          valid: false,
-          quantumSafe: false,
-          algorithm: 'ed25519+ml-dsa-65',
-        });
-        return true;
-      }
-
-      const expected = generateHybridSignature(message);
-      const valid = (expected.signatureHex === signatureHex);
+      const valid = verifyHybrid(message, signatureHex, ed25519Pk, mlDsaPk);
 
       sendJson(res, 200, {
         ok: true,
         valid,
-        quantumSafe: valid,
+        quantumSafe: false,
+        fipsCertified: false,
+        productionReady: false,
         algorithm: 'ed25519+ml-dsa-65',
+        quarantineNotice: 'Prototype verification only; non-FIPS certified.',
       });
     } catch (err: any) {
       sendJson(res, 400, { ok: false, error: err?.message || 'PQC verification failed' });
@@ -1074,20 +1100,31 @@ export async function handleEnterpriseProtocolRoutes(
   }
 
   // =========================================================================
-  // 3. POST /api/crypto/pqc/kem/encapsulate - ML-KEM-768 Shared Secret Encapsulation
+  // 3. POST /api/crypto/pqc/kem/encapsulate - KEM Encapsulation (QUARANTINED)
   // =========================================================================
   if (method === 'POST' && pathname === '/api/crypto/pqc/kem/encapsulate') {
+    if (isPqcQuarantineActive()) {
+      sendJson(res, 503, {
+        ok: false,
+        error: 'PQC_ENDPOINTS_QUARANTINED',
+        message: 'NIST FIPS 203/204 endpoints quarantined pending formal standards-vector review. Production use is disabled per independent audit.',
+        isQuarantined: true,
+        fipsCertified: false,
+        productionReady: false,
+      });
+      return true;
+    }
+
     try {
-      const p1 = crypto.randomBytes(48).toString('hex');
-      const p2 = crypto.randomBytes(96).toString('hex');
-      const hybridCiphertextHex = `sovra-hybrid-kem:v1:${p1}.${p2}`;
-      const quantumSafeSharedSecretHex = crypto.createHmac('sha256', KEM_MASTER_SECRET).update(hybridCiphertextHex).digest('hex');
-      activeKemSessions.set(hybridCiphertextHex, quantumSafeSharedSecretHex);
+      const enc = hybridEncapsulate(serverHybridKemKp.classicalPublicKey, serverHybridKemKp.pqcPublicKey);
 
       sendJson(res, 200, {
         ok: true,
-        hybridCiphertextHex,
-        quantumSafeSharedSecretHex,
+        fipsCertified: false,
+        productionReady: false,
+        quarantineNotice: 'Simulated KEM prototype; not FIPS 203 certified.',
+        hybridCiphertextHex: enc.hybridCiphertextHex,
+        quantumSafeSharedSecretHex: enc.quantumSafeSharedSecretHex,
       });
     } catch (err: any) {
       sendJson(res, 400, { ok: false, error: err?.message || 'KEM encapsulation failed' });
@@ -1096,20 +1133,36 @@ export async function handleEnterpriseProtocolRoutes(
   }
 
   // =========================================================================
-  // 4. POST /api/crypto/pqc/kem/decapsulate - ML-KEM-768 Shared Secret Decapsulation
+  // 4. POST /api/crypto/pqc/kem/decapsulate - KEM Decapsulation (QUARANTINED)
   // =========================================================================
   if (method === 'POST' && pathname === '/api/crypto/pqc/kem/decapsulate') {
+    if (isPqcQuarantineActive()) {
+      sendJson(res, 503, {
+        ok: false,
+        error: 'PQC_ENDPOINTS_QUARANTINED',
+        message: 'NIST FIPS 203/204 endpoints quarantined pending formal standards-vector review. Production use is disabled per independent audit.',
+        isQuarantined: true,
+        fipsCertified: false,
+        productionReady: false,
+      });
+      return true;
+    }
+
     try {
       const body = await parseJsonBody(req);
       const hybridCiphertextHex = String(body.hybridCiphertextHex || '');
-      let sharedSecretHex = activeKemSessions.get(hybridCiphertextHex);
-      if (!sharedSecretHex) {
-        sharedSecretHex = crypto.createHmac('sha256', KEM_MASTER_SECRET).update(hybridCiphertextHex).digest('hex');
-      }
+      const sharedSecretBytes = hybridDecapsulate(
+        hybridCiphertextHex,
+        serverHybridKemKp.classicalPrivateKey,
+        serverHybridKemKp.pqcPrivateKey
+      );
 
       sendJson(res, 200, {
         ok: true,
-        sharedSecretHex,
+        fipsCertified: false,
+        productionReady: false,
+        quarantineNotice: 'Simulated KEM prototype; not FIPS 203 certified.',
+        sharedSecretHex: Buffer.from(sharedSecretBytes).toString('hex'),
       });
     } catch (err: any) {
       sendJson(res, 400, { ok: false, error: err?.message || 'KEM decapsulation failed' });

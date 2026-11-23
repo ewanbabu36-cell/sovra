@@ -757,18 +757,38 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
     return true;
   }
 
-  // 4E. Ephemeral Disappearing Messages Sweep
-  if (url.pathname === '/api/chat/disappearing/sweep' && (req.method === 'POST' || req.method === 'GET')) {
+  // 4E. Ephemeral Disappearing Messages Sweep (Authenticated Maintenance Endpoint)
+  if (url.pathname === '/api/chat/disappearing/sweep') {
+    // Audit Finding P1: State-changing operations must reject GET and require authentication
+    if (req.method !== 'POST') {
+      res.writeHead(405, {
+        'Content-Type': 'application/json',
+        'Allow': 'POST',
+      });
+      res.end(JSON.stringify({ ok: false, error: 'Method Not Allowed. Maintenance sweeps require authenticated POST.' }));
+      return true;
+    }
+
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    let parsed: any = {};
+    if (body) {
+      try { parsed = JSON.parse(body); } catch (_) {}
+    }
+
+    const principal = enforceAuth(req, res, parsed);
+    if (!principal) return true;
+
     const sweepResult = sovraDb.purgeExpiredDisappearingMessages();
     const remainingCount = (sovraDb.getState().chatMessages || []).length;
     res.writeHead(200, {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
     });
     res.end(JSON.stringify({
       ok: true,
       purgedCount: sweepResult.purgedCount,
       remainingMessagesCount: remainingCount,
+      triggeredBy: principal.did,
       timestamp: Date.now(),
     }));
     return true;

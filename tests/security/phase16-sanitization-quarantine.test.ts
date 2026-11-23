@@ -17,13 +17,19 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { handleWalletRoutes } from '../../scripts/routes/wallet.routes.ts';
 import { handleVideoRoutes } from '../../scripts/routes/video.routes.ts';
+import { handleChatRoutes } from '../../scripts/routes/chat.routes.ts';
+import { handleEnterpriseProtocolRoutes } from '../../scripts/routes/enterprise-protocol.routes.ts';
 import { sovraDb } from '../../scripts/database-engine.ts';
 
-function createMockReqRes(method: string, urlPath: string, headers: Record<string, string> = {}) {
+function createMockReqRes(method: string, urlPath: string, headers: Record<string, string> = {}, body?: string) {
   const req = new http.IncomingMessage(null as any);
   req.method = method;
   req.url = urlPath;
   req.headers = { host: 'localhost:3001', ...headers };
+  if (body !== undefined) {
+    req.push(Buffer.from(body));
+    req.push(null);
+  }
 
   let statusCode = 200;
   let responseHeaders: Record<string, any> = {};
@@ -32,11 +38,15 @@ function createMockReqRes(method: string, urlPath: string, headers: Record<strin
   const res = {
     writeHead: (code: number, hdrs?: any) => {
       statusCode = code;
-      if (hdrs) responseHeaders = { ...responseHeaders, ...hdrs };
+      if (hdrs) {
+        for (const [k, v] of Object.entries(hdrs)) {
+          responseHeaders[k.toLowerCase()] = v;
+        }
+      }
       return res;
     },
     setHeader: (k: string, v: any) => {
-      responseHeaders[k] = v;
+      responseHeaders[k.toLowerCase()] = v;
       return res;
     },
     end: (chunk?: any) => {
@@ -208,7 +218,7 @@ describe('Phase 16 — Zero-Trust Codebase Sanitization & Financial Quarantine',
       expect(resp.json().debitedSov).toBe(10);
       expect(resp.json().payoutExecuted).toBe(false);
       expect(resp.json().payoutProvider).toBe('none_configured');
-      expect(resp.json().status).toBe('PROCESSED');
+      expect(resp.json().status).toBe('SIMULATED_TESTNET_DEBIT');
       expect(resp.json().settlementTier).toBe('TESTNET_SIMULATED_DEBIT');
     });
   });
@@ -319,6 +329,105 @@ describe('Phase 16 — Zero-Trust Codebase Sanitization & Financial Quarantine',
       expect(resp.json().rates.USD).toBe(0.12);
       expect(resp.json().quoteSource).toBe('testnet_fixed_peg');
       expect(resp.json().isOracleLive).toBe(false);
+    });
+  });
+
+  describe('7. P1 Audit Remediation: Ephemeral Disappearing Messages Sweep Protection', () => {
+    it('strictly rejects GET request with HTTP 405 Method Not Allowed', async () => {
+      const { req, res, getResponse } = createMockReqRes('GET', '/api/chat/disappearing/sweep');
+      const ctx = {
+        req,
+        res,
+        url: new URL('http://localhost:3001/api/chat/disappearing/sweep'),
+        readBoundedBody: async () => ({ body: '', ok: true }),
+        resolvePrincipal: () => null,
+        enforceAuth: () => null,
+      };
+
+      await handleChatRoutes(ctx as any);
+      const resp = getResponse();
+      expect(resp.statusCode).toBe(405);
+      expect(resp.headers['allow']).toBe('POST');
+      expect(resp.json().error).toContain('Method Not Allowed');
+    });
+
+    it('strictly rejects unauthenticated POST with HTTP 401 Unauthorized', async () => {
+      const { req, res, getResponse } = createMockReqRes('POST', '/api/chat/disappearing/sweep');
+      const ctx = {
+        req,
+        res,
+        url: new URL('http://localhost:3001/api/chat/disappearing/sweep'),
+        readBoundedBody: async () => ({ body: '{}', ok: true }),
+        resolvePrincipal: () => null,
+        enforceAuth: (r: any, w: any) => {
+          w.writeHead(401, { 'Content-Type': 'application/json' });
+          w.end(JSON.stringify({ ok: false, error: 'Authentication required' }));
+          return null;
+        },
+      };
+
+      await handleChatRoutes(ctx as any);
+      const resp = getResponse();
+      expect(resp.statusCode).toBe(401);
+      expect(resp.json().error).toContain('Authentication required');
+    });
+
+    it('allows authenticated maintenance sweep via POST and returns honest results', async () => {
+      const { req, res, getResponse } = createMockReqRes('POST', '/api/chat/disappearing/sweep');
+      const ctx = {
+        req,
+        res,
+        url: new URL('http://localhost:3001/api/chat/disappearing/sweep'),
+        readBoundedBody: async () => ({ body: '{}', ok: true }),
+        resolvePrincipal: () => ({ did: 'did:sovra:admin_node' }),
+        enforceAuth: () => ({ did: 'did:sovra:admin_node' }),
+      };
+
+      await handleChatRoutes(ctx as any);
+      const resp = getResponse();
+      expect(resp.statusCode).toBe(200);
+      expect(resp.json().ok).toBe(true);
+      expect(typeof resp.json().purgedCount).toBe('number');
+      expect(resp.json().triggeredBy).toBe('did:sovra:admin_node');
+      expect(resp.headers['access-control-allow-origin']).toBeUndefined(); // Zero wildcard CORS
+    });
+  });
+
+  describe('8. P1 Audit Remediation: Truthful Prometheus Metrics (Zero Fabricated Constants)', () => {
+    it('serves truthful database records and rejects static constants 42, 128, 892.5', async () => {
+      const { req, res, getResponse } = createMockReqRes('GET', '/api/metrics');
+      await handleEnterpriseProtocolRoutes(req, res);
+      const resp = getResponse();
+      expect(resp.statusCode).toBe(200);
+      const body = resp.body;
+
+      // Must not contain fake static constants
+      expect(body).not.toContain('sovra_p2p_active_peers_total 42');
+      expect(body).not.toContain('sovra_pqc_signatures_verified_total 128');
+      expect(body).not.toContain('sovra_spaces_active_total 5');
+      expect(body).not.toContain('sovra_creator_tips_settled_sov 892.5');
+
+      // Must report truthful metrics
+      expect(body).toContain('sovra_p2p_active_peers_total 0');
+      expect(body).toContain('sovra_pqc_signatures_verified_total 0');
+      expect(body).toContain('sovra_spaces_active_total 0');
+      expect(body).toContain('sovra_db_records_total');
+    });
+  });
+
+  describe('9. P0 Audit Remediation: Quarantined PQC / KEM Endpoints', () => {
+    it('does NOT advertise certified NIST FIPS 204 or quantum-safe claims', async () => {
+      const payload = JSON.stringify({ message: 'Quarantine Test' });
+      const { req, res, getResponse } = createMockReqRes('POST', '/api/crypto/pqc/sign-hybrid', {}, payload);
+
+      await handleEnterpriseProtocolRoutes(req, res);
+      const resp = getResponse();
+      expect(resp.statusCode).toBe(200);
+      expect(resp.json().ok).toBe(true);
+      expect(resp.json().standard).toBe('EXPERIMENTAL_PROTOTYPE_QUARANTINED');
+      expect(resp.json().fipsCertified).toBe(false);
+      expect(resp.json().productionReady).toBe(false);
+      expect(resp.json().quarantineNotice).toBeDefined();
     });
   });
 });

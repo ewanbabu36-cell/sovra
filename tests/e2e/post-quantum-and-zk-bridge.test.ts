@@ -96,7 +96,8 @@ describe('🚀 SOVRA POST-QUANTUM & ZERO-KNOWLEDGE ENTERPRISE EXPANSION PROTOCOL
       expect(res.status).toBe(200);
       expect(res.data.ok).toBe(true);
       expect(res.data.algorithm).toBe('ed25519+ml-dsa-65');
-      expect(res.data.standard).toBe('NIST FIPS 204');
+      expect(res.data.standard).toBe('EXPERIMENTAL_PROTOTYPE_QUARANTINED');
+      expect(res.data.fipsCertified).toBe(false);
       expect(res.data.signatureHex).toMatch(/^sovra-pqc-sig:v1:[0-9a-f]{128}\.[0-9a-f]{320}$/);
 
       generatedSignature = res.data.signatureHex;
@@ -118,7 +119,8 @@ describe('🚀 SOVRA POST-QUANTUM & ZERO-KNOWLEDGE ENTERPRISE EXPANSION PROTOCOL
       expect(res.status).toBe(200);
       expect(res.data.ok).toBe(true);
       expect(res.data.valid).toBe(true);
-      expect(res.data.quantumSafe).toBe(true);
+      expect(res.data.quantumSafe).toBe(false);
+      expect(res.data.fipsCertified).toBe(false);
       expect(res.data.algorithm).toBe('ed25519+ml-dsa-65');
     });
 

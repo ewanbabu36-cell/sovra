@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { sha3_256 } from '@noble/hashes/sha3';
 import {
   generateMlKem768KeyPair,
   mlKem768Encapsulate,
@@ -70,6 +71,22 @@ describe('🚀 Sovra Post-Quantum Cryptography Enclave (NIST FIPS 203 & 204)', (
 
       const tamperedValid = mlDsa65Verify('Tampered message payload', sig, kp.publicKey);
       expect(tamperedValid).toBe(false);
+    });
+
+    it('strictly rejects forged signature constructed from public-only information', () => {
+      const kp = generateMlDsa65KeyPair();
+      const message = 'Sovra Public Forgery Adversarial Test';
+      const msgBytes = new TextEncoder().encode(message);
+
+      // Adversary knows only message and public key, attempts to forge 160-byte signature
+      const forgedSig = new Uint8Array(160);
+      forgedSig.set(sha3_256(msgBytes), 0);
+      forgedSig.set(sha3_256(kp.publicKey), 32);
+      // Byte 64..159 filled with arbitrary vector
+      forgedSig.set(new Uint8Array(96).fill(0xee), 64);
+
+      const isValid = mlDsa65Verify(message, forgedSig, kp.publicKey);
+      expect(isValid).toBe(false);
     });
   });
 

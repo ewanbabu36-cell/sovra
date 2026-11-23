@@ -1,6 +1,6 @@
 module github.com/sovra/chain
 
-go 1.27.0
+go 1.26.0
 
 require (
 	cosmossdk.io/math v1.4.0

@@ -7,7 +7,7 @@
     {
       "height": 39999,
       "app_hash": "69a9a8b61e106ea23000b101e1fa0899d6544efc949f26079587c97a0ae63262",
-      "proposer_address": "sovra1f184b34c0b604e1d9394ad23532b66337def406c",
+      "proposer_address": "sovra18aabbca205d17e28543cce9524af17673b5fc0e6",
       "commit_power": 100,
       "commit_signatures_count": 4,
       "validator_set_used": "GENESIS_VALIDATOR_SET"
@@ -15,7 +15,7 @@
     {
       "height": 40000,
       "app_hash": "fa745f10a6d0c5b3dd7b0019319f8d180b0821b1c8d3437a4d4d7c1186dc6dd5",
-      "proposer_address": "sovra178bf0783c910e769a1f1300da65a7767cbbc0f36",
+      "proposer_address": "sovra16c6c105bf14039685fd6c995dc44df687f0d3fae",
       "commit_power": 100,
       "commit_signatures_count": 4,
       "validator_set_used": "REPLACEMENT_VALIDATOR_SET"
@@ -23,7 +23,7 @@
     {
       "height": 40001,
       "app_hash": "ac909a9193bb8ae178186a9ba973ae80fd15ec428fb3eb5400f7980d5fdee52e",
-      "proposer_address": "sovra1c4ab656e2019aece9b8628f05b7664c583176321",
+      "proposer_address": "sovra1cb6dfff79e90de5aa723281d92d94d17c916e7ab",
       "commit_power": 75,
       "commit_signatures_count": 3,
       "validator_set_used": "REPLACEMENT_VALIDATOR_SET"
@@ -31,10 +31,10 @@
   ],
   "revocation_enforcement": {
     "genesis_validators_revoked": [
-      "sovra1422ec312dd5e83d30480ff8c86638dd1fa3cc5fa",
-      "sovra1979f90b1eff8b6a446b675046c91981abde80f45",
-      "sovra1f184b34c0b604e1d9394ad23532b66337def406c",
-      "sovra1650a78cd66067841d8a717f697ecec848ef40ed9"
+      "sovra178ec6a2012b71339ad29542886db7bb07f7f61dc",
+      "sovra124cd01fbb1eb79e08d51321c711ed58633889644",
+      "sovra18aabbca205d17e28543cce9524af17673b5fc0e6",
+      "sovra10ddcdc81696fe6bba043309c2de7e115cca32537"
     ],
     "rejection_error_code": "ERR_REVOKED_VALIDATOR",
     "atomic_activation": true

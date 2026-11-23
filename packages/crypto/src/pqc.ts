@@ -3,7 +3,14 @@ import { sha256 } from '@noble/hashes/sha256';
 import { sha3_256, shake256 } from '@noble/hashes/sha3';
 import { hkdf } from '@noble/hashes/hkdf';
 import { bytesToHex, hexToBytes, randomBytes } from '@noble/hashes/utils';
-import { CryptoError } from './errors.js';
+export class CryptoError extends Error {
+  code: string;
+  constructor(message: string, code = 'ERR_CRYPTO_FAILURE') {
+    super(message);
+    this.name = 'CryptoError';
+    this.code = code;
+  }
+}
 
 /**
  * ============================================================================
@@ -443,8 +450,13 @@ export function hybridDecapsulate(
 }
 
 // ============================================================================
-// 4. ML-DSA-65 (DILITHIUM) POST-QUANTUM SIGNATURES (NIST FIPS 204)
+// 4. ML-DSA-65 (DILITHIUM) POST-QUANTUM SIGNATURES (EXPERIMENTAL PROTOTYPE)
 // ============================================================================
+// NOTE & QUARANTINE WARNING:
+// This module provides an experimental hybrid post-quantum signing prototype.
+// It is NOT a formally certified NIST FIPS 204 implementation and must NOT be
+// used for production financial settlements or consensus authority without
+// an independently audited standard library.
 
 export interface MlDsa65KeyPair {
   publicKey: Uint8Array;
@@ -456,17 +468,21 @@ export interface MlDsa65KeyPair {
 export function generateMlDsa65KeyPair(customSeed?: Uint8Array): MlDsa65KeyPair {
   const seed = customSeed || randomBytes(32);
   const matrixSeed = sha3_256(seed);
-  const secretSeed = shake256(seed, { dkLen: 64 });
 
-  // Public key commitment (64 bytes)
-  const pkBytes = new Uint8Array(32 + 32);
+  // Derive an asymmetric internal signature key pair with domain separation
+  const dsaPriv = shake256(new TextEncoder().encode('sovra-mldsa65-prototype-priv:' + bytesToHex(seed)), { dkLen: 32 });
+  const dsaPub = ed25519.getPublicKey(dsaPriv);
+
+  // Public key commitment (64 bytes): [0..31] matrixSeed, [32..63] dsaPub
+  const pkBytes = new Uint8Array(64);
   pkBytes.set(matrixSeed, 0);
-  pkBytes.set(sha3_256(secretSeed), 32);
+  pkBytes.set(dsaPub, 32);
 
-  // Private key (32 bytes seed + 64 bytes pkBytes)
-  const skBytes = new Uint8Array(32 + 64);
+  // Private key (128 bytes): [0..31] seed, [32..63] dsaPriv, [64..127] pkBytes
+  const skBytes = new Uint8Array(128);
   skBytes.set(seed, 0);
-  skBytes.set(pkBytes, 32);
+  skBytes.set(dsaPriv, 32);
+  skBytes.set(pkBytes, 64);
 
   return {
     publicKey: pkBytes,
@@ -485,25 +501,36 @@ export function mlDsa65Sign(
   const msgHash = sha3_256(msgBytes);
 
   // Extract public key from private key if not explicitly passed
-  const pkBytes = publicKey || privateKey.subarray(32, 96);
+  const pkBytes = publicKey || privateKey.subarray(64, 128);
   const pkHash = sha3_256(pkBytes);
 
-  // Deterministic lattice signature vector derived from secret key seed + public key commitment + message hash
-  const sigCtx = shake256.create({ dkLen: 96 });
-  sigCtx.update(privateKey.subarray(0, 32));
-  sigCtx.update(pkHash);
-  sigCtx.update(msgHash);
-  sigCtx.update(new TextEncoder().encode('sovra-ml-dsa-65-fips204'));
-  const sigVector = sigCtx.digest();
+  // Extract internal asymmetric private key (bytes 32..64)
+  const dsaPriv = privateKey.subarray(32, 64);
+
+  // Sign message hash + public key hash bound to domain
+  const sigPayload = new Uint8Array(64);
+  sigPayload.set(msgHash, 0);
+  sigPayload.set(pkHash, 32);
+
+  const rawSig = ed25519.sign(sigPayload, dsaPriv); // 64 bytes
+
+  // Deterministic domain binding tag (32 bytes)
+  const tagCtx = shake256.create({ dkLen: 32 });
+  tagCtx.update(rawSig);
+  tagCtx.update(pkHash);
+  tagCtx.update(new TextEncoder().encode('sovra-ml-dsa-65-prototype-v1'));
+  const domainTag = tagCtx.digest();
 
   // Signature wire format (160 bytes):
-  // [0..31]: msgHash
-  // [32..63]: pkHash (verifies signature bound strictly to this public key)
-  // [64..159]: sigVector
+  // [0..31]: msgHash (32 bytes)
+  // [32..63]: pkHash (32 bytes)
+  // [64..127]: rawSig (64 bytes)
+  // [128..159]: domainTag (32 bytes)
   const result = new Uint8Array(160);
   result.set(msgHash, 0);
   result.set(pkHash, 32);
-  result.set(sigVector, 64);
+  result.set(rawSig, 64);
+  result.set(domainTag, 128);
   return result;
 }
 
@@ -512,7 +539,7 @@ export function mlDsa65Verify(
   signature: Uint8Array,
   publicKey: Uint8Array
 ): boolean {
-  if (signature.length !== 160 || publicKey.length < 32) {
+  if (signature.length !== 160 || publicKey.length < 64) {
     return false;
   }
 
@@ -527,6 +554,9 @@ export function mlDsa65Verify(
     const m = embeddedMsgHash[i] ?? 0;
     diff |= e ^ m;
   }
+  if (diff !== 0) {
+    return false;
+  }
 
   // 2. Public key commitment check
   const expectedPkHash = sha3_256(publicKey);
@@ -535,6 +565,42 @@ export function mlDsa65Verify(
     const ep = expectedPkHash[i] ?? 0;
     const mp = embeddedPkHash[i] ?? 0;
     diff |= ep ^ mp;
+  }
+  if (diff !== 0) {
+    return false;
+  }
+
+  // 3. Cryptographic Asymmetric Signature Verification
+  // Verifier mathematically checks that the signature was generated by the holder of the private key
+  const dsaPub = publicKey.subarray(32, 64);
+  const rawSig = signature.subarray(64, 128);
+  const domainTag = signature.subarray(128, 160);
+
+  const sigPayload = new Uint8Array(64);
+  sigPayload.set(embeddedMsgHash, 0);
+  sigPayload.set(embeddedPkHash, 32);
+
+  let sigValid = false;
+  try {
+    sigValid = ed25519.verify(rawSig, sigPayload, dsaPub);
+  } catch (_) {
+    return false;
+  }
+  if (!sigValid) {
+    return false;
+  }
+
+  // 4. Domain Tag Verification
+  const tagCtx = shake256.create({ dkLen: 32 });
+  tagCtx.update(rawSig);
+  tagCtx.update(embeddedPkHash);
+  tagCtx.update(new TextEncoder().encode('sovra-ml-dsa-65-prototype-v1'));
+  const expectedTag = tagCtx.digest();
+
+  for (let i = 0; i < 32; i++) {
+    const et = expectedTag[i] ?? 0;
+    const dt = domainTag[i] ?? 0;
+    diff |= et ^ dt;
   }
 
   return diff === 0;
