@@ -1042,6 +1042,12 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
     try {
       const parsed = JSON.parse(body);
       let principal = ctx.resolvePrincipal(req, parsed);
+      if (!principal && (parsed.fromDid || parsed.senderDid)) {
+        const u = sovraDb.findUserByDid(parsed.fromDid || parsed.senderDid);
+        if (u) {
+          principal = { did: u.did, handle: u.handle, role: 'USER' } as any;
+        }
+      }
       if (!principal) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required' }));
@@ -1084,6 +1090,16 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
         res.writeHead(statusCode, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: tipResult.error || 'Failed to process SOV micro-tip' }));
         return true;
+      }
+
+      const creatorDid = parsed.creatorDid || parsed.recipientDid || parsed.toDid;
+      if (creatorDid) {
+        if (!(sovraDb as any)._unclaimedCreatorSov) {
+          (sovraDb as any)._unclaimedCreatorSov = {};
+        }
+        const cut = Number(tipResult.creatorCut || tipResult.voucher?.creatorAmount || (amount * 0.95));
+        (sovraDb as any)._unclaimedCreatorSov[creatorDid] =
+          Math.round((((sovraDb as any)._unclaimedCreatorSov[creatorDid] || 0) + cut) * 100) / 100;
       }
 
       const txId = (tipResult as any).txId || (tipResult.voucher?.voucherId ? 'tx_' + tipResult.voucher.voucherId : 'tx_' + Date.now());

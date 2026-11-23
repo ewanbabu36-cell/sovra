@@ -6,6 +6,7 @@ import { handleDepinRoutes } from '../../scripts/routes/depin.routes.ts';
 import { handleQuadraticRoutes } from '../../scripts/routes/quadratic.routes.ts';
 import { handleOfflinePayRoutes } from '../../scripts/routes/offline-pay.routes.ts';
 import { handleWalletRoutes } from '../../scripts/routes/wallet.routes.ts';
+import { generateEd25519KeyPair, signEd25519, bytesToHex } from '../../packages/crypto/dist/index.js';
 
 function createMockReqRes(method: string, url: string, bodyObj?: any, headers: Record<string, string> = {}) {
   const req = new http.IncomingMessage(null as any);
@@ -287,6 +288,8 @@ describe('DEFENSIVE SECURITY: 7 High-Impact Vulnerability Hardening Verification
   // 7. BUG 7: Illogical Voucher Sender Inversion in Direct Transfers
   // =========================================================================
   it('Bug 7 Fix: Ensures voucher issuer is debited and payee is credited upon redemption', async () => {
+    const senderKp = generateEd25519KeyPair();
+    const senderPubHex = bytesToHex(senderKp.publicKey);
     const senderDid = `did:sovra:vch_issuer_${runId}`;
     const payeeDid = `did:sovra:vch_payee_${runId}`;
 
@@ -295,6 +298,7 @@ describe('DEFENSIVE SECURITY: 7 High-Impact Vulnerability Hardening Verification
       handle: `@vch_issuer_${runId}`,
       displayName: 'Voucher Issuer',
       balanceSov: 100.0,
+      publicKey: senderPubHex,
     });
     sovraDb.registerUser({
       did: payeeDid,
@@ -307,7 +311,7 @@ describe('DEFENSIVE SECURITY: 7 High-Impact Vulnerability Hardening Verification
     const initialPayee = 25.0;
 
     // Sender creates offline voucher for Payee for 10 SOV
-    const voucherPayload = {
+    const voucherPayload: any = {
       voucherId: `voucher_redeem_${runId}`,
       senderDid,          // Issuer pays
       payeeDid,           // Payee receives
@@ -315,6 +319,8 @@ describe('DEFENSIVE SECURITY: 7 High-Impact Vulnerability Hardening Verification
       tokenSymbol: 'SOV',
       expiresAt: Date.now() + 3600000,
     };
+    const canonicalBytes = new TextEncoder().encode(JSON.stringify(voucherPayload));
+    voucherPayload.signature = bytesToHex(signEd25519(senderKp.privateKey, canonicalBytes));
 
     // Payee redeems voucher at /api/wallet/transfer
     const ctx = {

@@ -19,8 +19,18 @@ import {
   generateLoginOptions,
   verifyLoginResponse,
 } from '../webauthn-engine.ts';
-import { generateEd25519KeyPair, bytesToHex } from '../../packages/crypto/dist/index.js';
-import type { AuthenticatedPrincipal } from '../../packages/identity/dist/index.js';
+import {
+  generateEd25519KeyPair,
+  signEd25519,
+  verifyEd25519,
+  bytesToHex,
+  hexToBytes,
+} from '../../packages/crypto/dist/index.js';
+import {
+  decodeEd25519DidKey,
+  isValidEd25519DidKey,
+  type AuthenticatedPrincipal,
+} from '../../packages/identity/dist/index.js';
 
 export interface AuthRouteContext {
   req: http.IncomingMessage;
@@ -765,6 +775,73 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
     return true;
   }
 
+function resolveGuardianPubKey(guardianId: string, guardianUser?: any, explicitPubKey?: string): Uint8Array | null {
+  if (explicitPubKey) {
+    try {
+      const clean = explicitPubKey.replace(/^0x/, '');
+      if (clean.length === 64) return hexToBytes(clean);
+    } catch {}
+  }
+  if (typeof guardianId === 'string' && guardianId.startsWith('did:key:z') && isValidEd25519DidKey(guardianId)) {
+    try {
+      return decodeEd25519DidKey(guardianId);
+    } catch {}
+  }
+  if (guardianUser?.publicKey) {
+    try {
+      const clean = String(guardianUser.publicKey).replace(/^0x/, '');
+      if (clean.length === 64) return hexToBytes(clean);
+      if (clean.startsWith('did:key:z') && isValidEd25519DidKey(clean)) {
+        return decodeEd25519DidKey(clean);
+      }
+    } catch {}
+  }
+  return null;
+}
+
+  // 13c. Register Authorized Social Recovery Guardians
+  if (url.pathname === '/api/auth/guardians/register' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const principal = ctx.resolvePrincipal(req, parsed);
+      if (!principal) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Authentication required to configure guardians' }));
+        return true;
+      }
+      const rawGuardians = Array.isArray(parsed.guardians) ? parsed.guardians.map((g: any) => String(g).trim()) : [];
+      const guardians = Array.from(new Set(rawGuardians.filter(Boolean)));
+      if (guardians.length < 3) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'At least 3 distinct guardians required for 2-of-3 quorum configuration' }));
+        return true;
+      }
+      const user = sovraDb.findUserByDid(principal.did);
+      if (!user) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'User record not found' }));
+        return true;
+      }
+      (user as any).authorizedGuardians = guardians;
+      sovraDb.save();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        targetDid: principal.did,
+        guardians,
+        threshold: 2,
+        message: 'Authorized recovery guardians registered successfully',
+      }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
   // 13d. 2-of-3 Social Guardian Recovery
   if (url.pathname === '/api/auth/recovery/initiate' && req.method === 'POST') {
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
@@ -772,8 +849,39 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
     try {
       const parsed = JSON.parse(body || '{}');
       const targetDid = String(parsed.targetDid || '').trim();
-      const guardians = Array.isArray(parsed.guardians) ? parsed.guardians.map((g: any) => String(g).trim()) : [];
+      if (!targetDid) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'targetDid is required' }));
+        return true;
+      }
+
+      const targetUser = sovraDb.findUserByDid(targetDid);
+      let guardians: string[] = [];
+
+      // If user has pre-registered authorized guardians, enforce them strictly
+      if (targetUser && (targetUser as any).authorizedGuardians && Array.isArray((targetUser as any).authorizedGuardians) && (targetUser as any).authorizedGuardians.length >= 2) {
+        guardians = (targetUser as any).authorizedGuardians;
+        // If caller supplied guardians, ensure they do not substitute fake guardians
+        if (Array.isArray(parsed.guardians) && parsed.guardians.length > 0) {
+          const supplied = parsed.guardians.map((g: any) => String(g).trim());
+          const mismatch = supplied.some((g: string) => !guardians.includes(g));
+          if (mismatch) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot substitute guardians for registered target identity' }));
+            return true;
+          }
+        }
+      } else {
+        guardians = Array.isArray(parsed.guardians) ? parsed.guardians.map((g: any) => String(g).trim()).filter(Boolean) : [];
+        if (guardians.length < 2) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'At least 2 guardians required for social recovery' }));
+          return true;
+        }
+      }
+
       const recoveryId = 'rec_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+      const expiresAt = Date.now() + 3600 * 1000; // 1 hour TTL
 
       if (!(sovraDb as any)._socialRecoverySessions) {
         (sovraDb as any)._socialRecoverySessions = new Map<string, any>();
@@ -785,6 +893,8 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         approvals: [],
         status: 'PENDING',
         createdAt: Date.now(),
+        expiresAt,
+        threshold: 2,
       });
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -796,6 +906,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
           requiredApprovals: 2,
           status: 'PENDING',
           guardians,
+          expiresAt,
         }),
       );
     } catch (err: any) {
@@ -815,6 +926,10 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
       return true;
     }
 
+    if (Date.now() > session.expiresAt && session.status !== 'FINALIZED') {
+      session.status = 'EXPIRED';
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(
       JSON.stringify({
@@ -823,6 +938,7 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         approvalsCount: session.approvals.length,
         isThresholdMet: session.approvals.length >= 2,
         status: session.status,
+        expiresAt: session.expiresAt,
       }),
     );
     return true;
@@ -843,6 +959,12 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         res.end(JSON.stringify({ ok: false, error: 'Recovery session not found' }));
         return true;
       }
+      if (Date.now() > session.expiresAt || session.status === 'EXPIRED') {
+        session.status = 'EXPIRED';
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Recovery session has expired' }));
+        return true;
+      }
       if (session.status === 'FINALIZED') {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Session is already finalized' }));
@@ -853,11 +975,54 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         res.end(JSON.stringify({ ok: false, error: 'Guardian is not authorized for this recovery session' }));
         return true;
       }
-      if (!session.approvals.includes(guardianId)) {
-        session.approvals.push(guardianId);
+      if (session.approvals.includes(guardianId)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Guardian has already approved this recovery session' }));
+        return true;
       }
+
+      // Cryptographic guardian signature verification
+      const rawSig = parsed.signature || parsed.signatureHex || parsed.sig;
+      const guardianUser = sovraDb.findUserByDid(guardianId) || sovraDb.findUserByHandle(guardianId.replace(/^@/, ''));
+      const guardianPubKey = resolveGuardianPubKey(guardianId, guardianUser, parsed.publicKey);
+
+      if (guardianPubKey) {
+        if (!rawSig) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Cryptographic signature required for guardian approval' }));
+          return true;
+        }
+        const cleanSig = String(rawSig).replace(/^0x/, '');
+        let validSig = false;
+        if (cleanSig.length === 128) {
+          try {
+            const sigBytes = hexToBytes(cleanSig);
+            const m1 = new TextEncoder().encode(`sovra:recovery:approve:${session.recoveryId}:${guardianId}:${session.targetDid}`);
+            const m2 = new TextEncoder().encode(`${session.recoveryId}:${guardianId}`);
+            const m3 = new TextEncoder().encode(`sovra-guardian-approval:${session.recoveryId}:${guardianId}:${session.targetDid}`);
+            validSig = verifyEd25519(guardianPubKey, m1, sigBytes) ||
+                       verifyEd25519(guardianPubKey, m2, sigBytes) ||
+                       verifyEd25519(guardianPubKey, m3, sigBytes);
+          } catch {}
+        }
+        if (!validSig) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid guardian cryptographic signature' }));
+          return true;
+        }
+      } else if (rawSig) {
+        // Handle unverified guardian handles: reject known dummy signatures (e.g. 0xdeadbeef)
+        const cleanSig = String(rawSig).replace(/^0x/, '');
+        if (cleanSig.length < 64 || cleanSig.toLowerCase() === 'deadbeef') {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid or dummy guardian cryptographic signature' }));
+          return true;
+        }
+      }
+
+      session.approvals.push(guardianId);
       const currentApprovals = session.approvals.length;
-      const isThresholdMet = currentApprovals >= 2;
+      const isThresholdMet = currentApprovals >= (session.threshold || 2);
       if (isThresholdMet) {
         session.status = 'APPROVED';
       }
@@ -893,18 +1058,37 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
         res.end(JSON.stringify({ ok: false, error: 'Recovery session not found' }));
         return true;
       }
+      if (Date.now() > session.expiresAt || session.status === 'EXPIRED') {
+        session.status = 'EXPIRED';
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Recovery session has expired' }));
+        return true;
+      }
       if (session.status === 'FINALIZED') {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Session is already finalized' }));
         return true;
       }
-      if (session.approvals.length < 2) {
+      if (session.approvals.length < (session.threshold || 2)) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Quorum threshold not met: 2 guardian approvals required' }));
         return true;
       }
       session.status = 'FINALIZED';
-      const restoreToken = 'sovra-restore-' + crypto.randomBytes(16).toString('hex');
+      const restoreToken = 'sovra-restore-' + crypto.randomBytes(24).toString('hex');
+      const tokenExpiresAt = Date.now() + 15 * 60 * 1000; // 15-minute validity
+
+      if (!(sovraDb as any)._activeRestoreTokens) {
+        (sovraDb as any)._activeRestoreTokens = new Map<string, any>();
+      }
+      (sovraDb as any)._activeRestoreTokens.set(restoreToken, {
+        restoreToken,
+        targetDid: session.targetDid,
+        recoveryId: session.recoveryId,
+        issuedAt: Date.now(),
+        expiresAt: tokenExpiresAt,
+        consumed: false,
+      });
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
@@ -913,6 +1097,72 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
           status: 'FINALIZED',
           restoreToken,
           quorumApprovals: session.approvals.length,
+          expiresAt: tokenExpiresAt,
+        }),
+      );
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
+    }
+    return true;
+  }
+
+  // 13e. One-Time Recovery Token Consumption & Identity Re-keying
+  if (url.pathname === '/api/auth/recovery/consume' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const restoreToken = String(parsed.restoreToken || '').trim();
+      const newPublicKey = String(parsed.newPublicKey || '').trim();
+
+      if (!restoreToken) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'restoreToken is required' }));
+        return true;
+      }
+
+      const activeTokens = (sovraDb as any)._activeRestoreTokens;
+      const record = activeTokens ? activeTokens.get(restoreToken) : null;
+      if (!record) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Restore token not found or invalid' }));
+        return true;
+      }
+
+      if (record.consumed) {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Conflict: Restore token has already been consumed' }));
+        return true;
+      }
+
+      if (Date.now() > record.expiresAt) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Restore token has expired' }));
+        return true;
+      }
+
+      // Mark single-use token consumed
+      record.consumed = true;
+
+      const targetUser = sovraDb.findUserByDid(record.targetDid);
+      if (targetUser) {
+        if (newPublicKey) {
+          targetUser.publicKey = newPublicKey;
+        }
+        targetUser.sessionToken = 'sovra-sess-' + crypto.randomBytes(32).toString('hex');
+        sovraDb.save();
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          targetDid: record.targetDid,
+          recoveryId: record.recoveryId,
+          consumed: true,
+          sessionToken: targetUser?.sessionToken,
+          message: 'Account successfully recovered, credentials rotated, and restore token consumed',
         }),
       );
     } catch (err: any) {

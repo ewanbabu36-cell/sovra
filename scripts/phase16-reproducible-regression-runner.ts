@@ -48,6 +48,10 @@ const TEST_SUITES = [
   'tests/security/phase15-6-adversarial-audit.test.ts',
   'packages/crypto/test/pqc.test.ts',
   'tests/security/phase16-sanitization-quarantine.test.ts',
+  'tests/security/seven_vulnerabilities_hardening.test.ts',
+  'tests/security/target_a_wallet_voucher_hardening.test.ts',
+  'tests/security/target_b_guardian_recovery_hardening.test.ts',
+  'tests/security/target_c_media_proxy_ssrf_hardening.test.ts',
 ];
 
 function computeSha256(filePath: string): string {

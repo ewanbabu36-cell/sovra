@@ -1,36 +1,36 @@
 {
   "chain_id": "sovra-testnet-0",
-  "generated_at": "2026-11-23T04:08:03.221Z",
+  "generated_at": "2026-11-23T05:19:56.996Z",
   "genesis_validator_set": {
     "validators": [
       {
         "name": "genesis-node-0",
-        "address": "sovra178ec6a2012b71339ad29542886db7bb07f7f61dc",
-        "pub_key": "3942b4f211e82d0d661659c2e0dc2a35288304b7f5ee431ef71006d38ff50fa0",
+        "address": "sovra1f1553e647f1a096ab1a34e5d6fc2761b83b6b01a",
+        "pub_key": "e74d9fa29ee30db467513603acf55d3a4cc83ba75cf6fa379a507fc843bb87e6",
         "voting_power": 25,
         "status": "REVOKED_AT_TRANSITION",
         "revocation_height": 40000
       },
       {
         "name": "genesis-node-1",
-        "address": "sovra124cd01fbb1eb79e08d51321c711ed58633889644",
-        "pub_key": "740a890d359ea2dc23af4e89998bea55628392069e5181ca5c804f00f7599ce6",
+        "address": "sovra1d5ba033887c501f5655855a269036bd6ff0f5de0",
+        "pub_key": "91e69f11a2ee3801bcb30b44db06a6b6b5db7e1d62b1ae649605cde3486c748b",
         "voting_power": 25,
         "status": "REVOKED_AT_TRANSITION",
         "revocation_height": 40000
       },
       {
         "name": "genesis-node-2",
-        "address": "sovra18aabbca205d17e28543cce9524af17673b5fc0e6",
-        "pub_key": "0c62b6018a8e4b309e20f81865576b3c905770bd2a288fd977c131825ed2de4e",
+        "address": "sovra1ad30930b7ec3fe718a87d3b76f15e783cd99431c",
+        "pub_key": "3ba5b12ba93172db36940e134b114101530d01dd7033ffe04699bfc08122cf4b",
         "voting_power": 25,
         "status": "REVOKED_AT_TRANSITION",
         "revocation_height": 40000
       },
       {
         "name": "genesis-node-3",
-        "address": "sovra10ddcdc81696fe6bba043309c2de7e115cca32537",
-        "pub_key": "a8d3964e56fe936dc80f86bb6632b54276cccde8e38c8dda861cf4133d7f94bf",
+        "address": "sovra1d4764f42967b8ea0070ede28d7690854804f50b2",
+        "pub_key": "352ae086017760aa3362ca80f0dd4c6675ca188c3f6c85ae3ba58df766ecf403",
         "voting_power": 25,
         "status": "REVOKED_AT_TRANSITION",
         "revocation_height": 40000
@@ -43,32 +43,32 @@
     "validators": [
       {
         "name": "replacement-node-0",
-        "address": "sovra1cb6dfff79e90de5aa723281d92d94d17c916e7ab",
-        "pub_key": "65f71440de0ffe65069a8d50b88de235105d51481b5cf46991f960c8dbeb660c",
+        "address": "sovra10847cfb5d288c77fb4d308cc2bd8c2ef41bba2ac",
+        "pub_key": "2984624c08258a4050fc5b838591970afb6e75979c6690015d8bc110c1bbb2ae",
         "voting_power": 25,
         "status": "ACTIVE_AT_AND_ABOVE_TRANSITION",
         "activation_height": 40000
       },
       {
         "name": "replacement-node-1",
-        "address": "sovra17fa632445f250570b5a89d4187350cb7ccc2d6fe",
-        "pub_key": "e2e209baeb7c366b37afd31ab495dbe0e3ffb665223a920ec15d11e1f442d784",
+        "address": "sovra1f1280b7fa8607f0c425b2c90d168ed63503b94fe",
+        "pub_key": "b9d829e123b042bc36a1e806f79330f86d1413eadaf97e4070ae29570d7e48e7",
         "voting_power": 25,
         "status": "ACTIVE_AT_AND_ABOVE_TRANSITION",
         "activation_height": 40000
       },
       {
         "name": "replacement-node-2",
-        "address": "sovra1e79e0f05f26d15da2076103043a3cb1b83f6cae9",
-        "pub_key": "bfb862af715ae3da3509afc7c461561a118faf8a24f88bd509682d174a3fb8f3",
+        "address": "sovra1ee7d24e0d9173527d6b3264beb4e8277d406b2e9",
+        "pub_key": "7e5c9f8ec29c2c76bc94247dea76db78e328d316a41c7d1b481aef963780dcac",
         "voting_power": 25,
         "status": "ACTIVE_AT_AND_ABOVE_TRANSITION",
         "activation_height": 40000
       },
       {
         "name": "replacement-node-3",
-        "address": "sovra16c6c105bf14039685fd6c995dc44df687f0d3fae",
-        "pub_key": "1c34083a10e56aa4437f3bb7cf31442ea8394815d0af7fb66037793e3c615c81",
+        "address": "sovra16ab60535b2d5a5f7a98c995aa673f82526357d81",
+        "pub_key": "7b8fa396dc590a54756b87800fbd45a2d7e572bc334eb79efa1a268de9841fb2",
         "voting_power": 25,
         "status": "ACTIVE_AT_AND_ABOVE_TRANSITION",
         "activation_height": 40000

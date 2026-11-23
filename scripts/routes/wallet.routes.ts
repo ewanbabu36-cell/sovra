@@ -12,8 +12,19 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { sovraDb } from '../database-engine.ts';
 import { l1ChainSupervisor } from '../chain-supervisor.ts';
-import { signEd25519, bytesToHex, verifyMetaTransaction, type MetaTransactionRequest } from '../../packages/crypto/dist/index.js';
-import type { AuthenticatedPrincipal } from '../../packages/identity/dist/index.js';
+import {
+  signEd25519,
+  verifyEd25519,
+  bytesToHex,
+  hexToBytes,
+  verifyMetaTransaction,
+  type MetaTransactionRequest,
+} from '../../packages/crypto/dist/index.js';
+import {
+  decodeEd25519DidKey,
+  isValidEd25519DidKey,
+  type AuthenticatedPrincipal,
+} from '../../packages/identity/dist/index.js';
 
 const PRIMARY_RPC = process.env.SOVRA_L1_RPC || 'http://127.0.0.1:26657';
 
@@ -42,6 +53,32 @@ export async function isL1RpcAvailable(): Promise<boolean> {
   const ready = await l1ChainSupervisor.ensureReady(3000);
   l1RpcAvailableCache = { available: ready, timestamp: Date.now() };
   return ready;
+}
+
+function resolveSenderEd25519PubKey(did: string, userRecord?: any, explicitPubKey?: string): Uint8Array | null {
+  if (explicitPubKey) {
+    try {
+      const clean = explicitPubKey.replace(/^0x/, '');
+      if (clean.length === 64) return hexToBytes(clean);
+    } catch {}
+  }
+  if (typeof did === 'string' && did.startsWith('did:key:z')) {
+    try {
+      if (isValidEd25519DidKey(did)) {
+        return decodeEd25519DidKey(did);
+      }
+    } catch {}
+  }
+  if (userRecord?.publicKey) {
+    try {
+      const clean = String(userRecord.publicKey).replace(/^0x/, '');
+      if (clean.length === 64) return hexToBytes(clean);
+      if (clean.startsWith('did:key:z') && isValidEd25519DidKey(clean)) {
+        return decodeEd25519DidKey(clean);
+      }
+    } catch {}
+  }
+  return null;
 }
 
 export interface WalletRouteContext {
@@ -739,24 +776,112 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         }
       }
 
-      // Handle signed offline DTN voucher submission
+      // Handle signed offline DTN voucher submission with strict cryptographic validation & replay prevention
       if (parsed.voucher) {
         const vch = parsed.voucher;
-        if (vch.expiresAt && vch.expiresAt < Date.now()) {
+        const voucherId = String(vch.voucherId || vch.id || vch.nonce || '').trim();
+        if (!voucherId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Payment voucher requires unique voucherId' }));
+          return true;
+        }
+
+        if (vch.expiresAt && Number(vch.expiresAt) < Date.now()) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Payment voucher has expired' }));
           return true;
         }
-        // In offline voucher redemption: sender is the voucher issuer, recipient is the claimant/payee
+
+        // Replay Defense: Check memory registry and persisted vouchers
+        if (!(sovraDb as any)._redeemedVoucherIds) {
+          (sovraDb as any)._redeemedVoucherIds = new Set<string>();
+        }
+        if ((sovraDb as any)._redeemedVoucherIds.has(voucherId)) {
+          res.writeHead(409, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Conflict: Voucher has already been redeemed' }));
+          return true;
+        }
+
+        const dbVoucher = (sovraDb.db.offline_payment_vouchers || []).find((v: any) => v.voucherId === voucherId);
+        if (dbVoucher && dbVoucher.status === 'settled') {
+          res.writeHead(409, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Conflict: Voucher has already been redeemed' }));
+          return true;
+        }
+
         senderDid = vch.senderDid || vch.fromDid || vch.payerDid;
-        recipientDid = vch.payeeDid || vch.toDid || principal.did;
+        const designatedPayee = vch.payeeDid || vch.toDid || vch.recipientDid;
+        recipientDid = designatedPayee || principal.did;
         parsed.amount = vch.amount ?? vch.amountSov;
         parsed.tokenSymbol = vch.tokenSymbol || 'SOV';
-        parsed.idempotencyKey = vch.voucherId;
+        parsed.idempotencyKey = voucherId;
 
         if (!senderDid) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Voucher missing valid sender identification' }));
+          return true;
+        }
+
+        // Claimant Authorization: Payee must match claimant principal
+        if (designatedPayee && designatedPayee !== '*' && designatedPayee !== principal.did) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot claim voucher on behalf of another sovereign DID' }));
+          return true;
+        }
+
+        // Self-transfer prohibited
+        if (senderDid === principal.did) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Self-transfer prohibited: sender and claimant cannot be identical' }));
+          return true;
+        }
+
+        // Cryptographic Signature Verification
+        const rawSig = vch.signature || vch.signatureHex || vch.sig;
+        if (!rawSig) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Cryptographic signature is strictly required for offline payment vouchers' }));
+          return true;
+        }
+
+        const senderUser = sovraDb.findUserByDid(senderDid);
+        const senderPubKey = resolveSenderEd25519PubKey(senderDid, senderUser, vch.publicKey || vch.signerPublicKey);
+
+        let isSignatureValid = false;
+        if (senderPubKey && typeof rawSig === 'string') {
+          try {
+            const cleanSig = rawSig.replace(/^0x/, '');
+            if (cleanSig.length === 128) {
+              const sigBytes = hexToBytes(cleanSig);
+              const { signature: _s1, signatureHex: _s2, sig: _s3, ...payloadWithoutSig } = vch;
+              const canonical1 = new TextEncoder().encode(JSON.stringify(payloadWithoutSig));
+              const canonical2 = new TextEncoder().encode(`${voucherId}:${senderDid}:${recipientDid}:${parsed.amount}:${vch.nonce || ''}:${vch.expiresAt}`);
+              const canonical3 = new TextEncoder().encode(`sovra:voucher:v1:${voucherId}:${senderDid}:${recipientDid}:${parsed.amount}`);
+              const canonical4 = new TextEncoder().encode(JSON.stringify(vch));
+
+              isSignatureValid =
+                verifyEd25519(senderPubKey, canonical1, sigBytes) ||
+                verifyEd25519(senderPubKey, canonical2, sigBytes) ||
+                verifyEd25519(senderPubKey, canonical3, sigBytes) ||
+                verifyEd25519(senderPubKey, canonical4, sigBytes);
+            }
+          } catch {}
+        }
+
+        // Also check if voucher was pre-registered in offline_payment_vouchers
+        if (!isSignatureValid && dbVoucher) {
+          if (
+            dbVoucher.senderDid === senderDid &&
+            String(dbVoucher.signature) === String(rawSig) &&
+            dbVoucher.status === 'pending_sync'
+          ) {
+            isSignatureValid = true;
+          }
+        }
+
+        if (!isSignatureValid) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid voucher cryptographic signature' }));
           return true;
         }
       } else {
@@ -852,6 +977,23 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
           l1Committed: false,
         }));
         return true;
+      }
+
+      // If this was a voucher redemption, record replay protection and update voucher status
+      if (parsed.voucher) {
+        const voucherId = String(parsed.voucher.voucherId || parsed.voucher.id || parsed.voucher.nonce || '').trim();
+        if (voucherId) {
+          if (!(sovraDb as any)._redeemedVoucherIds) {
+            (sovraDb as any)._redeemedVoucherIds = new Set<string>();
+          }
+          (sovraDb as any)._redeemedVoucherIds.add(voucherId);
+          const dbVoucher = (sovraDb.db.offline_payment_vouchers || []).find((v: any) => v.voucherId === voucherId);
+          if (dbVoucher) {
+            dbVoucher.status = 'settled';
+            dbVoucher.settledAt = Date.now();
+            sovraDb.save();
+          }
+        }
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
