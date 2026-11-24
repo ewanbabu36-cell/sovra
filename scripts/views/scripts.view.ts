@@ -395,7 +395,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         if (typeof showAccountToast === 'function') {
           showAccountToast('🔴 Broadcast live: ' + title + ' (' + resolution + ' 60fps mesh signaling)', 'success');
         }
-        if (typeof switchTab === 'function') switchTab('watch');
+        if (typeof switchTab === 'function') switchTab('live');
+        if (typeof startSovereignLiveBroadcast === 'function') startSovereignLiveBroadcast();
       })
       .catch(function(err) {
         if (btn) btn.innerText = '🔴 Start 4K Mesh Broadcast';
@@ -403,6 +404,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         if (typeof showAccountToast === 'function') {
           showAccountToast('🔴 Broadcast live: ' + title + ' (P2P mesh active)', 'success');
         }
+        if (typeof switchTab === 'function') switchTab('live');
+        if (typeof startSovereignLiveBroadcast === 'function') startSovereignLiveBroadcast();
       });
     };
 
@@ -9863,6 +9866,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                 '<div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">Hosted by ' + s.creatorName + ' (@' + s.creatorHandle + ')</div>' +
               '</div>' +
               '<div style="display: flex; gap: 8px; align-items: center;">' +
+                ((window._activeLiveMediaStream || (typeof myProfile !== 'undefined' && myProfile && (s.creatorDid === myProfile.did || s.creatorHandle === myProfile.handle))) ?
+                  '<button class="action-pill-btn" onclick="window.confirmAndEndLiveBroadcast(&quot;' + s.id + '&quot;)" style="padding: 6px 14px; font-size: 0.78rem; background: linear-gradient(135deg, #ef4444, #b91c1c); color: #fff; font-weight: 800; border: none; cursor: pointer; box-shadow: 0 0 12px rgba(239,68,68,0.5);">🔴 End Live</button>' : '') +
                 '<button class="action-pill-btn action-pill-secondary" onclick="window._likeLiveStream(&quot;' + s.id + '&quot;)" style="padding: 6px 12px; font-size: 0.78rem;">❤️ <span id="liveLikesDisplay">' + (s.likesCount || 0) + '</span></button>' +
                 '<button class="action-pill-btn action-pill-secondary" onclick="window._shareLiveStream(&quot;' + s.id + '&quot;)" style="padding: 6px 12px; font-size: 0.78rem;">↗ Share</button>' +
               '</div>' +
@@ -17690,22 +17695,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       document.body.classList.remove('sovra-mode-home');
       document.body.classList.add('sovra-mode-app');
       if (tab === 'studio') {
-        const p = (window.SovraState && window.SovraState.currentUser) || (typeof myProfile !== 'undefined' ? myProfile : null);
-        const isCreator = Boolean(p && (
-          p.isCreator === true ||
-          p.role === 'CREATOR' ||
-          p.role === 'ADMIN' ||
-          p.role === 'SUPER_ADMIN' ||
-          p.role === 'OPERATOR'
-        ));
-        // Universal access: never block users with a dead-end modal or toast!
-        // If not yet a creator, route them smoothly into Onboarding Gateway
+        // Universal access: all users enter Studio Dashboard seamlessly (YouTube Studio Parity)
         var onboardingView = document.getElementById('studioChannelOnboardingView');
         var dashboardShell = document.getElementById('studioDashboardShell');
-        if (!isCreator) {
-          if (onboardingView) onboardingView.style.display = 'block';
-          if (dashboardShell) dashboardShell.style.display = 'none';
-        }
+        if (dashboardShell) dashboardShell.style.display = 'block';
+        if (onboardingView) onboardingView.style.display = 'none';
       }
       if (tab === 'saved') {
         switchTab('me');
@@ -18394,10 +18388,91 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     }
 
     let _activeLiveMediaStream = null;
+    let _liveBroadcastStartTimestamp = null;
+    let _liveBroadcastTimerInterval = null;
+    let _liveBroadcastStatsInterval = null;
+    window._currentLiveSessionId = null;
+
+    function _formatLiveDuration(sec) {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      if (h > 0) {
+        return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+      }
+      return (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+    }
+
+    function _startLiveBroadcastTimer() {
+      _stopLiveBroadcastTimer();
+      _liveBroadcastStartTimestamp = Date.now();
+      _liveBroadcastTimerInterval = setInterval(function() {
+        if (!_liveBroadcastStartTimestamp) return;
+        const elapsedSec = Math.floor((Date.now() - _liveBroadcastStartTimestamp) / 1000);
+        const formatted = _formatLiveDuration(elapsedSec);
+        const timer1 = document.getElementById('globalLiveBroadcastTimer');
+        const timer2 = document.getElementById('studioLiveDuration');
+        if (timer1) timer1.textContent = '⏱️ ' + formatted;
+        if (timer2) timer2.textContent = formatted;
+      }, 1000);
+
+      _liveBroadcastStatsInterval = setInterval(function() {
+        if (!window._currentLiveSessionId) return;
+        fetch('/api/live/session?id=' + encodeURIComponent(window._currentLiveSessionId))
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data && data.ok && data.session) {
+              const vCount = data.session.viewerCount || 1;
+              const tips = (data.session.tipsEarned || 0) / 1000000;
+              const vEl1 = document.getElementById('globalLiveBroadcastViewers');
+              const tEl1 = document.getElementById('globalLiveBroadcastTips');
+              const vEl2 = document.getElementById('studioLiveViewersCount');
+              const tEl2 = document.getElementById('studioLiveTipsEarned');
+              if (vEl1) vEl1.textContent = '👥 ' + vCount + ' viewer' + (vCount === 1 ? '' : 's');
+              if (tEl1) tEl1.textContent = '⚡ ' + tips.toFixed(2) + ' SOV';
+              if (vEl2) vEl2.textContent = vCount + ' Viewer' + (vCount === 1 ? '' : 's');
+              if (tEl2) tEl2.textContent = tips.toFixed(2) + ' SOV';
+            }
+          })
+          .catch(function() {});
+      }, 5000);
+    }
+
+    function _stopLiveBroadcastTimer() {
+      if (_liveBroadcastTimerInterval) {
+        clearInterval(_liveBroadcastTimerInterval);
+        _liveBroadcastTimerInterval = null;
+      }
+      if (_liveBroadcastStatsInterval) {
+        clearInterval(_liveBroadcastStatsInterval);
+        _liveBroadcastStatsInterval = null;
+      }
+      _liveBroadcastStartTimestamp = null;
+      const timer1 = document.getElementById('globalLiveBroadcastTimer');
+      const timer2 = document.getElementById('studioLiveDuration');
+      if (timer1) timer1.textContent = '⏱️ 00:00:00';
+      if (timer2) timer2.textContent = '00:00:00';
+    }
+
+    function syncGlobalLiveHud() {
+      const hud = document.getElementById('sovraGlobalLiveBroadcastHud');
+      if (!hud) return;
+      if (_activeLiveMediaStream) {
+        hud.style.display = 'block';
+        const titleEl = document.getElementById('globalLiveBroadcastTitle');
+        const studioTitle = document.getElementById('studioLiveTitleInput');
+        if (titleEl && studioTitle && studioTitle.value) {
+          titleEl.textContent = studioTitle.value.trim();
+        }
+      } else {
+        hud.style.display = 'none';
+      }
+    }
+    window.syncGlobalLiveHud = syncGlobalLiveHud;
 
     async function toggleSovereignLiveBroadcast() {
       if (_activeLiveMediaStream) {
-        stopSovereignLiveBroadcast();
+        confirmAndEndLiveBroadcast();
       } else {
         await startSovereignLiveBroadcast();
       }
@@ -18424,6 +18499,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           audio: true,
         });
         _activeLiveMediaStream = stream;
+        _startLiveBroadcastTimer();
+        syncGlobalLiveHud();
 
         if (inner) {
           let videoEl = document.getElementById('sovraLiveBroadcastVideo');
@@ -18446,6 +18523,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           btn.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.6)';
         }
 
+        if (window.SovraCreatorStudioEngine && typeof window.SovraCreatorStudioEngine.loadLiveCommandCenter === 'function') {
+          window.SovraCreatorStudioEngine.loadLiveCommandCenter();
+        }
+
         if (typeof showAccountToast === 'function') {
           showAccountToast('🔴 LIVE: Sovereign WebRTC Broadcast Active! Streaming to mesh peers.');
         }
@@ -18465,6 +18546,9 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         _activeLiveMediaStream = null;
       }
 
+      _stopLiveBroadcastTimer();
+      syncGlobalLiveHud();
+
       const videoEl = document.getElementById('sovraLiveBroadcastVideo');
       if (videoEl) {
         videoEl.srcObject = null;
@@ -18478,11 +18562,176 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         btn.style.boxShadow = 'none';
       }
 
+      if (window.SovraCreatorStudioEngine && typeof window.SovraCreatorStudioEngine.loadLiveCommandCenter === 'function') {
+        window.SovraCreatorStudioEngine.loadLiveCommandCenter();
+      }
+
       if (typeof showAccountToast === 'function') {
         showAccountToast('⏹️ Live stream terminated. Broadcast stats recorded to ledger.');
       }
     }
     window.stopSovereignLiveBroadcast = stopSovereignLiveBroadcast;
+
+    window.confirmAndEndLiveBroadcast = function(sessionId) {
+      const ok = confirm('🔴 End your Live Broadcast now?\\n\\nYour live stream will conclude, and view/tip statistics will be finalized on the ledger.');
+      if (!ok) return;
+
+      const targetId = sessionId || window._currentLiveSessionId;
+      if (targetId) {
+        const authHeaders = (typeof getAuthHeaders === 'function') ? getAuthHeaders() : { 'Content-Type': 'application/json' };
+        const token = (typeof window.getEffectiveSessionToken === 'function') ? window.getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || '');
+        const myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : '';
+        fetch('/api/live/status', {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ id: targetId, status: 'ENDED', sessionToken: token, userDid: myDid })
+        }).catch(function() {});
+        fetch('/api/live/stream/end', {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ sessionId: targetId, sessionToken: token, userDid: myDid })
+        }).catch(function() {});
+        window._currentLiveSessionId = null;
+      }
+
+      stopSovereignLiveBroadcast();
+
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('⏹️ Live broadcast successfully ended.');
+      }
+    };
+
+    window.startStudioLiveBroadcast = async function() {
+      const titleInput = document.getElementById('studioLiveTitleInput');
+      const catSelect = document.getElementById('studioLiveCategorySelect');
+      const title = titleInput ? titleInput.value.trim() : 'Sovereign Live Broadcast';
+      const category = catSelect ? catSelect.value : 'tech';
+
+      try {
+        const authHeaders = (typeof getAuthHeaders === 'function') ? getAuthHeaders() : { 'Content-Type': 'application/json' };
+        const token = (typeof window.getEffectiveSessionToken === 'function') ? window.getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || '');
+        const myDid = (typeof myProfile !== 'undefined' && myProfile && myProfile.did) ? myProfile.did : '';
+        const res = await fetch('/api/live/create', {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({
+            title: title || 'Live Broadcast',
+            category: category,
+            channelId: (window.SovraCreatorStudioEngine && window.SovraCreatorStudioEngine.activeChannelId) || undefined,
+            sessionToken: token,
+            creatorDid: myDid,
+          })
+        });
+        const data = await res.json();
+        if (data && data.ok && data.session) {
+          window._currentLiveSessionId = data.session.id;
+          await fetch('/api/live/status', {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({ id: data.session.id, status: 'LIVE', sessionToken: token, userDid: myDid })
+          });
+        }
+      } catch(_) {}
+
+      await startSovereignLiveBroadcast();
+
+      if (window.SovraCreatorStudioEngine) {
+        window.SovraCreatorStudioEngine.loadLiveCommandCenter();
+      }
+    };
+
+    window.toggleStudioMic = function() {
+      if (!_activeLiveMediaStream) {
+        if (typeof showAccountToast === 'function') showAccountToast('Broadcast is not active.');
+        return;
+      }
+      const audioTracks = _activeLiveMediaStream.getAudioTracks();
+      if (!audioTracks || audioTracks.length === 0) return;
+      const isMuted = !audioTracks[0].enabled;
+      audioTracks[0].enabled = isMuted;
+      const label = document.getElementById('studioMicLabel');
+      const icon = document.getElementById('studioMicIcon');
+      if (label) label.textContent = isMuted ? 'Mute Mic' : 'Unmute Mic';
+      if (icon) icon.textContent = isMuted ? '🎤' : '🔇';
+      if (typeof showAccountToast === 'function') showAccountToast(isMuted ? '🎤 Microphone unmuted' : '🔇 Microphone muted');
+    };
+
+    window.toggleStudioCam = function() {
+      if (!_activeLiveMediaStream) {
+        if (typeof showAccountToast === 'function') showAccountToast('Broadcast is not active.');
+        return;
+      }
+      const videoTracks = _activeLiveMediaStream.getVideoTracks();
+      if (!videoTracks || videoTracks.length === 0) return;
+      const isOff = !videoTracks[0].enabled;
+      videoTracks[0].enabled = isOff;
+      const label = document.getElementById('studioCamLabel');
+      const icon = document.getElementById('studioCamIcon');
+      if (label) label.textContent = isOff ? 'Stop Camera' : 'Start Camera';
+      if (icon) icon.textContent = isOff ? '📹' : '🚫';
+      if (typeof showAccountToast === 'function') showAccountToast(isOff ? '📹 Camera active' : '🚫 Camera stopped');
+    };
+
+    window.toggleStudioScreenShare = async function() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        if (typeof showAccountToast === 'function') showAccountToast('Screen sharing is not supported in this browser.');
+        return;
+      }
+      try {
+        const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const screenTrack = displayStream.getVideoTracks()[0];
+        if (_activeLiveMediaStream) {
+          const oldVideoTrack = _activeLiveMediaStream.getVideoTracks()[0];
+          if (oldVideoTrack) {
+            _activeLiveMediaStream.removeTrack(oldVideoTrack);
+            try { oldVideoTrack.stop(); } catch(_) {}
+          }
+          _activeLiveMediaStream.addTrack(screenTrack);
+        }
+        const preview = document.getElementById('studioLivePreviewVideo');
+        if (preview) preview.srcObject = _activeLiveMediaStream;
+        screenTrack.onended = function() {
+          startSovereignLiveBroadcast();
+        };
+        if (typeof showAccountToast === 'function') showAccountToast('🖥️ Screen sharing active');
+      } catch (e) {
+        if (typeof showAccountToast === 'function') showAccountToast('Screen share cancelled');
+      }
+    };
+
+    window.copyLiveShareLink = function() {
+      const liveId = window._currentLiveSessionId || 'stream';
+      const url = window.location.origin + '/live?id=' + encodeURIComponent(liveId);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function() {
+          if (typeof showAccountToast === 'function') showAccountToast('🔗 Live Stream link copied: ' + url);
+        });
+      } else {
+        prompt('Share Stream Link:', url);
+      }
+    };
+
+    window.submitStudioLiveChat = function(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      const inEl = document.getElementById('studioLiveChatInput');
+      if (!inEl || !inEl.value.trim()) return;
+      const msg = inEl.value.trim();
+      inEl.value = '';
+
+      fetch('/api/live/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: window._currentLiveSessionId || 'session-primary',
+          message: msg,
+          isHost: true,
+        })
+      }).then(function() {
+        if (window.SovraCreatorStudioEngine) {
+          window.SovraCreatorStudioEngine.pollStudioLiveChat();
+        }
+      }).catch(function() {});
+    };
 
     // --- Module 7: SOVRA Communities Engine ---
     let _activeCommunitiesSubtab = 'explore';
@@ -32453,8 +32702,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       if (typeof switchTab === 'function') {
         switchTab('live');
       }
-      if (typeof openLiveBroadcastModal === 'function') {
-        openLiveBroadcastModal();
+      if (typeof startSovereignLiveBroadcast === 'function') {
+        startSovereignLiveBroadcast();
       }
     }
     window.launchInstantLiveSwarm = launchInstantLiveSwarm;
@@ -33144,33 +33393,6 @@ _scheduleTargetContext: 'workspace',
             self.channelsList = myChannels;
 
             if (!myChannels.length) {
-              var p = (window.SovraState && window.SovraState.currentUser) || (typeof myProfile !== 'undefined' ? myProfile : null);
-              var isCreator = Boolean(p && (
-                p.isCreator === true ||
-                p.role === 'CREATOR' ||
-                p.role === 'ADMIN' ||
-                p.role === 'SUPER_ADMIN' ||
-                p.role === 'OPERATOR'
-              ));
-              if (!isCreator || window.__forceStudioOnboardingTest) {
-                // 🎬 Display YouTube-style Onboarding Gateway for users without an existing channel
-                if (onboardingView) onboardingView.style.display = 'block';
-                if (dashboardShell) dashboardShell.style.display = 'none';
-
-                var cancelTopText = document.getElementById('studioOnboardingCancelBtnText');
-                var cancelBottomText = document.getElementById('studioOnboardingNotNowBtnText');
-                if (cancelTopText) cancelTopText.textContent = 'Exit to Feed';
-                if (cancelBottomText) cancelBottomText.textContent = 'Not Now, Return to Feed';
-
-                var nameIn = document.getElementById('studioNewChanNameInput');
-                var profName = (typeof myProfile !== 'undefined' && myProfile && (myProfile.name || myProfile.handle)) ? (myProfile.name || myProfile.handle) : '';
-                if (nameIn && !nameIn.value && profName) {
-                  nameIn.value = profName.replace(/^@/, '');
-                  self.handleOnboardingNameChange(nameIn.value);
-                }
-                return;
-              }
-
               // Real-World YouTube Studio Parity: Auto-link personal channel so creator enters Dashboard directly
               var profName = (typeof myProfile !== 'undefined' && myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Personal Channel';
               var profHandle = (typeof myProfile !== 'undefined' && myProfile && myProfile.handle) ? myProfile.handle : '@creator';
@@ -33247,10 +33469,9 @@ _scheduleTargetContext: 'workspace',
             self.loadDashboardComments();
           })
           .catch(function() {
-            if (!self.channelsList || !self.channelsList.length) {
-              if (onboardingView) onboardingView.style.display = 'block';
-              if (dashboardShell) dashboardShell.style.display = 'none';
-            }
+            if (onboardingView) onboardingView.style.display = 'none';
+            if (dashboardShell) dashboardShell.style.display = 'block';
+            self.loadDashboard();
           });
       },
 
@@ -33530,7 +33751,7 @@ _scheduleTargetContext: 'workspace',
             window.history.pushState({ tab: tab, channelId: this.activeChannelId }, '', '/studio#tab=' + tab + chanParam);
           }
         } catch(_) {}
-        var subtabs = ['dashboard', 'content', 'playlists', 'analytics', 'comments', 'community', 'subtitles', 'copyright', 'earn', 'customization', 'audio', 'ingest', 'schedule', 'settings', 'feedback'];
+        var subtabs = ['dashboard', 'live', 'content', 'playlists', 'analytics', 'comments', 'community', 'subtitles', 'copyright', 'earn', 'customization', 'audio', 'ingest', 'schedule', 'settings', 'feedback'];
         subtabs.forEach(function(s) {
           var cap = s.charAt(0).toUpperCase() + s.slice(1);
           var sec = document.getElementById('studioSection' + cap);
@@ -33546,6 +33767,8 @@ _scheduleTargetContext: 'workspace',
           this.loadDashboard();
           this.loadDashboardComments();
           this.renderRealtimeBars(this.cachedAnalytics ? this.cachedAnalytics.realtimeVelocity : null);
+        } else if (tab === 'live') {
+          this.loadLiveCommandCenter();
         } else if (tab === 'content') {
           this.loadContentLibrary();
         } else if (tab === 'playlists') {
@@ -33573,6 +33796,73 @@ _scheduleTargetContext: 'workspace',
         } else if (tab === 'feedback') {
           this.loadStudioFeedback();
         }
+      },
+
+      loadLiveCommandCenter: function() {
+        var isBroadcasting = Boolean(window._activeLiveMediaStream);
+        var btnStart = document.getElementById('studioBtnStartBroadcast');
+        var btnEnd = document.getElementById('studioBtnEndBroadcast');
+        var statusDot = document.getElementById('studioLiveStatusDot');
+        var statusText = document.getElementById('studioLiveStatusText');
+        var badge = document.getElementById('studioLiveBadge');
+        var standbyCover = document.getElementById('studioLiveStandbyCover');
+        var videoEl = document.getElementById('studioLivePreviewVideo');
+        var ind = document.getElementById('studioNavLiveIndicator');
+
+        if (isBroadcasting) {
+          if (btnStart) btnStart.style.display = 'none';
+          if (btnEnd) btnEnd.style.display = 'inline-flex';
+          if (statusDot) statusDot.style.background = '#ef4444';
+          if (statusText) statusText.textContent = 'LIVE NOW';
+          if (badge) {
+            badge.style.background = 'rgba(239, 68, 68, 0.2)';
+            badge.style.color = '#ef4444';
+            badge.style.borderColor = '#ef4444';
+          }
+          if (standbyCover) standbyCover.style.display = 'none';
+          if (videoEl) {
+            videoEl.style.display = 'block';
+            videoEl.srcObject = window._activeLiveMediaStream;
+          }
+          if (ind) {
+            ind.style.display = 'inline-block';
+            ind.style.background = '#ef4444';
+          }
+        } else {
+          if (btnStart) btnStart.style.display = 'inline-flex';
+          if (btnEnd) btnEnd.style.display = 'none';
+          if (statusDot) statusDot.style.background = '#94a3b8';
+          if (statusText) statusText.textContent = 'STANDBY';
+          if (badge) {
+            badge.style.background = 'rgba(148, 163, 184, 0.15)';
+            badge.style.color = '#94a3b8';
+            badge.style.borderColor = 'rgba(148, 163, 184, 0.3)';
+          }
+          if (standbyCover) standbyCover.style.display = 'block';
+          if (videoEl) videoEl.style.display = 'none';
+          if (ind) ind.style.background = '#64748b';
+        }
+
+        this.pollStudioLiveChat();
+      },
+
+      pollStudioLiveChat: function() {
+        var container = document.getElementById('studioLiveChatMessages');
+        if (!container) return;
+        fetch('/api/live/chat?sessionId=' + encodeURIComponent(window._currentLiveSessionId || 'session-primary'))
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d && d.ok && Array.isArray(d.messages) && d.messages.length > 0) {
+              container.innerHTML = d.messages.map(function(m) {
+                return '<div style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 6px 10px; font-size: 0.8rem;">' +
+                  '<strong style="color: #38bdf8;">' + (m.senderName || m.senderHandle || 'Viewer') + ':</strong> ' +
+                  '<span style="color: #f1f5f9;">' + (m.message || m.text || '') + '</span>' +
+                '</div>';
+              }).join('');
+              container.scrollTop = container.scrollHeight;
+            }
+          })
+          .catch(function() {});
       },
 
       loadDashboard: function() {
@@ -52226,8 +52516,7 @@ _scheduleTargetContext: 'workspace',
     function triggerHeaderGoLive(e) {
       if (e && e.stopPropagation) e.stopPropagation();
       hideHeaderCreateMenu();
-      if (typeof switchWatchSubTab === 'function') switchWatchSubTab('live');
-      if (typeof switchTab === 'function') switchTab('watch');
+      if (typeof switchTab === 'function') switchTab('live');
       if (typeof showAccountToast === 'function') showAccountToast('🔴 Sovereign Live Swarm active');
     }
 
@@ -53799,10 +54088,7 @@ _scheduleTargetContext: 'workspace',
 
     function triggerUniversalGoLive() {
       closeUniversalCreateModal();
-      switchTab('watch');
-      if (typeof switchWatchSubTab === 'function') {
-        switchWatchSubTab('live');
-      }
+      switchTab('live');
       if (typeof showAccountToast === 'function') {
         showAccountToast('🔴 Swarm Live Stream activated!');
       }

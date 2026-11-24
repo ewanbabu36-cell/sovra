@@ -84,6 +84,25 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
       }
     }
 
+    // Real-World YouTube Studio Parity: Seamless default creator channel auto-provisioning
+    if (myChannels.length === 0) {
+      const defaultChannel = {
+        id: 'ch-personal-' + (creatorDid ? creatorDid.replace(/[^a-zA-Z0-9]/g, '').slice(-8) : 'primary'),
+        handle: (principal && principal.handle) || '@creator',
+        name: (principal && principal.displayName) || (principal && principal.handle ? principal.handle.replace(/^@/, '') : 'Creator Studio'),
+        category: 'tech',
+        desc: 'Sovereign 4K Video & Live Broadcast Channel',
+        count: 0,
+        avatar: '🎬',
+        bg: '#0284c7',
+        isSubbed: true,
+        ownerDid: creatorDid || 'did:sovra:creator_primary',
+        createdAt: Date.now(),
+      };
+      sovraDb.upsertChannel(defaultChannel);
+      myChannels = [defaultChannel];
+    }
+
     const hasChannel = myChannels.length > 0;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({

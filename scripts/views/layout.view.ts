@@ -41,18 +41,40 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     localFeed,
     hostUser,
     hostSessionToken,
-    livePosts,
-    livePeers,
-    liveUsers,
-    liveReels,
-    isCreatorModeActive,
-    reelsStore,
-    longFormVideosCatalog,
-    youtubeCommentsStore,
+    livePosts = [],
+    livePeers = [],
+    liveUsers = [],
+    liveReels = [],
+    isCreatorModeActive = true,
+    reelsStore = (sovraDb.getAllReels ? sovraDb.getAllReels() : []),
+    longFormVideosCatalog = [],
+    youtubeCommentsStore = {},
     getIceServers,
     SOVRA_RTC_CONFIGURATION,
     contactsStore = (sovraDb.getAllPeers ? sovraDb.getAllPeers() : []),
   } = ctx;
+
+  const safeReelsStore = Array.isArray(reelsStore) ? reelsStore : [];
+  const safeGetIceServers = typeof getIceServers === 'function' ? getIceServers : () => [];
+  const safeRtcConfig = SOVRA_RTC_CONFIGURATION || {};
+
+  const defaultFallbackVideo: any = {
+    id: 'yt-video-default',
+    title: 'Sovra Decentralized Media Stream',
+    shortHeader: 'Sovra Decentralized Media',
+    summary: 'Decentralized P2P streaming on Sovra.',
+    category: 'Technology',
+    channelName: 'SOVRA Protocol Lab',
+    channelHandle: 'sovralab',
+    channelAvatar: 'S',
+    channelAvatarBg: '#0284c7',
+    channelSubscribersText: '1 subscriber',
+    likes: 0,
+    description: 'Decentralized video on Sovra mesh network.',
+  };
+  const safeVideosCatalog = (Array.isArray(longFormVideosCatalog) && longFormVideosCatalog.length > 0)
+    ? longFormVideosCatalog
+    : [defaultFallbackVideo];
 
   return `<!-- Archetype reference: <body class="nav-mode-auto theme-normal" data-active-tab="feed"> -->
 <body class="nav-mode-auto theme-black sovra-mode-home" data-active-tab="home">
@@ -63,6 +85,30 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
   </div>
   <!-- 📢 GLOBAL SYSTEM BROADCAST / AMBER ALERT BANNER (Auto-Reactive) -->
   <div id="sovraGlobalAlertBanner" style="display: none; width: 100%; position: sticky; top: 0; z-index: 10002; transition: all 0.3s ease;"></div>
+
+  <!-- 🔴 PERSISTENT GLOBAL LIVE BROADCAST HUD (Industry Standard Broadcast Controller) -->
+  <div id="sovraGlobalLiveBroadcastHud" class="sovra-global-live-hud" style="display: none;">
+    <div style="max-width: 1400px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+        <span style="display: inline-flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.4); padding: 4px 10px; border-radius: 20px; font-weight: 800; font-size: 0.78rem; letter-spacing: 0.5px; border: 1px solid rgba(255,255,255,0.2);">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 10px #ef4444; animation: sovraLivePulse 1s infinite alternate;"></span>
+          BROADCASTING LIVE
+        </span>
+        <span id="globalLiveBroadcastTitle" style="font-weight: 700; font-size: 0.88rem; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff;">Live Swarm Stream</span>
+        <span style="font-size: 0.8rem; font-weight: 700; opacity: 0.9; color: #fecaca;" id="globalLiveBroadcastTimer">⏱️ 00:00:00</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 0.8rem; font-weight: 700; background: rgba(0,0,0,0.35); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);" id="globalLiveBroadcastViewers">👥 1 viewer</span>
+        <span style="font-size: 0.8rem; font-weight: 700; color: #fde047; background: rgba(0,0,0,0.35); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(253,224,71,0.25);" id="globalLiveBroadcastTips">⚡ 0.00 SOV</span>
+        <button type="button" onclick="if(window.SovraCreatorStudioEngine){window.SovraCreatorStudioEngine.switchStudioTab('live'); switchTab('studio');}" style="background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); color: #fff; font-size: 0.78rem; font-weight: 700; padding: 6px 14px; border-radius: 8px; cursor: pointer;">
+          Open Studio Live
+        </button>
+        <button type="button" id="btnGlobalEndLive" onclick="window.confirmAndEndLiveBroadcast()" style="background: #ffffff; border: none; color: #b91c1c; font-size: 0.84rem; font-weight: 900; padding: 7px 18px; border-radius: 20px; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 6px; transition: transform 0.15s ease;">
+          <span>🔴</span> <span>End Live</span>
+        </button>
+      </div>
+    </div>
+  </div>
   <script>
 
     // OWASP Compliant CSPRNG Helper for Decentralized Identifiers, Nonces & Keys
@@ -244,8 +290,8 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         }
       } catch(e) {}
     })();
-    window.SOVRA_ICE_SERVERS = ${JSON.stringify(getIceServers())};
-    window.SOVRA_RTC_CONFIGURATION = ${JSON.stringify(SOVRA_RTC_CONFIGURATION)};
+    window.SOVRA_ICE_SERVERS = ${JSON.stringify(safeGetIceServers())};
+    window.SOVRA_RTC_CONFIGURATION = ${JSON.stringify(safeRtcConfig)};
   </script>
   <!-- Top Notice Banner for Insecure LAN Contexts (WebRTC Camera/Mic) -->
   <div id="insecureContextNotice" style="display: none; background: linear-gradient(90deg, #1e1b4b, #312e81); color: #e0e7ff; padding: 10px 16px; font-size: 0.8rem; border-bottom: 1px solid #4f46e5; align-items: center; justify-content: space-between; z-index: 999999; position: sticky; top: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
@@ -2308,7 +2354,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <!-- Reels Player Stage -->
       <div class="reels-stage">
         <div class="reels-phone-wrapper">
-          <div class="reel-ambient-cinema-glow" id="reelAmbientCinemaGlow" style="background: ${reelsStore[0] ? reelsStore[0].bgGradient : 'linear-gradient(135deg, #1e1b4b, #312e81)'};"></div>
+          <div class="reel-ambient-cinema-glow" id="reelAmbientCinemaGlow" style="background: ${(safeReelsStore && safeReelsStore[0]) ? safeReelsStore[0].bgGradient : 'linear-gradient(135deg, #1e1b4b, #312e81)'};"></div>
           <!-- Phone Mockup Container with 60fps Gesture Physics -->
           <div class="reels-phone" id="reelsPhone" 
              onpointerdown="handleReelPointerDown(event)" 
@@ -4638,7 +4684,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35); padding: 0.15rem 0.55rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 600;">#Decentralized</span>
               </div>
               <div class="yt-video-title" id="ytVideoTitle">
-                ${longFormVideosCatalog[0]!.title}
+                ${safeVideosCatalog[0].title}
               </div>
             </div>
 
@@ -4653,7 +4699,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <div class="yt-action-pill-group">
                   <button class="yt-action-pill-btn" id="ytLikeBtn" onclick="likeYtVideo()" aria-label="Like video">
                     <span id="ytLikeThumb" style="display: inline-flex; align-items: center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg></span>
-                    <span id="ytLikeCount" style="font-weight: 700; margin-left: 4px;">${longFormVideosCatalog[0]!.likes}</span>
+                    <span id="ytLikeCount" style="font-weight: 700; margin-left: 4px;">${safeVideosCatalog[0].likes || 0}</span>
                   </button>
                   <div class="yt-action-pill-divider"></div>
                   <button class="yt-action-pill-btn" id="ytDislikeBtn" onclick="dislikeYtVideo()" aria-label="Dislike video">
@@ -4708,17 +4754,17 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
             <!-- Channel Bar (Gap 3 YouTube Watch Layout Parity) -->
             <div class="yt-channel-row">
-              <div class="yt-channel-left" id="ytChannelLeftBar" data-channel-id-or-handle="${longFormVideosCatalog[0]!.channelHandle || 'sovralab'}" onclick="window.openChannelHub(this.dataset.channelIdOrHandle || 'sovralab')" style="cursor: pointer;">
-                <div class="yt-channel-avatar" id="ytChannelAvatar" style="background: ${longFormVideosCatalog[0]!.channelAvatarBg};">
-                  ${longFormVideosCatalog[0]!.channelAvatar}
+              <div class="yt-channel-left" id="ytChannelLeftBar" data-channel-id-or-handle="${safeVideosCatalog[0].channelHandle || 'sovralab'}" onclick="window.openChannelHub(this.dataset.channelIdOrHandle || 'sovralab')" style="cursor: pointer;">
+                <div class="yt-channel-avatar" id="ytChannelAvatar" style="background: ${safeVideosCatalog[0].channelAvatarBg || '#0284c7'};">
+                  ${safeVideosCatalog[0].channelAvatar || 'S'}
                 </div>
                 <div>
                   <div style="font-weight: 700; color: var(--text-main, currentColor); display: flex; align-items: center; gap: 0.35rem;">
-                    <span id="ytChannelName">${longFormVideosCatalog[0]!.channelName}</span>
+                    <span id="ytChannelName">${safeVideosCatalog[0].channelName || 'SOVRA'}</span>
                     <span style="color: #60a5fa; font-size: 0.85rem;" title="Verified Sovereign Identity">✓</span>
                   </div>
                   <div style="font-size: 0.75rem; color: var(--text-muted);" id="subscribersCountDisplay">
-                    ${longFormVideosCatalog[0]!.channelSubscribersText}
+                    ${safeVideosCatalog[0].channelSubscribersText || '1 subscriber'}
                   </div>
                 </div>
               </div>
@@ -4745,14 +4791,14 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
             <!-- Expandable Description Box with Clickable Chapters -->
             <div class="yt-desc-box collapsed" id="ytDescBox">
-              <div id="ytSummaryBox" style="${longFormVideosCatalog[0]!.summary ? 'display: block;' : 'display: none;'} background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 8px; padding: 10px 14px; margin-bottom: 0.85rem; font-size: 0.82rem; color: #e9d5ff; line-height: 1.5; backdrop-filter: blur(8px);">
+              <div id="ytSummaryBox" style="${safeVideosCatalog[0].summary ? 'display: block;' : 'display: none;'} background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 8px; padding: 10px 14px; margin-bottom: 0.85rem; font-size: 0.82rem; color: #e9d5ff; line-height: 1.5; backdrop-filter: blur(8px);">
                 <div style="font-weight: 700; color: #c084fc; margin-bottom: 5px; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;">
                   <span>🧠</span> <span>Smart AI / Mesh Summary (TL;DR)</span>
                 </div>
-                <div id="ytSummaryText" style="white-space: pre-line; color: #f3e8ff;">${longFormVideosCatalog[0]!.summary || ''}</div>
+                <div id="ytSummaryText" style="white-space: pre-line; color: #f3e8ff;">${safeVideosCatalog[0].summary || ''}</div>
               </div>
               <div id="ytDescText">
-                ${longFormVideosCatalog[0]!.description}
+                ${safeVideosCatalog[0].description || ''}
               </div>
               <div style="margin-top: 0.75rem; font-weight: 700; font-size: 0.82rem; color: #fff;">
                 🎬 Interactive Chapters (Click to Jump):
@@ -4786,7 +4832,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </div>
 
               <div style="font-size: 0.8rem; color: #cbd5e1; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem;">
-                <span>Send direct micro-tokens to <b id="tipRecipientName">${longFormVideosCatalog[0]!.channelName}</b>. Zero gas fees, instant Verified off-chain voucher settlement.</span>
+                <span>Send direct micro-tokens to <b id="tipRecipientName">${safeVideosCatalog[0].channelName || 'Creator'}</b>. Zero gas fees, instant Verified off-chain voucher settlement.</span>
                 <span style="font-size: 0.72rem; color: #94a3b8;">YouTube takes 45% &bull; Sovra takes 0%</span>
               </div>
 
@@ -6600,7 +6646,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               </button>
 
               <!-- Go Live (((•))) - Real P2P WebRTC Live Broadcast -->
-              <button type="button" class="studio-btn-icon" id="studioQuickGoLiveBtn" onclick="if(typeof openSpatialLiveCreatorSurface==='function'){openSpatialLiveCreatorSurface(this, SovraCreatorStudioEngine.activeChannelId);}else{showAccountToast('🔴 Initializing P2P WebRTC 4K Live Broadcast...');}" title="Go Live (P2P WebRTC Broadcast)" style="background: none; border: none; color: #f43f5e; cursor: pointer; padding: 6px 8px; border-radius: 50%; display: flex; align-items: center;">
+              <button type="button" class="studio-btn-icon" id="studioQuickGoLiveBtn" onclick="SovraCreatorStudioEngine.switchStudioTab('live')" title="Go Live (P2P WebRTC Broadcast)" style="background: none; border: none; color: #f43f5e; cursor: pointer; padding: 6px 8px; border-radius: 50%; display: flex; align-items: center;">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>
               </button>
 
@@ -6643,6 +6689,11 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
             <button type="button" class="studio-sidebar-nav-btn active" id="studioNavDashboard" onclick="SovraCreatorStudioEngine.switchStudioTab('dashboard')">
               <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></span> <span>Dashboard</span>
+            </button>
+            <button type="button" class="studio-sidebar-nav-btn" id="studioNavLive" onclick="SovraCreatorStudioEngine.switchStudioTab('live')" style="color: #f43f5e; font-weight: 700;">
+              <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg></span>
+              <span>Live Stream</span>
+              <span style="margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444;" id="studioNavLiveIndicator"></span>
             </button>
             <button type="button" class="studio-sidebar-nav-btn" id="studioNavContent" onclick="SovraCreatorStudioEngine.switchStudioTab('content')">
               <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></span> <span>Content</span>
@@ -6976,6 +7027,128 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                   </div>
                 </div>
 
+              </div>
+            </div>
+
+            <!-- ============================================== -->
+            <!-- TAB: LIVE STREAM COMMAND CENTER (YouTube Parity)-->
+            <!-- ============================================== -->
+            <div id="studioSectionLive" style="display: none;">
+              <!-- Header Bar with Broadcast Controls -->
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <h2 style="font-size: 1.5rem; font-weight: 900; color: #fff; margin: 0; letter-spacing: -0.5px;">Live Broadcast Command Center</h2>
+                    <span id="studioLiveBadge" class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.35); font-size: 0.75rem; padding: 3px 10px; border-radius: 20px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px;">
+                      <span id="studioLiveStatusDot" style="width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; display: inline-block;"></span>
+                      <span id="studioLiveStatusText">STANDBY</span>
+                    </span>
+                  </div>
+                  <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">P2P WebRTC decentralized live broadcast &bull; Ultra-low latency mesh dissemination &bull; Zero relay cloud costs</div>
+                </div>
+
+                <!-- Primary Action Buttons (End Live & Start Live) -->
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <button type="button" class="btn btn-primary" id="studioBtnStartBroadcast" onclick="window.startStudioLiveBroadcast()" style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 0.88rem; padding: 8px 20px; border-radius: 12px; background: linear-gradient(135deg, #10b981, #059669); border: none; cursor: pointer; color: #fff; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);">
+                    <span>🎥</span> <span>Start Live</span>
+                  </button>
+                  <button type="button" class="btn btn-danger" id="studioBtnEndBroadcast" onclick="window.confirmAndEndLiveBroadcast()" style="display: none; align-items: center; gap: 8px; font-weight: 800; font-size: 0.88rem; padding: 8px 22px; border-radius: 12px; background: linear-gradient(135deg, #ef4444, #b91c1c); border: none; cursor: pointer; color: #fff; box-shadow: 0 4px 20px rgba(239, 68, 68, 0.5); animation: sovraLivePulse 1.5s infinite alternate;">
+                    <span>🔴</span> <span>End Live Broadcast</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Live Telemetry Stats Bar -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 1.5rem;">
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 12px 16px;">
+                  <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Duration</div>
+                  <div id="studioLiveDuration" style="font-size: 1.25rem; font-weight: 900; color: #fff; margin-top: 4px;">00:00:00</div>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 12px 16px;">
+                  <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Concurrent Viewers</div>
+                  <div id="studioLiveViewersCount" style="font-size: 1.25rem; font-weight: 900; color: #38bdf8; margin-top: 4px;">0 Viewers</div>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 12px 16px;">
+                  <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Tips Earned</div>
+                  <div id="studioLiveTipsEarned" style="font-size: 1.25rem; font-weight: 900; color: #facc15; margin-top: 4px;">0.00 SOV</div>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 12px 16px;">
+                  <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Stream Health</div>
+                  <div id="studioLiveHealthStatus" style="font-size: 0.88rem; font-weight: 800; color: #34d399; margin-top: 6px;">🟢 Excellent (WebRTC Direct)</div>
+                </div>
+              </div>
+
+              <!-- Main Broadcast Layout: Video Monitor + Stream Controls + Live Chat -->
+              <div style="display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; align-items: start;">
+                <!-- Left: Video Monitor & Hardware Toggles -->
+                <div>
+                  <div class="studio-live-video-box" id="studioLiveVideoBox">
+                    <video id="studioLivePreviewVideo" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                    <div id="studioLiveStandbyCover" style="text-align: center; padding: 40px 20px;">
+                      <div style="font-size: 3.5rem; margin-bottom: 12px;">📡</div>
+                      <div style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">Broadcast Stage Ready</div>
+                      <div style="font-size: 0.82rem; color: #94a3b8; margin-top: 6px; max-width: 380px; margin-left: auto; margin-right: auto;">Click &quot;Start Live&quot; above to activate your camera and stream directly to peer mesh viewers.</div>
+                    </div>
+                  </div>
+
+                  <!-- Quick Hardware Toolbar: Mic, Camera, Screen Share, Quality -->
+                  <div style="display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-secondary" id="btnToggleStudioMic" onclick="window.toggleStudioMic()" style="font-size: 0.8rem; font-weight: 700; padding: 8px 14px; border-radius: 10px; display: flex; align-items: center; gap: 6px;">
+                      <span id="studioMicIcon">🎤</span> <span id="studioMicLabel">Mute Mic</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btnToggleStudioCam" onclick="window.toggleStudioCam()" style="font-size: 0.8rem; font-weight: 700; padding: 8px 14px; border-radius: 10px; display: flex; align-items: center; gap: 6px;">
+                      <span id="studioCamIcon">📹</span> <span id="studioCamLabel">Stop Camera</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btnToggleStudioScreenShare" onclick="window.toggleStudioScreenShare()" style="font-size: 0.8rem; font-weight: 700; padding: 8px 14px; border-radius: 10px; display: flex; align-items: center; gap: 6px;">
+                      <span>🖥️</span> <span>Share Screen</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="window.copyLiveShareLink()" style="font-size: 0.8rem; font-weight: 700; padding: 8px 14px; border-radius: 10px; display: flex; align-items: center; gap: 6px; margin-left: auto;">
+                      <span>🔗</span> <span>Copy Stream Link</span>
+                    </button>
+                  </div>
+
+                  <!-- Broadcast Details Form -->
+                  <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 1.25rem; margin-top: 1.25rem;">
+                    <div style="font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 12px;">Broadcast Configuration</div>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px;">
+                      <div>
+                        <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; margin-bottom: 6px;">Stream Title</label>
+                        <input type="text" id="studioLiveTitleInput" value="Building Sovereign P2P WebRTC Apps with SOVRA" style="width: 100%; box-sizing: border-box; background: #030712; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 0.84rem; outline: none;" />
+                      </div>
+                      <div>
+                        <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; margin-bottom: 6px;">Category</label>
+                        <select id="studioLiveCategorySelect" style="width: 100%; box-sizing: border-box; background: #030712; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 0.84rem; outline: none;">
+                          <option value="tech" selected>💻 Technology &amp; Coding</option>
+                          <option value="gaming">🎮 Gaming &amp; Esports</option>
+                          <option value="crypto">🪙 Web3 &amp; Tokens</option>
+                          <option value="education">📚 Education</option>
+                          <option value="music">🎵 Music &amp; Audio</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Right: Real-time Moderator Live Chat -->
+                <div style="background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; height: 560px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 10px; margin-bottom: 10px;">
+                    <div style="font-weight: 800; font-size: 0.88rem; color: #fff; display: flex; align-items: center; gap: 6px;">
+                      <span>💬</span> <span>Live Stream Chat</span>
+                    </div>
+                    <span id="studioLiveChatStatus" style="font-size: 0.72rem; color: #34d399; font-weight: 700;">● Active</span>
+                  </div>
+
+                  <!-- Messages Scroll Area -->
+                  <div id="studioLiveChatMessages" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+                    <div style="font-size: 0.76rem; color: #64748b; text-align: center; padding: 20px 0;">Live chat messages from your viewers will appear here in real time.</div>
+                  </div>
+
+                  <!-- Host Live Reply Form -->
+                  <form onsubmit="window.submitStudioLiveChat(event)" style="margin-top: 10px; display: flex; gap: 6px;">
+                    <input type="text" id="studioLiveChatInput" placeholder="Reply as host..." autocomplete="off" style="flex: 1; background: #030712; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 0.82rem; outline: none;" />
+                    <button type="submit" style="background: #38bdf8; border: none; color: #020617; font-weight: 800; font-size: 0.82rem; padding: 8px 14px; border-radius: 10px; cursor: pointer;">Send</button>
+                  </form>
+                </div>
               </div>
             </div>
 
@@ -9506,7 +9679,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
             <div class="key-val">
               <span class="key-label">Local Blockstore</span>
-              <span class="key-data">${storageDaemon.getStats().totalBlocks} Blocks (${storageDaemon.getStats().pinnedCount} Pinned)</span>
+              <span class="key-data">${(storageDaemon && typeof storageDaemon.getStats === 'function') ? storageDaemon.getStats().totalBlocks : 0} Blocks (${(storageDaemon && typeof storageDaemon.getStats === 'function') ? storageDaemon.getStats().pinnedCount : 0} Pinned)</span>
             </div>
           </div>
 
@@ -9517,15 +9690,15 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             </div>
             <div class="key-val">
               <span class="key-label">Following</span>
-              <span class="key-data" id="followingCount" style="color: #60a5fa; font-weight: bold;">${socialGraph.getFollowing(masterKey.did).length}</span>
+              <span class="key-data" id="followingCount" style="color: #60a5fa; font-weight: bold;">${(socialGraph && typeof socialGraph.getFollowing === 'function') ? socialGraph.getFollowing(masterKey.did).length : 0}</span>
             </div>
             <div class="key-val">
               <span class="key-label">Locally Blocked</span>
-              <span class="key-data" id="blockedCount" style="color: #f87171; font-weight: bold;">${socialGraph.getBlockedUsers(masterKey.did).length}</span>
+              <span class="key-data" id="blockedCount" style="color: #f87171; font-weight: bold;">${(socialGraph && typeof socialGraph.getBlockedUsers === 'function') ? socialGraph.getBlockedUsers(masterKey.did).length : 0}</span>
             </div>
             <div class="key-val">
               <span class="key-label">Locally Muted</span>
-              <span class="key-data" id="mutedCount" style="color: #fbbf24; font-weight: bold;">${socialGraph.getMutedUsers(masterKey.did).length}</span>
+              <span class="key-data" id="mutedCount" style="color: #fbbf24; font-weight: bold;">${(socialGraph && typeof socialGraph.getMutedUsers === 'function') ? socialGraph.getMutedUsers(masterKey.did).length : 0}</span>
             </div>
             <div class="key-val">
               <span class="key-label">Feed Neutrality</span>
