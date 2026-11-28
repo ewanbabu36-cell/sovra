@@ -25,6 +25,19 @@ import {
   isValidEd25519DidKey,
   type AuthenticatedPrincipal,
 } from '../../packages/identity/dist/index.js';
+import {
+  verifyBandwidthReceipt,
+  detectSeederWashTrading,
+  type SeederBandwidthReceipt,
+} from '../../packages/protocol/dist/index.js';
+import {
+  buildEconomyOverviewSnapshot,
+  getVestingLockedForDid,
+  applyRollingRewardVestingSov,
+} from './economy.routes.ts';
+import { riskManagementEngine } from '../risk-management-engine.ts';
+import { resolveFiatPayoutProvider, StripePayoutAdapter, RazorpayXPayoutAdapter } from '../payments/fiat-gateway.ts';
+import { KYC_TIER_LIMITS } from '../storage/sovra-store.ts';
 
 const PRIMARY_RPC = process.env.SOVRA_L1_RPC || 'http://127.0.0.1:26657';
 
@@ -88,22 +101,24 @@ export interface WalletRouteContext {
   readBoundedBody: (req: http.IncomingMessage, res: http.ServerResponse, maxBytes: number) => Promise<{ body: string; ok: boolean }>;
   resolvePrincipal: (req: http.IncomingMessage) => AuthenticatedPrincipal | null;
   enforceAuth: (req: http.IncomingMessage, res: http.ServerResponse) => AuthenticatedPrincipal | null;
+  checkAdminRbac?: (req: http.IncomingMessage, requiredPerm?: string) => { authorized: boolean; adminDid: string; role: string; statusCode: number; error?: string };
+  fetchFn?: (url: string, init?: RequestInit) => Promise<Response>;
 }
 
 function resolveUserAddress(ctx: WalletRouteContext): string {
-  const qAddr = ctx.url.searchParams.get('address') || ctx.url.searchParams.get('addr');
-  if (qAddr && qAddr.trim().length > 0) {
-    return qAddr.trim();
-  }
   const principal = ctx.resolvePrincipal(ctx.req);
   if (principal && principal.did) {
     return 'sovra1' + crypto.createHash('sha256').update(principal.did).digest('hex').slice(0, 38);
+  }
+  const qAddr = ctx.url.searchParams.get('address') || ctx.url.searchParams.get('addr');
+  if (qAddr && qAddr.trim().length > 0) {
+    return qAddr.trim();
   }
   const qDid = ctx.url.searchParams.get('did');
   if (qDid && qDid.trim().length > 0) {
     return 'sovra1' + crypto.createHash('sha256').update(qDid.trim()).digest('hex').slice(0, 38);
   }
-  return 'sovra12a806ca82d506a025d580d40600abc77a69e10e7';
+  return '';
 }
 
 export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boolean> {
@@ -125,10 +140,13 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         if (balRes.ok) {
           const balData = await balRes.json();
           nativeBalance = String(balData.balance || '0');
-          // Authoritative L1 Synchronization: Ensure SQLite read-cache reflects Layer-1
+          // Authoritative L1 Synchronization: Ensure SQLite read-cache reflects Layer-1 only for authenticated principal's own derived address
           const principal = ctx.resolvePrincipal(ctx.req);
           const targetDid = ctx.url.searchParams.get('did') || (principal ? principal.did : null);
-          if (targetDid && balData.balance !== undefined) {
+          const derivedAddress = targetDid
+            ? ('sovra1' + crypto.createHash('sha256').update(targetDid).digest('hex').slice(0, 38))
+            : '';
+          if (principal && targetDid && principal.did === targetDid && address === derivedAddress && balData.balance !== undefined) {
             const l1SovNumeric = Number(balData.balance) / 1_000_000;
             const rawDb = (sovraDb as any).getSqliteEngine?.()?.getRawDb?.();
             if (rawDb) {
@@ -263,12 +281,15 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
 
   // 2. POST /api/wallet/swap - 1-Click AMM Swap between Native SOV and CW20 Creator Token
   if (url.pathname === '/api/wallet/swap' && req.method === 'POST') {
+    const principal = ctx.enforceAuth(req, res);
+    if (!principal) return true;
+
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
 
     try {
       const parsed = JSON.parse(body);
-      const userAddress = parsed.address || resolveUserAddress(ctx);
+      const userAddress = parsed.address || ('sovra1' + crypto.createHash('sha256').update(principal.did).digest('hex').slice(0, 38));
       const tokenAddress = (parsed.tokenAddress || '').trim();
       const direction = parsed.direction === 'sell' ? 'sell' : 'buy'; // 'buy' (SOV -> Token) or 'sell' (Token -> SOV)
       const amount = String(parsed.amount || '0');
@@ -361,6 +382,12 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         const fee = (inputAmt * 1n) / 100n;
         royaltyFee = fee.toString();
         const netSov = inputAmt - fee;
+        const swapRisk = riskManagementEngine.checkAmmPoolSwapRisk(tokenAddress, principal.did, Number(netSov), Number(rSov), '/api/wallet/swap');
+        if (!swapRisk.allowed) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: swapRisk.reason, code: swapRisk.code }));
+          return true;
+        }
         const denominator = rSov + netSov;
         if (denominator <= 0n) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -386,6 +413,12 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
           return true;
         }
         const grossSov = (rSov * inputAmt) / denominator;
+        const swapRisk = riskManagementEngine.checkAmmPoolSwapRisk(tokenAddress, principal.did, Number(grossSov), Number(rSov), '/api/wallet/swap');
+        if (!swapRisk.allowed) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: swapRisk.reason, code: swapRisk.code }));
+          return true;
+        }
         if (grossSov >= rSov) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Insufficient SOV liquidity in pool' }));
@@ -399,6 +432,21 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         pool.sovReserve = pool.reserveSov;
         pool.reserveToken = (rTok + inputAmt).toString();
         pool.tokenReserve = pool.reserveToken;
+      }
+
+      const feeSovApprox = Number(royaltyFee) / 1_000_000;
+      if (feeSovApprox > 0) {
+        riskManagementEngine.recordRiskEvent({
+          category: 'REVENUE_RECORDED',
+          severity: 'LOW',
+          direction: 'REVENUE',
+          amountSov: feeSovApprox,
+          actorDid: principal.did,
+          endpoint: '/api/wallet/swap',
+          description: `AMM Swap 1% royalty/fee accrued (${tokenAddress})`,
+          prevented: false,
+          metadata: { kind: 'AMM_FEE', tokenAddress },
+        });
       }
 
       if (typeof dbAny.save === 'function') {
@@ -485,6 +533,8 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         creator.balance_sov = creator.balanceSov;
       }
 
+      const polPermanent = Boolean(parsed.polLockPermanent);
+      const polLockDays = Number(parsed.polLockDays || 0);
       const newPool = {
         poolAddress: 'sovra1wasm' + crypto.createHash('sha256').update(`amm_pool:${tokenAddress}`).digest('hex').slice(0, 32),
         tokenAddress,
@@ -493,9 +543,24 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         reserveSov: String(initialSov),
         reserveToken: String(initialToken),
         feePercent: Math.min(Math.max(Number(parsed.feePercent || 1), 0.1), 5),
+        polLocked: polPermanent || polLockDays > 0,
+        polPermanent,
+        polUnlockAt: polPermanent ? 0 : (polLockDays > 0 ? Date.now() + polLockDays * 86400_000 : 0),
         createdAt: Date.now(),
       };
       dbAny.db.amm_pools.push(newPool);
+      if (newPool.polLocked) {
+        if (!Array.isArray(dbAny.db.pol_locks)) dbAny.db.pol_locks = [];
+        dbAny.db.pol_locks.push({
+          poolAddress: newPool.poolAddress,
+          tokenAddress: newPool.tokenAddress,
+          lockerDid: principal.did,
+          permanent: polPermanent,
+          unlockAt: newPool.polUnlockAt,
+          sovLockedApprox: Math.round((initialSov / 1_000_000) * 1_000_000) / 1_000_000,
+          lockedAt: Date.now(),
+        });
+      }
       if (typeof dbAny.save === 'function') dbAny.save();
 
       res.writeHead(201, { 'Content-Type': 'application/json' });
@@ -510,7 +575,7 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
   // 3B. GET /api/v1/monetary/ultrasound - Ultra-Sound Monetary Engine Metrics & Deflation Tracker
   if ((url.pathname === '/api/v1/monetary/ultrasound' || url.pathname === '/api/wallet/ultrasound') && req.method === 'GET') {
     try {
-      const metrics = (sovraDb as any).getUltraSoundMetrics();
+      const metrics = buildEconomyOverviewSnapshot();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         ok: true,
@@ -519,9 +584,20 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         deflationaryMechanism: {
           gasFeeBurnPercent: 50,
           adSpendBurnPercent: 20,
+          handleBurnPercent: 80,
+          storageRentBurnPercent: 50,
+          boostBurnPercent: 80,
           immutableBurnSink: metrics.burnSinkAddress,
           hardCapSov: 100_000_000,
-          emissionModel: '20-Year Algorithmic Exponential Disinflation',
+          emissionModel: 'Bitcoin-Inspired 4-Year Halving (128-Year Long-Tail, 100M Hard Cap)',
+          halvingIntervalYears: 4,
+          unbondingPeriodDays: 14,
+          miningPoolAllocationSov: {
+            seeder: 40_000_000,
+            validator: 20_000_000,
+            community: 10_000_000,
+            genesis: 30_000_000,
+          },
         },
       }));
     } catch (err: any) {
@@ -692,6 +768,39 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         return true;
       }
 
+      const store = (sovraDb as any).getSovraStore?.();
+      const callerDid = principal?.did || senderAddress;
+      const kyc = store?.getKycVerification
+        ? await store.getKycVerification(callerDid)
+        : { did: callerDid, tier: 0 as const, status: 'UNVERIFIED' as const };
+      const effectiveTier: 0 | 1 | 2 = kyc.status === 'VERIFIED' ? (kyc.tier as 0 | 1 | 2) : 0;
+      const strictKyc = process.env.SOVRA_STRICT_KYC_GATES === 'true' || process.env.NODE_ENV === 'production';
+      if (strictKyc && effectiveTier < 1) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: false,
+          code: 'KYC_TIER_REQUIRED',
+          requiredTier: 1,
+          currentTier: effectiveTier,
+          error: 'Verified KYC Tier >= 1 required for cross-chain bridge transfers in strict/production mode',
+        }));
+        return true;
+      }
+      const dailyBridgeCap = KYC_TIER_LIMITS[effectiveTier].dailyBridgeMaxSov;
+      const dailyBridgeUsed = store?.getDailyBridgeSov ? await store.getDailyBridgeSov(callerDid) : 0;
+      if (dailyBridgeUsed + Number(amount) > dailyBridgeCap) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: false,
+          code: 'KYC_TIER_LIMIT_EXCEEDED',
+          tier: effectiveTier,
+          dailyLimitSov: dailyBridgeCap,
+          dailyUsedSov: dailyBridgeUsed,
+          error: `24h bridge cap exceeded for KYC Tier ${effectiveTier} (${dailyBridgeUsed} + ${amount} > ${dailyBridgeCap} SOV)`,
+        }));
+        return true;
+      }
+
       // Execute bridge transfer in database
       const transferRecord = (sovraDb as any).createBridgeTransfer({
         senderAddress,
@@ -770,14 +879,24 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         } catch (_) {}
       }
 
-      // Ensure user exists in SQLite
+      // Global 24h Risk Policy faucet cap guard & P&L cost tracking
+      const faucetGuard = riskManagementEngine.checkAndRecordFaucetClaim(targetDid, amount);
+      if (!faucetGuard.allowed) {
+        res.writeHead(429, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: faucetGuard.reason || 'Global faucet budget exceeded', code: faucetGuard.code }));
+        return true;
+      }
+
+      // Ensure user exists in SQLite (with collision-safe unique handle derived from DID)
       let user = sqlite?.prepare('SELECT balance_sov FROM users WHERE did = ?').get(targetDid) as any;
       if (!user) {
         const now = Date.now();
+        const baseHandle = String(principal.displayName || 'user').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 16) || 'user';
+        const uniqueHandle = `@${baseHandle}_${targetDid.slice(-6)}_${crypto.randomBytes(2).toString('hex')}`;
         sqlite?.prepare(`
           INSERT INTO users (did, handle, display_name, avatar, avatar_bg, balance_sov, device_type, created_at, updated_at)
           VALUES (?, ?, ?, '🎨', '#10b981', 0.0, 'BROWSER', ?, ?)
-        `).run(targetDid, principal.displayName || ('@user_' + targetDid.slice(-6)), principal.displayName || 'User', now, now);
+        `).run(targetDid, uniqueHandle, principal.displayName || 'User', now, now);
         user = { balance_sov: 0.0 };
       }
 
@@ -994,6 +1113,20 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         return true;
       }
 
+      const vestedLockedSov = getVestingLockedForDid(senderDid);
+      if (vestedLockedSov > 0) {
+        const senderRec = sovraDb.findUserByDid(senderDid);
+        const curBalSov = Number(senderRec?.balanceSov ?? senderRec?.balance_sov ?? 0);
+        if (curBalSov - vestedLockedSov < amountSov) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: false,
+            error: `Transfer blocked by genesis vesting cliff/schedule (locked: ${vestedLockedSov} SOV, spendable: ${Math.max(0, curBalSov - vestedLockedSov)} SOV)`,
+          }));
+          return true;
+        }
+      }
+
       // 1. Initiate settlement intent & reserve balance atomically in SQLite (State: RESERVED)
       const reservation = (sovraDb as any).createSettlementIntent({
         idempotencyKey,
@@ -1059,7 +1192,7 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
             Sender: senderDid,
             Recipient: recipientDid,
             Amount: String(BigInt(Math.round(amountSov * 1_000_000))),
-            Fee: '0',
+            Fee: '100',
             PubKeyHex: parsed.pubKeyHex || '',
             SigHex: parsed.signature || intentId,
           };
@@ -1230,6 +1363,19 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
             errorReason: l1Error,
           });
 
+          // Track unburned off-chain fee & L1 settlement reconciliation backlog without altering net recipient math
+          riskManagementEngine.recordRiskEvent({
+            category: 'L1_OFFCHAIN_FEE_DEFICIT',
+            severity: 'MEDIUM',
+            direction: 'RISK_EXPOSURE',
+            amountSov: 0.0001,
+            actorDid: senderDid,
+            endpoint: '/api/wallet/transfer',
+            description: `Local off-chain transfer (${intentId}) pending L1 settlement fee & 50% burn reconciliation`,
+            prevented: false,
+            metadata: { intentId, amountSov, l1Error },
+          });
+
           markVoucherSettled();
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1275,15 +1421,15 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         return true;
       }
 
-      // Resolve sender public key
+      // Resolve sender public key cleanly (including base58btc did:key:z via resolveSenderEd25519PubKey)
       const sender = (sovraDb as any).db?.users?.find((u: any) => u.did === metaReq.from);
-      let pubKeyBytes: Uint8Array | null = null;
-      if (sender && sender.publicKey) {
-        pubKeyBytes = Buffer.from(sender.publicKey, 'hex');
-      } else if (metaReq.from.startsWith('did:key:')) {
-        pubKeyBytes = Buffer.from(metaReq.from.slice(8, 72).padEnd(64, '0'), 'hex');
-      } else {
-        pubKeyBytes = crypto.createHash('sha256').update(metaReq.from).digest();
+      let pubKeyBytes = resolveSenderEd25519PubKey(metaReq.from, sender, (metaReq as any).pubKeyHex);
+      if (!pubKeyBytes) {
+        if (metaReq.from.startsWith('did:key:')) {
+          pubKeyBytes = Buffer.from(metaReq.from.slice(8, 72).padEnd(64, '0'), 'hex');
+        } else {
+          pubKeyBytes = crypto.createHash('sha256').update(metaReq.from).digest();
+        }
       }
 
       const verifyRes = verifyMetaTransaction(metaReq, pubKeyBytes);
@@ -1293,16 +1439,36 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         return true;
       }
 
+      const dbAny = sovraDb as any;
+      if (!Array.isArray(dbAny.db.meta_tx_used_nonces)) {
+        dbAny.db.meta_tx_used_nonces = [];
+      }
+      const nonceKey = `${metaReq.from}:${metaReq.nonce}`;
+      if (dbAny.db.meta_tx_used_nonces.includes(nonceKey)) {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: `Meta-tx nonce already consumed (${nonceKey})` }));
+        return true;
+      }
+
+      const metaGuard = riskManagementEngine.checkAndRecordMetaTxSubsidy(metaReq.from, 0.02);
+      if (!metaGuard.allowed) {
+        res.writeHead(429, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: metaGuard.reason || 'Meta-tx sponsorship cap exceeded', code: metaGuard.code }));
+        return true;
+      }
+
       const amountSov = parseFloat(metaReq.amount || '0') || 0;
       let txId = 'relayer_tx_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+      let burnedSov = 0;
 
       if (amountSov > 0) {
+        const isBurnSinkAction = metaReq.action === 'REGISTER_HANDLE' || metaReq.action === 'BOOST' || metaReq.action === 'STORAGE_RENT';
         const transferRes = (sovraDb as any).executeUserP2PTransfer({
           fromDid: metaReq.from,
           toDid: metaReq.to,
           amountSov,
           feeSov: 0.0, // Sponsored: 0 fee charged to user!
-          txType: metaReq.action === 'TIP' ? 'CREATOR_TIP' : 'P2P_TRANSFER',
+          txType: metaReq.action === 'TIP' ? 'CREATOR_TIP' : (isBurnSinkAction ? metaReq.action : 'P2P_TRANSFER'),
           memo: `Gasless Meta-Tx Relayed: ${metaReq.action}`,
           idempotencyKey: `meta_${metaReq.from}_${metaReq.nonce}`,
         });
@@ -1312,7 +1478,31 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
           return true;
         }
         txId = transferRes.txId;
+        if (isBurnSinkAction && typeof (sovraDb as any).burnToConsensusSink === 'function') {
+          const share = metaReq.action === 'STORAGE_RENT' ? 0.5 : 0.8;
+          burnedSov = Math.round(amountSov * share * 1_000_000) / 1_000_000;
+          try {
+            (sovraDb as any).burnToConsensusSink(burnedSov, 'PROTOCOL_DEFLATION', txId);
+          } catch {}
+          const yieldPortion = Math.round((amountSov - burnedSov) * 1_000_000) / 1_000_000;
+          if (yieldPortion > 0) {
+            riskManagementEngine.recordRiskEvent({
+              category: 'REVENUE_RECORDED',
+              severity: 'LOW',
+              direction: 'REVENUE',
+              amountSov: yieldPortion,
+              actorDid: metaReq.from,
+              endpoint: '/api/wallet/meta-tx',
+              description: `Meta-Tx ${metaReq.action} protocol/staking yield portion`,
+              prevented: false,
+              metadata: { kind: 'BOOST', txId },
+            });
+          }
+        }
       }
+
+      dbAny.db.meta_tx_used_nonces.push(nonceKey);
+      dbAny.save?.();
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
@@ -1320,6 +1510,7 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         txHash: txId,
         relayerSponsored: true,
         gasChargedSov: 0,
+        burnedSov,
         action: metaReq.action,
         status: 'confirmed',
       }));
@@ -1329,6 +1520,97 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
       res.end(JSON.stringify({ ok: false, error: err?.message || 'Meta-tx execution failed' }));
       return true;
     }
+  }
+
+  // ==========================================
+  // 10B. POST /api/wallet/auto-settle - Sponsored AMM Swap Buy & Protocol Burn Settlement
+  // ==========================================
+  if (url.pathname === '/api/wallet/auto-settle' && req.method === 'POST') {
+    const principal = ctx.enforceAuth(req, res);
+    if (!principal) return true;
+    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    if (!ok) return true;
+    try {
+      const parsed = JSON.parse(body || '{}');
+      const tokenAddress = String(parsed.tokenAddress || '').trim();
+      const inputTokens = BigInt(String(parsed.inputTokenUnits || '0'));
+      const purpose = String(parsed.purpose || 'TIP').toUpperCase();
+      if (!tokenAddress || inputTokens <= 0n) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'tokenAddress and positive inputTokenUnits required' }));
+        return true;
+      }
+      const dbAny = sovraDb as any;
+      const pool = (dbAny.db?.amm_pools || []).find((pl: any) => pl.tokenAddress === tokenAddress);
+      if (!pool) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: `AMM pool not found for ${tokenAddress}` }));
+        return true;
+      }
+      const rSov = BigInt(pool.reserveSov || '0');
+      const rTok = BigInt(pool.reserveToken || '0');
+      if (rSov <= 0n || rTok <= 0n) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Pool reserves empty' }));
+        return true;
+      }
+      const grossSovUsov = (rSov * inputTokens) / (rTok + inputTokens);
+      if (grossSovUsov <= 0n || grossSovUsov >= rSov) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Insufficient SOV liquidity for AMM auto-settle' }));
+        return true;
+      }
+      const autoSettleRisk = riskManagementEngine.checkAmmPoolSwapRisk(tokenAddress, principal.did, Number(grossSovUsov), Number(rSov), '/api/wallet/auto-settle');
+      if (!autoSettleRisk.allowed) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: autoSettleRisk.reason, code: autoSettleRisk.code }));
+        return true;
+      }
+      const feeUsov = (grossSovUsov * 1n) / 100n;
+      const netSovUsov = grossSovUsov - feeUsov;
+      const burnShareBps = purpose === 'HANDLE' || purpose === 'BOOST' ? 8000n : 5000n;
+      const burnedUsov = (netSovUsov * burnShareBps) / 10000n;
+      const netRecipientUsov = netSovUsov - burnedUsov;
+
+      pool.reserveSov = (rSov - grossSovUsov).toString();
+      pool.sovReserve = pool.reserveSov;
+      pool.reserveToken = (rTok + inputTokens).toString();
+      pool.tokenReserve = pool.reserveToken;
+      if (typeof dbAny.burnToConsensusSink === 'function' && burnedUsov > 0n) {
+        try {
+          dbAny.burnToConsensusSink(Number(burnedUsov) / 1_000_000, 'PROTOCOL_DEFLATION');
+        } catch {}
+      }
+      if (feeUsov > 0n) {
+        riskManagementEngine.recordRiskEvent({
+          category: 'REVENUE_RECORDED',
+          severity: 'LOW',
+          direction: 'REVENUE',
+          amountSov: Number(feeUsov) / 1_000_000,
+          actorDid: principal.did,
+          endpoint: '/api/wallet/auto-settle',
+          description: `AMM auto-settle 1% pool royalty (${purpose})`,
+          prevented: false,
+          metadata: { kind: 'AMM_FEE', tokenAddress },
+        });
+      }
+      dbAny.save?.();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        purpose,
+        inputTokenUnits: inputTokens.toString(),
+        acquiredSovUsov: netSovUsov.toString(),
+        burnedUsov: burnedUsov.toString(),
+        settledRecipientUsov: netRecipientUsov.toString(),
+        gasChargedToUser: '0',
+      }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Auto-settle failed' }));
+    }
+    return true;
   }
 
   // ==========================================
@@ -1390,28 +1672,96 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         return true;
       }
 
-      // Idempotency: prevent replay attack on duplicate paymentId
+      // Durable Idempotency: check in-memory, persisted JSON registry, AND SQLite financial_idempotency_keys
+      const dbAny = sovraDb as any;
+      if (!Array.isArray(dbAny.db.processed_fiat_payments)) {
+        dbAny.db.processed_fiat_payments = [];
+      }
+      const sqliteRaw = dbAny.getSqliteEngine?.()?.getRawDb?.() || dbAny.getSqliteEngine?.()?.db;
       const finalPaymentId = paymentId || `pay_${Date.now()}`;
-      if (paymentId && processedFiatPaymentIds.has(paymentId)) {
-        res.writeHead(409, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Duplicate paymentId: payment already processed', paymentId }));
-        return true;
+      if (paymentId) {
+        let alreadyProcessed =
+          processedFiatPaymentIds.has(paymentId) ||
+          dbAny.db.processed_fiat_payments.includes(paymentId);
+        if (!alreadyProcessed && sqliteRaw) {
+          try {
+            const existingKey = sqliteRaw
+              .prepare("SELECT idempotency_key FROM financial_idempotency_keys WHERE idempotency_key = ?")
+              .get(`fiat_pay:${paymentId}`);
+            if (existingKey) alreadyProcessed = true;
+          } catch {}
+        }
+        if (alreadyProcessed) {
+          res.writeHead(409, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Duplicate paymentId: payment already processed', paymentId }));
+          return true;
+        }
       }
 
       const sovToCredit = Number((amountFiat / 10).toFixed(4));
-      const user = (sovraDb as any).db?.users?.find((u: any) => u.did === userDid);
+      const fiatGuard = riskManagementEngine.checkAndRecordFiatOnRamp(userDid, sovToCredit, finalPaymentId);
+      if (!fiatGuard.allowed) {
+        res.writeHead(429, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: fiatGuard.reason || 'Daily fiat mint ceiling exceeded', code: fiatGuard.code }));
+        return true;
+      }
+
+      const user = dbAny.db?.users?.find((u: any) => u.did === userDid);
       if (!user) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'User not found' }));
         return true;
       }
 
-      if (paymentId) {
-        processedFiatPaymentIds.add(paymentId);
+      const now = Date.now();
+      let fundingSource: 'AMM_DEX_SWAP' | 'FIAT_BACKED_TREASURY_ISSUANCE' = 'FIAT_BACKED_TREASURY_ISSUANCE';
+      const targetPool = payload.tokenAddress
+        ? (dbAny.db?.amm_pools || []).find((pl: any) => pl.tokenAddress === String(payload.tokenAddress).trim())
+        : null;
+      const reqSovUsov = BigInt(Math.round(sovToCredit * 1_000_000));
+      if (targetPool && BigInt(targetPool.reserveSov || '0') > reqSovUsov + 1_000_000n) {
+        // Route on-ramp through real AMM liquidity pool buy when pool is designated and deep enough
+        targetPool.reserveSov = (BigInt(targetPool.reserveSov) - reqSovUsov).toString();
+        targetPool.sovReserve = targetPool.reserveSov;
+        fundingSource = 'AMM_DEX_SWAP';
+      } else {
+        // Account truthfully in fiat-backed reserve obligation & genesis supply ceiling (never stealth print)
+        const sqEng = dbAny.getSqliteEngine?.();
+        if (sqEng && typeof sqEng.getRevenueSetting === 'function' && typeof sqEng.setRevenueSetting === 'function') {
+          try {
+            const curMinted = Number(sqEng.getRevenueSetting('total_genesis_minted_sov', 5_000_000.0).valueNum || 5_000_000.0);
+            sqEng.setRevenueSetting('total_genesis_minted_sov', Math.round((curMinted + sovToCredit) * 1000) / 1000);
+            const curFiatRes = Number(sqEng.getRevenueSetting('fiat_backed_reserve_sov', 0.0).valueNum || 0.0);
+            sqEng.setRevenueSetting('fiat_backed_reserve_sov', Math.round((curFiatRes + sovToCredit) * 1000) / 1000);
+          } catch {}
+        }
       }
 
-      user.balanceSov = (user.balanceSov || 0) + sovToCredit;
-      (sovraDb as any).save();
+      if (paymentId) {
+        processedFiatPaymentIds.add(paymentId);
+        dbAny.db.processed_fiat_payments.push(paymentId);
+        if (sqliteRaw) {
+          try {
+            const payloadHash = crypto.createHash('sha256').update(String(body || '')).digest('hex');
+            sqliteRaw.prepare(`
+              INSERT OR IGNORE INTO financial_idempotency_keys
+              (idempotency_key, user_did, operation_type, payload_hash, payload_json, tx_id, status, status_code, created_at, updated_at)
+              VALUES (?, ?, 'FIAT_WEBHOOK', ?, ?, ?, 'COMMITTED', 200, ?, ?)
+            `).run(`fiat_pay:${paymentId}`, userDid, payloadHash, String(body || '{}').slice(0, 1024), finalPaymentId, now, now);
+          } catch {}
+        }
+      }
+
+      const nextBal = Math.round(((Number(user.balanceSov ?? user.balance_sov ?? 0)) + sovToCredit) * 10_000) / 10_000;
+      user.balanceSov = nextBal;
+      user.balance_sov = nextBal;
+      user.fiatFunded = true;
+      if (sqliteRaw) {
+        try {
+          sqliteRaw.prepare('UPDATE users SET balance_sov = ?, updated_at = ? WHERE did = ?').run(nextBal, now, userDid);
+        } catch {}
+      }
+      dbAny.save();
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
@@ -1420,6 +1770,7 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         newBalance: user.balanceSov,
         paymentId: finalPaymentId,
         verifiedSignature: signatureValid,
+        fundingSource,
       }));
       return true;
     } catch (err: any) {
@@ -1450,19 +1801,239 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         return true;
       }
 
-      const user = (sovraDb as any).db?.users?.find((u: any) => u.did === principal.did);
-      if (!user || (user.balanceSov || 0) < amountSov) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Insufficient SOV balance for cash out' }));
+      const dbAny = sovraDb as any;
+      const store = dbAny.getSovraStore?.();
+      const now = Date.now();
+      const currency = String(payload.currency || 'INR').toUpperCase();
+      const fiatPayoutAmount = Number((amountSov * 10).toFixed(2));
+      const payoutReceiptId = `payout_${now}_${crypto.randomBytes(4).toString('hex')}`;
+      const isStrictGatewayMode =
+        process.env.FIAT_PAYOUT_PROVIDER_ENABLED === 'true' ||
+        process.env.SOVRA_STRICT_KYC_GATES === 'true' ||
+        process.env.NODE_ENV === 'production';
+
+      const kyc = store?.getKycVerification
+        ? await store.getKycVerification(principal.did)
+        : { did: principal.did, tier: 0 as const, status: 'UNVERIFIED' as const };
+      const effectiveTier: 0 | 1 | 2 = kyc.status === 'VERIFIED' ? (kyc.tier as 0 | 1 | 2) : 0;
+
+      if (isStrictGatewayMode) {
+        if (effectiveTier < 1) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: false,
+            code: 'KYC_TIER_REQUIRED',
+            requiredTier: 1,
+            currentTier: effectiveTier,
+            error: 'Verified KYC Tier >= 1 is required for external fiat payouts',
+          }));
+          return true;
+        }
+        const dailyCap = KYC_TIER_LIMITS[effectiveTier].dailyFiatPayoutMaxSov;
+        const dailyUsed = store?.getDailyFiatPayoutSov ? await store.getDailyFiatPayoutSov(principal.did) : 0;
+        if (dailyUsed + amountSov > dailyCap) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: false,
+            code: 'KYC_TIER_LIMIT_EXCEEDED',
+            tier: effectiveTier,
+            dailyLimitSov: dailyCap,
+            dailyUsedSov: dailyUsed,
+            error: `24h fiat cashout cap exceeded for KYC Tier ${effectiveTier} (${dailyUsed} + ${amountSov} > ${dailyCap} SOV)`,
+          }));
+          return true;
+        }
+      }
+
+      const providerResolution = isStrictGatewayMode
+        ? resolveFiatPayoutProvider(payload.provider, ctx.fetchFn)
+        : { enabled: false, adapter: null, code: 'SANDBOX_DISABLED' as const };
+
+      if (isStrictGatewayMode && !providerResolution.adapter) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: false,
+          code: providerResolution.code || 'ERR_FIAT_GATEWAY_DISABLED',
+          error: providerResolution.error || 'Fiat banking payout provider is not configured',
+        }));
         return true;
       }
 
-      user.balanceSov -= amountSov;
-      (sovraDb as any).save();
+      const user = dbAny.db?.users?.find((u: any) => u.did === principal.did);
+      const currentBal = Number(user?.balanceSov ?? user?.balance_sov ?? 0);
+      const vestingLocked = getVestingLockedForDid(principal.did);
+      const spendableBal = Math.max(0, currentBal - vestingLocked);
+      if (!user || spendableBal < amountSov) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: vestingLocked > 0 && currentBal >= amountSov
+            ? `Insufficient spendable SOV: ${vestingLocked} SOV is time-locked under genesis vesting`
+            : 'Insufficient SOV balance for cash out',
+        }));
+        return true;
+      }
 
-      const fiatPayoutAmount = Number((amountSov * 10).toFixed(2));
-      const payoutReceiptId = `payout_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-      const isPayoutGatewayLive = process.env.FIAT_PAYOUT_PROVIDER_ENABLED === 'true';
+      const nextBal = Math.round((currentBal - amountSov) * 10_000) / 10_000;
+      user.balanceSov = nextBal;
+      user.balance_sov = nextBal;
+      const sqliteRaw = dbAny.getSqliteEngine?.()?.getRawDb?.() || dbAny.getSqliteEngine?.()?.db;
+      if (sqliteRaw) {
+        try {
+          sqliteRaw.prepare('UPDATE users SET balance_sov = ?, updated_at = ? WHERE did = ?').run(nextBal, now, principal.did);
+        } catch {}
+      }
+      dbAny.save();
+
+      if (providerResolution.adapter) {
+        if (store?.recordFiatPayout) {
+          await store.recordFiatPayout({
+            id: payoutReceiptId,
+            userDid: principal.did,
+            amountSov,
+            fiatAmount: fiatPayoutAmount,
+            currency,
+            destinationRef: targetAddress || payoutTarget,
+            provider: providerResolution.adapter.name,
+            status: 'PENDING_BANK_PAYOUT',
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+
+        const payoutResp = await providerResolution.adapter.createPayout({
+          payoutId: payoutReceiptId,
+          userDid: principal.did,
+          amountSov,
+          fiatAmount: fiatPayoutAmount,
+          currency,
+          destinationRef: targetAddress || payoutTarget,
+        });
+
+        if (!payoutResp.ok) {
+          const refundedBal = Math.round((Number(user.balanceSov ?? 0) + amountSov) * 10_000) / 10_000;
+          user.balanceSov = refundedBal;
+          user.balance_sov = refundedBal;
+          if (sqliteRaw) {
+            try {
+              sqliteRaw.prepare('UPDATE users SET balance_sov = ?, updated_at = ? WHERE did = ?').run(refundedBal, Date.now(), principal.did);
+            } catch {}
+          }
+          dbAny.save();
+          if (store?.recordFiatPayout) {
+            await store.recordFiatPayout({
+              id: payoutReceiptId,
+              userDid: principal.did,
+              amountSov,
+              fiatAmount: fiatPayoutAmount,
+              currency,
+              destinationRef: targetAddress || payoutTarget,
+              provider: providerResolution.adapter.name,
+              status: 'FAILED_REFUNDED',
+              failureReason: payoutResp.error || 'Provider rejected payout',
+              createdAt: now,
+              updatedAt: Date.now(),
+            });
+          }
+          riskManagementEngine.recordRiskEvent({
+            category: 'MITIGATION_RECOVERY',
+            severity: 'HIGH',
+            direction: 'RECOVERED_OR_SAVED',
+            amountSov,
+            actorDid: principal.did,
+            endpoint: '/api/wallet/fiat/withdraw',
+            description: `Atomically refunded ${amountSov} SOV after banking provider failure: ${payoutResp.error}`,
+            prevented: true,
+            metadata: { payoutReceiptId, provider: providerResolution.adapter.name },
+          });
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: false,
+            code: 'FIAT_PROVIDER_FAILED',
+            refunded: true,
+            payoutReceiptId,
+            remainingBalance: user.balanceSov,
+            error: payoutResp.error || 'External payout provider rejected disbursement',
+          }));
+          return true;
+        }
+
+        const settledAt = payoutResp.status === 'SETTLED' ? Date.now() : undefined;
+        if (store?.recordFiatPayout) {
+          await store.recordFiatPayout({
+            id: payoutReceiptId,
+            userDid: principal.did,
+            amountSov,
+            fiatAmount: fiatPayoutAmount,
+            currency,
+            destinationRef: targetAddress || payoutTarget,
+            provider: providerResolution.adapter.name,
+            externalPayoutId: payoutResp.externalPayoutId,
+            status: payoutResp.status === 'SETTLED' ? 'SETTLED' : 'PENDING_BANK_PAYOUT',
+            createdAt: now,
+            updatedAt: Date.now(),
+            settledAt,
+          });
+        }
+
+        riskManagementEngine.recordRiskEvent({
+          category: 'FIAT_WITHDRAWAL_OUTFLOW',
+          severity: 'LOW',
+          direction: 'RISK_EXPOSURE',
+          amountSov,
+          actorDid: principal.did,
+          endpoint: '/api/wallet/fiat/withdraw',
+          description: `Fiat withdrawal dispatched via ${providerResolution.adapter.name} (${amountSov} SOV -> ${payoutTarget}) [${payoutResp.status}]`,
+          prevented: false,
+          metadata: { payoutReceiptId, externalPayoutId: payoutResp.externalPayoutId, payoutTarget, fiatPayoutAmount },
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true,
+          payoutReceiptId,
+          externalPayoutId: payoutResp.externalPayoutId,
+          debitedSov: amountSov,
+          fiatPayoutAmount,
+          currency,
+          payoutTarget,
+          targetAddress,
+          remainingBalance: user.balanceSov,
+          status: payoutResp.status,
+          payoutExecuted: true,
+          payoutProvider: providerResolution.adapter.name,
+          settlementTier: payoutResp.status === 'SETTLED' ? 'BANK_SETTLED' : 'PENDING_BANK_PAYOUT',
+          note: `Payout submitted to ${providerResolution.adapter.name} banking rail`,
+        }));
+        return true;
+      }
+
+      if (store?.recordFiatPayout) {
+        await store.recordFiatPayout({
+          id: payoutReceiptId,
+          userDid: principal.did,
+          amountSov,
+          fiatAmount: fiatPayoutAmount,
+          currency,
+          destinationRef: targetAddress || payoutTarget,
+          provider: 'sandbox',
+          status: 'PENDING_BANK_PAYOUT',
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+
+      riskManagementEngine.recordRiskEvent({
+        category: 'FIAT_WITHDRAWAL_OUTFLOW',
+        severity: 'LOW',
+        direction: 'RISK_EXPOSURE',
+        amountSov,
+        actorDid: principal.did,
+        endpoint: '/api/wallet/fiat/withdraw',
+        description: `Fiat withdrawal request (${amountSov} SOV -> ${payoutTarget}) [TESTNET_SIMULATED]`,
+        prevented: false,
+        metadata: { payoutReceiptId, payoutTarget, fiatPayoutAmount },
+      });
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
@@ -1470,15 +2041,15 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
         payoutReceiptId,
         debitedSov: amountSov,
         fiatPayoutAmount,
-        currency: 'INR',
+        currency,
         payoutTarget,
         targetAddress,
         remainingBalance: user.balanceSov,
-        status: isPayoutGatewayLive ? 'PROCESSED' : 'SIMULATED_TESTNET_DEBIT',
-        payoutExecuted: isPayoutGatewayLive,
-        payoutProvider: isPayoutGatewayLive ? 'configured_gateway' : 'none_configured',
-        settlementTier: isPayoutGatewayLive ? 'BANK_SETTLED' : 'TESTNET_SIMULATED_DEBIT',
-        note: isPayoutGatewayLive ? 'Payout dispatched to banking partner' : 'Testnet simulation: SOV debited from ledger; external banking payout queued for manual review',
+        status: 'SIMULATED_TESTNET_DEBIT',
+        payoutExecuted: false,
+        payoutProvider: 'none_configured',
+        settlementTier: 'TESTNET_SIMULATED_DEBIT',
+        note: 'Testnet simulation: SOV debited from ledger; external banking payout queued for manual review',
       }));
       return true;
     } catch (err: any) {
@@ -1568,9 +2139,9 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
     return true;
   }
 
-  // 15. POST /api/wallet/claim-seeder-yield - Calculate and claim bandwidth earnings from seeder receipts
+  // 15. POST /api/wallet/claim-seeder-yield - Proof-verified & anti-collusion bandwidth yield claims
   if (url.pathname === '/api/wallet/claim-seeder-yield' && req.method === 'POST') {
-    const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
+    const { body, ok } = await readBoundedBody(req, res, 128 * 1024);
     if (!ok) return true;
     let bodyObj: any = {};
     try {
@@ -1584,54 +2155,443 @@ export async function handleWalletRoutes(ctx: WalletRouteContext): Promise<boole
     if (!dbAny.db.seeder_receipts) {
       dbAny.db.seeder_receipts = [];
     }
+    if (!dbAny.db.claimed_seeder_receipt_ids) {
+      dbAny.db.claimed_seeder_receipt_ids = [];
+    }
+    const claimedIdSet = new Set<string>(dbAny.db.claimed_seeder_receipt_ids);
 
-    const receipts = dbAny.db.seeder_receipts.filter((r: any) => (r.seederDid === targetDid || r.did === targetDid) && !r.claimed);
-    let claimableSov = 0;
-    if (receipts.length > 0) {
-      for (const r of receipts) {
-        claimableSov += Number(r.amountSov || r.earnedSov || (Number(r.bytesRelayed || 1048576) / (1024 * 1024 * 1024) * 0.05));
-        r.claimed = true;
+    const submittedReceipts: any[] = Array.isArray(bodyObj?.receipts) ? bodyObj.receipts : [];
+    const storedReceipts: any[] = dbAny.db.seeder_receipts.filter(
+      (r: any) => (r.seederDid === targetDid || r.did === targetDid) && !r.claimed,
+    );
+    const candidateReceipts = submittedReceipts.length > 0 ? submittedReceipts : storedReceipts;
+
+    if (candidateReceipts.length === 0) {
+      const sqlite = (sovraDb as any).getSqliteEngine?.()?.getRawDb?.() || (sovraDb as any).getSqliteEngine?.()?.db;
+      const user = sqlite?.prepare('SELECT balance_sov FROM users WHERE did = ?').get(targetDid) as any;
+      const existingBal = Number(user?.balance_sov || 0);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        claimedSov: 0,
+        newBalanceSov: existingBal,
+        receiptsCount: 0,
+        message: 'No unclaimed seeder receipts found',
+      }));
+      return true;
+    }
+
+    const validProtocolReceipts: SeederBandwidthReceipt[] = [];
+    const acceptedRawReceipts: any[] = [];
+    let rejectedCount = 0;
+
+    for (const r of candidateReceipts) {
+      const seederDid = String(r.seederDid || r.did || targetDid);
+      const downloaderDid = String(r.downloaderDid || '');
+      const receiptId = String(r.receiptId || '');
+      const bytesServed = Number(r.bytesServed ?? r.bytesRelayed ?? 0);
+      const totalMediaBytes = Number(r.totalMediaBytes ?? bytesServed);
+      const ts = Number(r.timestamp || 0);
+
+      // Anti-self-reporting + anti-replay gates
+      if (
+        !receiptId ||
+        claimedIdSet.has(receiptId) ||
+        seederDid !== targetDid ||
+        !downloaderDid ||
+        downloaderDid === seederDid ||
+        bytesServed <= 0 ||
+        !r.signatureHex ||
+        Date.now() - ts > 7 * 86400_000
+      ) {
+        rejectedCount++;
+        continue;
       }
-    } else {
-      // Zero-Trust: Never award fabricated unearned fallback yields
-      claimableSov = 0;
+
+      const downloaderRecord = sovraDb.findUserByDid(downloaderDid);
+      const downloaderPub = resolveSenderEd25519PubKey(
+        downloaderDid,
+        downloaderRecord,
+        r.downloaderPublicKeyHex,
+      );
+      if (!downloaderPub) {
+        rejectedCount++;
+        continue;
+      }
+
+      const normalized: SeederBandwidthReceipt = {
+        receiptId,
+        contentCid: String(r.contentCid || ''),
+        seederDid,
+        downloaderDid,
+        bytesServed,
+        totalMediaBytes,
+        timestamp: ts,
+        signatureHex: String(r.signatureHex),
+      };
+
+      if (!verifyBandwidthReceipt(normalized, downloaderPub)) {
+        rejectedCount++;
+        continue;
+      }
+
+      validProtocolReceipts.push(normalized);
+      acceptedRawReceipts.push(r);
+    }
+
+    if (validProtocolReceipts.length === 0) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: false,
+        claimedSov: 0,
+        receiptsCount: 0,
+        rejectedCount,
+        error: 'All seeder receipts failed cryptographic co-signature or anti-self-report verification',
+      }));
+      return true;
+    }
+
+    const collusionAudit = detectSeederWashTrading(validProtocolReceipts);
+    if (collusionAudit.payoutHold) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: false,
+        claimedSov: 0,
+        collusionDetected: true,
+        zScore: collusionAudit.zScore,
+        topDownloaderSharePercent: collusionAudit.topDownloaderSharePercent,
+        error: collusionAudit.reason || 'Wash-trading collusion detected; payout held',
+      }));
+      return true;
+    }
+
+    let claimableSov = 0;
+    for (let i = 0; i < validProtocolReceipts.length; i++) {
+      const vr = validProtocolReceipts[i]!;
+      const raw = acceptedRawReceipts[i]!;
+      // Deterministic yield bound: max 0.05 SOV per verified GiB relayed (never trust self-declared amountSov blindly)
+      const maxDeterministicSov = (vr.bytesServed / (1024 * 1024 * 1024)) * 0.05;
+      const requestedSov = raw.amountSov !== undefined ? Number(raw.amountSov) : maxDeterministicSov;
+      const awarded = Math.max(0, Math.min(requestedSov, Math.max(0.01, maxDeterministicSov)));
+      claimableSov += awarded;
     }
 
     claimableSov = Math.round(claimableSov * 100) / 100;
 
-    const sqlite = (sovraDb as any).getSqliteEngine?.()?.getRawDb?.() || (sovraDb as any).getSqliteEngine?.()?.db;
-    let currentBal = 0;
-    let user = sqlite?.prepare('SELECT balance_sov FROM users WHERE did = ?').get(targetDid) as any;
-    if (user) {
-      if (claimableSov > 0) {
-        sqlite?.prepare('UPDATE users SET balance_sov = balance_sov + ?, updated_at = ? WHERE did = ?').run(claimableSov, Date.now(), targetDid);
+    // Stake-to-Work check (>= 100 SOV collateral from seeder_bonds when strict/bond policy enabled)
+    if (!Array.isArray(dbAny.db.seeder_bonds)) dbAny.db.seeder_bonds = [];
+    const seederBondRec = dbAny.db.seeder_bonds.find((b: any) => b.did === targetDid);
+    const bondedSov = Number(seederBondRec?.bondedSov || 0);
+    if (claimableSov > 0) {
+      const seederGuard = riskManagementEngine.checkAndRecordSeederYield(targetDid, claimableSov, bondedSov, 100);
+      if (!seederGuard.allowed) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: false,
+          claimedSov: 0,
+          code: seederGuard.code,
+          bondedSov,
+          minRequiredBondSov: 100,
+          error: seederGuard.reason || 'Minimum 100 SOV Seeder collateral bond required to claim bandwidth yield',
+        }));
+        return true;
       }
-      currentBal = Number(user.balance_sov) + claimableSov;
-    } else {
-      currentBal = claimableSov;
     }
 
-    if (dbAny.db?.users) {
-      const u = dbAny.db.users.find((x: any) => x.did === targetDid);
-      if (u) {
-        u.balanceSov = (Number(u.balanceSov) || 0) + claimableSov;
-        currentBal = u.balanceSov;
-      }
+    // Mark receipts claimed ONLY after collateral policy gate succeeds
+    for (let i = 0; i < validProtocolReceipts.length; i++) {
+      const vr = validProtocolReceipts[i]!;
+      const raw = acceptedRawReceipts[i]!;
+      raw.claimed = true;
+      claimedIdSet.add(vr.receiptId);
+      dbAny.db.claimed_seeder_receipt_ids.push(vr.receiptId);
+    }
+
+    const sqlite = (sovraDb as any).getSqliteEngine?.()?.getRawDb?.() || (sovraDb as any).getSqliteEngine?.()?.db;
+    let currentBal = 0;
+    const nowTs = Date.now();
+    const userSql = sqlite?.prepare('SELECT balance_sov FROM users WHERE did = ?').get(targetDid) as any;
+    const jsonUser = dbAny.db?.users?.find((x: any) => x.did === targetDid);
+    const baseBal = Number(userSql?.balance_sov ?? jsonUser?.balanceSov ?? jsonUser?.balance_sov ?? 0);
+    currentBal = Math.round((baseBal + claimableSov) * 100) / 100;
+
+    if (userSql && claimableSov > 0) {
+      sqlite?.prepare('UPDATE users SET balance_sov = ?, updated_at = ? WHERE did = ?').run(currentBal, nowTs, targetDid);
+    }
+    if (jsonUser) {
+      jsonUser.balanceSov = currentBal;
+      jsonUser.balance_sov = currentBal;
     }
     if (dbAny.db?.wallets && dbAny.db.wallets[targetDid]) {
-      dbAny.db.wallets[targetDid].balance = (Number(dbAny.db.wallets[targetDid].balance) || 0) + claimableSov;
+      dbAny.db.wallets[targetDid].balance = currentBal;
     }
+
+    // Apply 50% 30-day rolling vesting lock to Seeder emissions
+    let vestedLockedSov = 0;
+    let unlockedLiquidSov = claimableSov;
+    if (claimableSov > 0) {
+      vestedLockedSov = Math.round(claimableSov * 0.5 * 1_000_000) / 1_000_000;
+      unlockedLiquidSov = Math.round((claimableSov - vestedLockedSov) * 1_000_000) / 1_000_000;
+      applyRollingRewardVestingSov(targetDid, vestedLockedSov, 30, 'Seeder Emission Linear Lock (30d)');
+    }
+    dbAny.save?.(true);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       ok: true,
       claimedSov: claimableSov,
+      unlockedLiquidSov,
+      vestedLockedSov,
+      bondedSov,
       newBalanceSov: currentBal,
-      receiptsCount: receipts.length,
-      txId: claimableSov > 0 ? ('tx_yield_' + Date.now()) : undefined,
-      message: claimableSov === 0 ? 'No unclaimed seeder receipts found' : 'Seeder bandwidth yield claimed successfully',
+      receiptsCount: validProtocolReceipts.length,
+      rejectedCount,
+      txId: claimableSov > 0 ? ('tx_yield_' + nowTs) : undefined,
+      message: claimableSov === 0 ? 'No unclaimed seeder receipts found' : 'Verified seeder bandwidth yield claimed successfully (50% vested 30d)',
     }));
     return true;
+  }
+
+  // ==========================================
+  // 18. POST /api/wallet/fiat/payout-webhook - Signed Bank Settlement / Refund State Machine
+  // ==========================================
+  if (url.pathname === '/api/wallet/fiat/payout-webhook' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 128 * 1024);
+    if (!ok) return true;
+    try {
+      const requestedProvider = (
+        url.searchParams.get('provider') ||
+        (req.headers['stripe-signature'] ? 'stripe' : req.headers['x-razorpay-signature'] ? 'razorpayx' : process.env.FIAT_PAYOUT_PROVIDER || 'razorpayx')
+      ).toLowerCase();
+
+      const adapter = requestedProvider === 'stripe'
+        ? new StripePayoutAdapter()
+        : new RazorpayXPayoutAdapter();
+
+      const sigCheck = adapter.verifyWebhookSignature(body, req.headers);
+      if (!sigCheck.valid || !sigCheck.event) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, code: 'INVALID_WEBHOOK_SIGNATURE', error: sigCheck.reason || 'Webhook HMAC verification failed' }));
+        return true;
+      }
+
+      const ev = sigCheck.event;
+      const store = (sovraDb as any).getSovraStore?.();
+      const lookupId = ev.payoutId || ev.externalPayoutId || '';
+      const existing = store?.getFiatPayout && lookupId ? await store.getFiatPayout(lookupId) : null;
+      if (!existing) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Fiat payout record not found', lookupId }));
+        return true;
+      }
+
+      if (ev.outcome === 'IGNORED') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, ignored: true, payoutId: existing.id, status: existing.status }));
+        return true;
+      }
+
+      if (existing.status === 'SETTLED' || existing.status === 'FAILED_REFUNDED') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, idempotentReplay: true, payoutId: existing.id, status: existing.status }));
+        return true;
+      }
+
+      const now = Date.now();
+      if (ev.outcome === 'SETTLED') {
+        await store.recordFiatPayout({
+          ...existing,
+          externalPayoutId: ev.externalPayoutId || existing.externalPayoutId,
+          status: 'SETTLED',
+          settledAt: now,
+          updatedAt: now,
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, payoutId: existing.id, status: 'SETTLED', settledAt: now }));
+        return true;
+      }
+
+      // Bank payout failed -> atomically restore locked SOV to user & mark FAILED_REFUNDED
+      const dbAny = sovraDb as any;
+      const user = dbAny.db?.users?.find((u: any) => u.did === existing.userDid);
+      if (user) {
+        const refundedBal = Math.round((Number(user.balanceSov ?? user.balance_sov ?? 0) + existing.amountSov) * 10_000) / 10_000;
+        user.balanceSov = refundedBal;
+        user.balance_sov = refundedBal;
+      }
+      const sqliteRaw = dbAny.getSqliteEngine?.()?.getRawDb?.() || dbAny.getSqliteEngine?.()?.db;
+      if (sqliteRaw) {
+        try {
+          sqliteRaw.prepare('UPDATE users SET balance_sov = balance_sov + ?, updated_at = ? WHERE did = ?').run(existing.amountSov, now, existing.userDid);
+        } catch {}
+      }
+      const pgPool = store?.getPgPool?.();
+      if (pgPool) {
+        try {
+          await pgPool.query('UPDATE users SET balance_sov = balance_sov + $1, updated_at = $2 WHERE did = $3', [existing.amountSov, now, existing.userDid]);
+        } catch {}
+      }
+      await store.recordFiatPayout({
+        ...existing,
+        externalPayoutId: ev.externalPayoutId || existing.externalPayoutId,
+        status: 'FAILED_REFUNDED',
+        failureReason: ev.failureReason || 'Bank payout rejected by rail webhook',
+        updatedAt: now,
+      });
+      dbAny.save?.();
+
+      riskManagementEngine.recordRiskEvent({
+        category: 'MITIGATION_RECOVERY',
+        severity: 'MEDIUM',
+        direction: 'RECOVERED_OR_SAVED',
+        amountSov: existing.amountSov,
+        actorDid: existing.userDid,
+        endpoint: '/api/wallet/fiat/payout-webhook',
+        description: `Webhook-verified payout failure refunded ${existing.amountSov} SOV for ${existing.id}`,
+        prevented: true,
+        metadata: { payoutId: existing.id, provider: ev.provider, reason: ev.failureReason },
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, payoutId: existing.id, status: 'FAILED_REFUNDED', refundedSov: existing.amountSov }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Payout webhook processing failed' }));
+      return true;
+    }
+  }
+
+  // ==========================================
+  // 19. POST /api/kyc/submit & GET /api/kyc/status & POST /api/admin/kyc/verify
+  // ==========================================
+  if (url.pathname === '/api/kyc/submit' && req.method === 'POST') {
+    const principal = ctx.enforceAuth(req, res);
+    if (!principal) return true;
+    const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
+    if (!ok) return true;
+    try {
+      const payload = JSON.parse(body || '{}');
+      const requestedTier = Number(payload.tier || 1) >= 2 ? 2 : 1;
+      const country = String(payload.country || 'IN').toUpperCase().slice(0, 8);
+      const docRaw = String(payload.documentHash || payload.documentNumber || '').trim();
+      if (!docRaw || docRaw.length < 4) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Valid KYC document identifier or SHA-256 documentHash is required' }));
+        return true;
+      }
+      const documentHash = /^[0-9a-f]{64}$/i.test(docRaw)
+        ? docRaw.toLowerCase()
+        : crypto.createHash('sha256').update(`${principal.did}:${country}:${docRaw}`).digest('hex');
+
+      const now = Date.now();
+      const autoApprove = process.env.KYC_AUTO_VERIFY_SANDBOX === 'true' && process.env.NODE_ENV !== 'production';
+      const status = autoApprove ? 'VERIFIED' : 'PENDING';
+      const record = {
+        did: principal.did,
+        tier: requestedTier as 0 | 1 | 2,
+        status: status as 'PENDING' | 'VERIFIED',
+        provider: String(payload.provider || 'internal-compliance').slice(0, 32),
+        country,
+        documentHash,
+        submittedAt: now,
+        ...(autoApprove ? { verifiedAt: now, reviewedBy: 'sandbox_auto_verifier' } : {}),
+        updatedAt: now,
+      };
+      const store = (sovraDb as any).getSovraStore?.();
+      await store.upsertKycVerification(record);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, kyc: record, limits: KYC_TIER_LIMITS[autoApprove ? requestedTier : 0] }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid KYC submission' }));
+      return true;
+    }
+  }
+
+  if (url.pathname === '/api/kyc/status' && req.method === 'GET') {
+    const principal = ctx.enforceAuth(req, res);
+    if (!principal) return true;
+    const store = (sovraDb as any).getSovraStore?.();
+    const kyc = await store.getKycVerification(principal.did);
+    const effectiveTier = (kyc.status === 'VERIFIED' ? kyc.tier : 0) as 0 | 1 | 2;
+    const [dailyFiatSov, dailyBridgeSov] = await Promise.all([
+      store.getDailyFiatPayoutSov(principal.did),
+      store.getDailyBridgeSov(principal.did),
+    ]);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      kyc,
+      effectiveTier,
+      limits: KYC_TIER_LIMITS[effectiveTier],
+      dailyUsage: { fiatPayoutSov: dailyFiatSov, bridgeSov: dailyBridgeSov },
+    }));
+    return true;
+  }
+
+  if (url.pathname === '/api/admin/kyc/verify' && req.method === 'POST') {
+    let adminDid = '';
+    if (ctx.checkAdminRbac) {
+      const rbac = ctx.checkAdminRbac(req, 'kyc:verify');
+      if (!rbac.authorized) {
+        res.writeHead(rbac.statusCode || 403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: rbac.error || 'Forbidden: Admin KYC privilege required' }));
+        return true;
+      }
+      adminDid = rbac.adminDid;
+    } else {
+      const principal = ctx.enforceAuth(req, res);
+      if (!principal) return true;
+      const role = String((principal as any).role || '').toUpperCase();
+      const caps = Array.isArray((principal as any).capabilities) ? (principal as any).capabilities : [];
+      if (!['ADMIN', 'FOUNDER', 'COMPLIANCE_OFFICER'].includes(role) && !caps.includes('admin')) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Compliance/Admin role required to verify KYC tier' }));
+        return true;
+      }
+      adminDid = principal.did;
+    }
+
+    const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
+    if (!ok) return true;
+    try {
+      const payload = JSON.parse(body || '{}');
+      const targetDid = String(payload.did || '').trim();
+      const approve = payload.approve !== false;
+      const tierNum = Number(payload.tier ?? 1);
+      const verifiedTier = (approve ? (tierNum >= 2 ? 2 : 1) : 0) as 0 | 1 | 2;
+      if (!targetDid) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Target user did is required' }));
+        return true;
+      }
+
+      const store = (sovraDb as any).getSovraStore?.();
+      const current = await store.getKycVerification(targetDid);
+      const now = Date.now();
+      const updated = {
+        ...current,
+        did: targetDid,
+        tier: verifiedTier,
+        status: (approve ? 'VERIFIED' : 'REJECTED') as 'VERIFIED' | 'REJECTED',
+        provider: current.provider === 'none' ? 'manual-compliance' : current.provider,
+        reviewedBy: adminDid,
+        rejectionReason: approve ? undefined : String(payload.reason || 'Compliance verification declined'),
+        submittedAt: current.submittedAt || now,
+        verifiedAt: approve ? now : undefined,
+        updatedAt: now,
+      };
+      await store.upsertKycVerification(updated);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, kyc: updated, limits: KYC_TIER_LIMITS[verifiedTier] }));
+      return true;
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: err?.message || 'Admin KYC update failed' }));
+      return true;
+    }
   }
 
   return false;

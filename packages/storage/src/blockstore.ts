@@ -200,10 +200,17 @@ export class DiskBlockstore implements Blockstore {
   constructor(
     public readonly rootDir: string,
     public readonly maxSizeBytes: number = 1024 * 1024 * 1024, // 1 GB default
-  ) {}
+  ) {
+    if (typeof rootDir !== 'string' || rootDir.trim().length === 0) {
+      throw new StorageError('DiskBlockstore requires a non-empty rootDir path', 'ERR_INVALID_STORAGE_PATH');
+    }
+  }
 
   public async init(): Promise<void> {
     if (this.initialized) return;
+    if (typeof this.rootDir !== 'string' || this.rootDir.trim().length === 0) {
+      throw new StorageError('DiskBlockstore requires a non-empty rootDir path', 'ERR_INVALID_STORAGE_PATH');
+    }
     await fs.mkdir(this.rootDir, { recursive: true });
 
     // Load persisted pins

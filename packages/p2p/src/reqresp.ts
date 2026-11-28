@@ -233,7 +233,7 @@ export class RequestResponseManager implements RequestResponseProtocol {
         const pending = this.pendingRequests.get(wireRes.requestId);
         if (pending) {
           clearTimeout(pending.timer);
-          if (wireRes.success && wireRes.payloadHex) {
+          if (wireRes.success && typeof wireRes.payloadHex === 'string') {
             pending.resolve(hexToBytes(wireRes.payloadHex));
           } else {
             pending.reject(new P2PError(wireRes.error ?? 'Remote peer returned error'));
@@ -243,7 +243,7 @@ export class RequestResponseManager implements RequestResponseProtocol {
       }
 
       // Handle inbound request
-      if (parsed.requestId && parsed.protocolId && parsed.payloadHex) {
+      if (parsed.requestId && parsed.protocolId && typeof parsed.payloadHex === 'string') {
         const wireReq = parsed as WireRequest;
         const handler = this.handlers.get(wireReq.protocolId);
         const reqPayload = hexToBytes(wireReq.payloadHex);

@@ -7,7 +7,7 @@
  */
 
 import type http from 'node:http';
-import { SOVRA_RTC_CONFIGURATION, type SovraRtcConfiguration } from '../webrtc-config.ts';
+import { getWebRtcConfiguration } from '../webrtc-config.ts';
 import type { AuthenticatedPrincipal } from '../../packages/identity/dist/index.js';
 
 export interface WebRtcRouteContext {
@@ -33,7 +33,7 @@ export function handleWebRtcRoutes(ctx: WebRtcRouteContext): boolean {
     res.end(JSON.stringify({
       ok: true,
       iceServers,
-      configuration: SOVRA_RTC_CONFIGURATION,
+      configuration: { ...getWebRtcConfiguration(principal?.did), iceServers },
     }));
     return true;
   }

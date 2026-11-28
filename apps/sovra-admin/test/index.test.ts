@@ -9,6 +9,7 @@ describe('@sovra/admin', () => {
     expect(ADMIN_SECTIONS).toContain('Audit Logs');
     expect(ADMIN_SECTIONS).toContain('Network');
     expect(ADMIN_SECTIONS).toContain('Incidents');
+    expect(ADMIN_SECTIONS).toContain('Risk Management');
   });
 
   it('enforces RBAC role definitions', () => {

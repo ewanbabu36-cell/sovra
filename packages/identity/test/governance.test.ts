@@ -617,8 +617,42 @@ describe('SOVRA Foundational Governance & Founder Identity Subsystem', () => {
   // 10. GENESIS SECURITY COUNCIL 3-OF-5 THRESHOLD & KEY BINDING VERIFICATION
   // =========================================================================
   describe('Genesis Security Council (Track D)', () => {
-    it('binds all 5 genesis security council keys with 3-of-5 threshold enforcement', () => {
-      const mpaEngine = new MultiPartyApprovalEngine();
+    it('does NOT bind hardcoded Genesis Security Council signers by default and enforces zero founder protocol privilege', () => {
+      const defaultMpa = new MultiPartyApprovalEngine();
+      expect(() =>
+        defaultMpa.resolveAuthorizedPublicKey('did:sovra:council-1', 'EMERGENCY_SECURITY_PAUSE'),
+      ).toThrow();
+
+      const kp = generateEd25519KeyPair();
+      const founderReg = new FounderIdentityRegistry();
+      const rec = founderReg.registerFounder({ pseudonym: 'alex_zero_priv', publicKeyBytes: kp.publicKey });
+      expect(rec.hasProtocolPrivilege).toBe(false);
+      expect(founderReg.getPublicProfile().hasProtocolPrivilege).toBe(false);
+      expect(() => FounderIdentityRegistry.assertZeroProtocolPrivilege(rec)).not.toThrow();
+
+      const coreVoting = new GovernanceVotingEngine({ coreTokenFreeMode: true });
+      expect(coreVoting.isExtensionTokenVotingEnabled()).toBe(false);
+      const richKey = generateEd25519KeyPair();
+      const poorKey = generateEd25519KeyPair();
+      const richVote = coreVoting.castVote({
+        proposalId: 'prop-token-free-1',
+        voterProfile: { did: 'did:sovra:rich', stakeMicroSov: 10_000_000_000_000n, accountAgeDays: 100, usageScore: 0.8 },
+        option: 'YES',
+        signatureHex: bytesToHex(signEd25519(richKey.privateKey, Buffer.from('SOVRA_VOTE:prop-token-free-1:YES:did:sovra:rich'))),
+        voterPublicKeyBytes: richKey.publicKey,
+      });
+      const poorVote = coreVoting.castVote({
+        proposalId: 'prop-token-free-1',
+        voterProfile: { did: 'did:sovra:poor', stakeMicroSov: 0n, accountAgeDays: 100, usageScore: 0.8 },
+        option: 'YES',
+        signatureHex: bytesToHex(signEd25519(poorKey.privateKey, Buffer.from('SOVRA_VOTE:prop-token-free-1:YES:did:sovra:poor'))),
+        voterPublicKeyBytes: poorKey.publicKey,
+      });
+      expect(richVote.rawWeight).toBeCloseTo(poorVote.rawWeight, 10);
+    });
+
+    it('binds all 5 genesis security council keys when explicitly opted into legacy council mode', () => {
+      const mpaEngine = new MultiPartyApprovalEngine({ bindGenesisCouncil: true });
       expect(MultiPartyApprovalEngine.REQUIRED_COUNCIL_APPROVALS).toBe(3);
       expect(MultiPartyApprovalEngine.TOTAL_COUNCIL_SEATS).toBe(5);
 

@@ -160,23 +160,27 @@ func TestCreatorRevenueSplit_BlockchainLifecycle(t *testing.T) {
 	require.NoError(t, app.CheckTx(distributeTx))
 	require.NoError(t, app.DeliverTx(distributeTx))
 
-	// 4. Assert Atomic On-Chain Ledger Balances:
+	// 4. Assert Atomic On-Chain Ledger Balances & Mandatory 5% Protocol Burn Sink:
 	// - Dave: initial - 10,000,000 - 1,000 fee
 	tipInt, _ := math.NewIntFromString(tipAmount)
 	feeInt, _ := math.NewIntFromString(gasFee)
 	expectedDaveBal := daveInitialBal.Sub(tipInt).Sub(feeInt)
 	require.Equal(t, expectedDaveBal.String(), app.QueryBalance(dave.Address).String())
 
-	// - Alice: before + 7,000,000 (70% share)
-	aliceShareInt, _ := math.NewIntFromString("7000000")
+	// - Mandatory 5% cw_split burn = 500,000 uSOV burned on-chain; remaining 9,500,000 split 70%/20%/10%
+	// - Alice: before + 6,650,000 (70% of 9.5M)
+	aliceShareInt, _ := math.NewIntFromString("6650000")
 	expectedAliceBal := aliceBeforeBal.Add(aliceShareInt)
 	require.Equal(t, expectedAliceBal.String(), app.QueryBalance(alice.Address).String())
 
-	// - Bob: 2,000,000 (20% share)
-	require.Equal(t, "2000000", app.QueryBalance(bob.Address).String())
+	// - Bob: 1,900,000 (20% of 9.5M)
+	require.Equal(t, "1900000", app.QueryBalance(bob.Address).String())
 
-	// - Charlie: 1,000,000 (10% share)
-	require.Equal(t, "1000000", app.QueryBalance(charlie.Address).String())
+	// - Charlie: 950,000 (10% of 9.5M)
+	require.Equal(t, "950000", app.QueryBalance(charlie.Address).String())
+
+	// Verify cw_split burned 500,000 uSOV via wasm BankMsg.Burn -> ik.ExecuteBurn (+ 1,500 gas burns from 3 txs)
+	require.Equal(t, "501500", app.QueryLifetimeBurned().String())
 
 	// 5. MinPayout Threshold Enforcement: Dave attempts to distribute 99 uSOV (< 100 uSOV threshold)
 	underMinTx := node.SignedTransaction{
@@ -190,14 +194,11 @@ func TestCreatorRevenueSplit_BlockchainLifecycle(t *testing.T) {
 	signSplitTx(dave, &underMinTx)
 	require.Error(t, app.DeliverTx(underMinTx), "distribution below MinPayout threshold must be rejected")
 
-	// 6. Zero-Loss Dust Remainder Test on Live Ledger:
-	// Dave distributes 101 uSOV:
-	// Total weight: 10,000
-	// Alice:   (101 * 7,000) / 10,000 = 70 uSOV
-	// Bob:     (101 * 2,000) / 10,000 = 20 uSOV
-	// Charlie: (101 * 1,000) / 10,000 = 10 uSOV
-	// Sum: 70 + 20 + 10 = 100 uSOV. Remainder: 101 - 100 = 1 uSOV.
-	// Remainder goes to Alice (primary recipient) => Alice gets 70 + 1 = 71 uSOV!
+	// 6. Zero-Loss Dust Remainder Test on Live Ledger after 5% protocol burn:
+	// Dave distributes 101 uSOV -> 5% protocol burn = 5 uSOV, net 96 uSOV split across 10,000 weights:
+	// Alice:   (96 * 7,000) / 10,000 = 67 uSOV + 1 dust remainder = 68 uSOV
+	// Bob:     (96 * 2,000) / 10,000 = 19 uSOV
+	// Charlie: (96 * 1,000) / 10,000 = 9 uSOV
 	oddDistributeTx := node.SignedTransaction{
 		Type:     node.TxTypeExecuteContract,
 		Fee:      gasFee,
@@ -210,14 +211,17 @@ func TestCreatorRevenueSplit_BlockchainLifecycle(t *testing.T) {
 	require.NoError(t, app.CheckTx(oddDistributeTx))
 	require.NoError(t, app.DeliverTx(oddDistributeTx))
 
-	// Alice gains 71 uSOV
-	require.Equal(t, expectedAliceBal.Add(math.NewInt(71)).String(), app.QueryBalance(alice.Address).String())
-	// Bob gains 20 uSOV
-	require.Equal(t, "2000020", app.QueryBalance(bob.Address).String())
-	// Charlie gains 10 uSOV
-	require.Equal(t, "1000010", app.QueryBalance(charlie.Address).String())
+	// Alice gains 68 uSOV
+	require.Equal(t, expectedAliceBal.Add(math.NewInt(68)).String(), app.QueryBalance(alice.Address).String())
+	// Bob gains 19 uSOV
+	require.Equal(t, "1900019", app.QueryBalance(bob.Address).String())
+	// Charlie gains 9 uSOV
+	require.Equal(t, "950009", app.QueryBalance(charlie.Address).String())
+	// Burn counter includes the extra 5 uSOV split burn + 500 uSOV fee burn
+	require.Equal(t, "502005", app.QueryLifetimeBurned().String())
 
-	// Invariant: Total bank supply remains constant (minus burned fees)
+	// Invariant: Total bank supply remains constant (minus burned fees & cw_split burns)
+	require.Equal(t, app.QueryLifetimeMinted().Sub(app.QueryLifetimeBurned()).String(), app.QueryTotalSupply().String())
 	// Query cumulative earnings via Smart Query
 	bobQueryBz := []byte(`{"recipient_share":{"address":"` + bob.Address + `"}}`)
 	bobQueryResp, err := app.QueryWasmSmart(contractAddr, bobQueryBz)
@@ -231,7 +235,7 @@ func TestCreatorRevenueSplit_BlockchainLifecycle(t *testing.T) {
 	require.NoError(t, json.Unmarshal(bobQueryResp, &bobShareInfo))
 	require.True(t, bobShareInfo.IsRecipient)
 	require.Equal(t, uint64(2000), bobShareInfo.PercentageBps)
-	require.Equal(t, "2000020", bobShareInfo.TotalEarned)
+	require.Equal(t, "1900019", bobShareInfo.TotalEarned)
 
 	// 6. Access Control: Non-admin cannot alter recipient split weights
 	unauthUpdateTx := node.SignedTransaction{

@@ -326,7 +326,7 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
   if ((url.pathname === '/api/youtube/video' || url.pathname === '/api/watch/video') && req.method === 'GET') {
     const allVideos = sovraDb.getAllVideos();
     const vidId = url.searchParams.get('id') || allVideos[0]?.id;
-    const found = allVideos.find(v => v.id === vidId) || allVideos[0] || (vidId ? sovraDb.getVideoById(vidId) : null);
+    const found = (vidId ? (allVideos.find(v => v.id === vidId) || sovraDb.getVideoById(vidId)) : null) || allVideos[0];
     const comments = found ? sovraDb.getVideoComments(found.id) : [];
     const recommended = allVideos.filter(v => found && v.id !== found.id);
 
@@ -420,7 +420,7 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
       };
       activeResumableUploads.set(uploadId, session);
 
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.writeHead(201, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         ok: true,
         uploadId,
@@ -491,7 +491,8 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
       res.end(JSON.stringify({
         ok: true,
         uploadId: session.uploadId,
-        bytesReceived: bytesWritten,
+        bytesReceived: session.receivedBytes,
+        chunkBytesReceived: bytesWritten,
         totalBytesReceived: session.receivedBytes,
         totalBytes: session.fileSize,
         chunkCount: session.chunkCount,
@@ -659,8 +660,10 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
   // ==========================================
 
   // 4.1 Serve HLS Master Playlist & Variant Playlists
-  if (url.pathname.startsWith('/api/videos/hls/') && req.method === 'GET') {
-    const parts = url.pathname.replace('/api/videos/hls/', '').split('/');
+  if ((url.pathname.startsWith('/api/videos/hls/') || url.pathname.startsWith('/api/video/hls/')) && req.method === 'GET') {
+    const isPlural = url.pathname.startsWith('/api/videos/hls/');
+    const basePath = isPlural ? '/api/videos/hls' : '/api/video/hls';
+    const parts = url.pathname.replace(/^\/api\/videos?\/hls\//, '').split('/');
     const videoId = parts[0];
     const filename = parts[1] || 'master.m3u8';
     const baseStorage = path.dirname(REELS_DIR);
@@ -689,13 +692,13 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
         '#EXT-X-VERSION:3',
         '#EXT-X-INDEPENDENT-SEGMENTS',
         '#EXT-X-STREAM-INF:BANDWIDTH=4500000,RESOLUTION=1920x1080,CODECS="avc1.64002a,mp4a.40.2"',
-        `/api/videos/hls/${encodeURIComponent(videoId)}/1080p.m3u8`,
-        '#EXT-X-STREAM-INF:BANDWIDTH=2200000,RESOLUTION=1280x720,CODECS="avc1.4d401f,mp4a.40.2"',
-        `/api/videos/hls/${encodeURIComponent(videoId)}/720p.m3u8`,
-        '#EXT-X-STREAM-INF:BANDWIDTH=1100000,RESOLUTION=854x480,CODECS="avc1.4d401f,mp4a.40.2"',
-        `/api/videos/hls/${encodeURIComponent(videoId)}/480p.m3u8`,
+        `${basePath}/${encodeURIComponent(videoId)}/1080p.m3u8`,
+        '#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=1280x720,CODECS="avc1.4d401f,mp4a.40.2"',
+        `${basePath}/${encodeURIComponent(videoId)}/720p.m3u8`,
+        '#EXT-X-STREAM-INF:BANDWIDTH=1200000,RESOLUTION=854x480,CODECS="avc1.4d401f,mp4a.40.2"',
+        `${basePath}/${encodeURIComponent(videoId)}/480p.m3u8`,
         '#EXT-X-STREAM-INF:BANDWIDTH=600000,RESOLUTION=640x360,CODECS="avc1.4d401f,mp4a.40.2"',
-        `/api/videos/hls/${encodeURIComponent(videoId)}/360p.m3u8`,
+        `${basePath}/${encodeURIComponent(videoId)}/360p.m3u8`,
         ''
       ].join('\n');
       res.writeHead(200, {
@@ -716,11 +719,11 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
         '#EXT-X-TARGETDURATION:4',
         '#EXT-X-MEDIA-SEQUENCE:0',
         '#EXTINF:4.000,',
-        `/api/videos/hls/${encodeURIComponent(videoId)}/${tierName}_seq0.ts`,
+        `${basePath}/${encodeURIComponent(videoId)}/${tierName}_seq0.ts?res=${tierName}`,
         '#EXTINF:4.000,',
-        `/api/videos/hls/${encodeURIComponent(videoId)}/${tierName}_seq1.ts`,
+        `${basePath}/${encodeURIComponent(videoId)}/${tierName}_seq1.ts?res=${tierName}`,
         '#EXTINF:4.000,',
-        `/api/videos/hls/${encodeURIComponent(videoId)}/${tierName}_seq2.ts`,
+        `${basePath}/${encodeURIComponent(videoId)}/${tierName}_seq2.ts?res=${tierName}`,
         '#EXT-X-ENDLIST',
         ''
       ].join('\n');
@@ -832,8 +835,8 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
   }
 
   // 4.2 Serve Storyboard Timeline Scrub WebVTT & Thumbnail Images
-  if (url.pathname.startsWith('/api/videos/storyboard/') && req.method === 'GET') {
-    const parts = url.pathname.replace('/api/videos/storyboard/', '').split('/');
+  if ((url.pathname.startsWith('/api/videos/storyboard/') || url.pathname.startsWith('/api/video/storyboard/')) && req.method === 'GET') {
+    const parts = url.pathname.replace(/^\/api\/videos?\/storyboard\//, '').split('/');
     const videoId = parts[0];
     const filename = parts[1] || 'storyboard.vtt';
     const baseStorage = path.dirname(REELS_DIR);
@@ -1117,6 +1120,7 @@ export async function handleVideoRoutes(ctx: VideoRouteContext): Promise<boolean
           txId,
           amount,
           newBalance: tipResult.senderBalance,
+          newBalanceSov: tipResult.senderBalance,
           voucher: tipResult.voucher,
           creatorCut: tipResult.creatorCut,
           seederCut: tipResult.seederCut,

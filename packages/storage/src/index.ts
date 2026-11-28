@@ -14,3 +14,4 @@ export * from './reels.js';
 export * from './webrtc-bitswap.js';
 export * from './sharded-storage.js';
 export * from './cold-peer-fallback.js';
+export * from './replication-policy.js';

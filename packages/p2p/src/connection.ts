@@ -1,9 +1,9 @@
-import * as net from 'node:net';
 import { Result, ok, err } from '@sovra/shared';
 import { PeerConnectionStatus, PeerInfo, ResourceLimits } from './types.js';
 import { PeerConnectionError, ResourceExceededError } from './errors.js';
 import { SecureChannel } from './transport.js';
 import { StreamMultiplexer } from './multiplex.js';
+import type { DuplexTransportStream } from './websocket.js';
 
 export const DEFAULT_RESOURCE_LIMITS: ResourceLimits = {
   maxConnections: 100,
@@ -18,23 +18,34 @@ export interface ActivePeerConnection {
   readonly peerId: string;
   readonly multiaddr: string;
   status: PeerConnectionStatus;
-  channel?: SecureChannel;
-  multiplexer?: StreamMultiplexer;
-  socket?: net.Socket;
+  channel?: SecureChannel | undefined;
+  multiplexer?: StreamMultiplexer | undefined;
+  socket?: DuplexTransportStream | undefined;
   lastActive: number;
   retryCount: number;
   nextRetryTime?: number;
 }
 
 /**
- * Extracts IPv4 subnet /24 prefix from a multiaddr.
+ * Extracts IPv4 /24 or IPv6 /48 subnet prefix from a multiaddr for Sybil/Eclipse diversity enforcement.
  */
 function extractIpSubnetPrefix(multiaddr: string): string | null {
-  const match = multiaddr.match(/\/ip4\/(\d+)\.(\d+)\.(\d+)\.(\d+)/);
-  if (match && match[1] && match[2] && match[3]) {
-    return `${match[1]}.${match[2]}.${match[3]}.0/24`;
+  const v4 = multiaddr.match(/\/ip4\/(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+  if (v4 && v4[1] && v4[2] && v4[3]) {
+    return `${v4[1]}.${v4[2]}.${v4[3]}.0/24`;
+  }
+  const v6 = multiaddr.match(/\/ip6\/([^/]+)/);
+  if (v6 && v6[1]) {
+    const raw = v6[1].toLowerCase().replace(/^\[|\]$/g, '');
+    if (raw === '::1' || raw === '0:0:0:0:0:0:0:1') return 'ip6-loopback';
+    const segs = raw.split(':').filter(Boolean);
+    return `ip6:${segs.slice(0, 3).join(':') || raw}::/48`;
   }
   return null;
+}
+
+function isLoopbackSubnet(subnet: string | null): boolean {
+  return !subnet || subnet.startsWith('127.') || subnet === 'ip6-loopback';
 }
 
 export class ConnectionManager {
@@ -46,7 +57,8 @@ export class ConnectionManager {
   constructor(
     public readonly limits: ResourceLimits = DEFAULT_RESOURCE_LIMITS,
     private readonly dialFn?: (multiaddr: string) => Promise<ActivePeerConnection>,
-    private readonly maxPerSubnet = 10, // Max connections per /24 prefix (mitigates Sybil/Eclipse)
+    private readonly maxPerSubnet = 10, // Max connections per /24 IPv4 or /48 IPv6 prefix (mitigates Sybil/Eclipse)
+    private readonly reconnectFn?: (multiaddr: string) => Promise<ActivePeerConnection>,
   ) {}
 
   public get activeCount(): number {
@@ -69,10 +81,17 @@ export class ConnectionManager {
       if (conn.status === 'connected' || conn.status === 'relayed' || conn.status === 'degraded') {
         const info = this.peerInfos.get(conn.peerId);
         if (info) {
+          const isRelayed =
+            conn.status === 'relayed' ||
+            conn.multiaddr.includes('/p2p-circuit/') ||
+            info.connectionType === 'relayed';
+          const isOnion =
+            !isRelayed &&
+            (conn.multiaddr.includes('/onion') || info.connectionType === 'tor-onion');
           result.push({
             ...info,
-            status: conn.status,
-            connectionType: conn.status === 'relayed' ? 'relayed' : 'direct',
+            status: isRelayed ? 'relayed' : conn.status,
+            connectionType: isRelayed ? 'relayed' : isOnion ? 'tor-onion' : 'direct',
           });
         }
       }
@@ -86,6 +105,10 @@ export class ConnectionManager {
 
   public registerPeerInfo(info: PeerInfo): void {
     this.peerInfos.set(info.id.peerId, info);
+  }
+
+  public getPeerInfo(peerId: string): PeerInfo | undefined {
+    return this.peerInfos.get(peerId);
   }
 
   public async connect(multiaddr: string): Promise<Result<ActivePeerConnection>> {
@@ -110,7 +133,7 @@ export class ConnectionManager {
 
     // Subnet diversity check for non-localhost addresses
     const subnet = extractIpSubnetPrefix(multiaddr);
-    if (subnet && !subnet.startsWith('127.')) {
+    if (!isLoopbackSubnet(subnet) && subnet) {
       const currentInSubnet = this.subnetCounts.get(subnet) ?? 0;
       if (currentInSubnet >= this.maxPerSubnet) {
         return err(
@@ -148,6 +171,11 @@ export class ConnectionManager {
         return ok(established);
       } catch (errDial) {
         activeConn.status = 'failed';
+        if (subnet) {
+          const count = this.subnetCounts.get(subnet) ?? 1;
+          if (count <= 1) this.subnetCounts.delete(subnet);
+          else this.subnetCounts.set(subnet, count - 1);
+        }
         this.scheduleReconnect(activeConn);
         return err(
           new PeerConnectionError(
@@ -162,12 +190,32 @@ export class ConnectionManager {
     return ok(activeConn);
   }
 
-  public registerEstablishedConnection(conn: ActivePeerConnection): void {
-    this.connections.set(conn.peerId, conn);
-    const subnet = extractIpSubnetPrefix(conn.multiaddr);
-    if (subnet) {
-      this.subnetCounts.set(subnet, (this.subnetCounts.get(subnet) ?? 0) + 1);
+  public canAcceptConnection(multiaddr: string): boolean {
+    if (this.activeCount >= this.limits.maxConnections) {
+      return false;
     }
+    const subnet = extractIpSubnetPrefix(multiaddr);
+    if (!isLoopbackSubnet(subnet) && subnet) {
+      if ((this.subnetCounts.get(subnet) ?? 0) >= this.maxPerSubnet) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public registerEstablishedConnection(conn: ActivePeerConnection): boolean {
+    const existing = this.connections.get(conn.peerId);
+    if (!existing && !this.canAcceptConnection(conn.multiaddr)) {
+      return false;
+    }
+    this.connections.set(conn.peerId, conn);
+    if (!existing) {
+      const subnet = extractIpSubnetPrefix(conn.multiaddr);
+      if (subnet) {
+        this.subnetCounts.set(subnet, (this.subnetCounts.get(subnet) ?? 0) + 1);
+      }
+    }
+    return true;
   }
 
   public disconnect(peerId: string): void {
@@ -212,7 +260,12 @@ export class ConnectionManager {
 
     const timer = setTimeout(() => {
       this.reconnectTimers.delete(conn.peerId);
-      this.connect(conn.multiaddr).catch(() => {});
+      const runner = this.reconnectFn
+        ? this.reconnectFn(conn.multiaddr).catch(() => {
+            this.scheduleReconnect(conn, maxRetries, baseDelayMs);
+          })
+        : this.connect(conn.multiaddr).catch(() => {});
+      void runner;
     }, finalDelay);
 
     this.reconnectTimers.set(conn.peerId, timer);

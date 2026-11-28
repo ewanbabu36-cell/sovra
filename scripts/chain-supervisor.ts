@@ -60,6 +60,11 @@ export class L1ChainSupervisor {
   private mempool: any[] = [];
   private recentBlocks: any[] = [];
   private wsClients = new Set<{ socket: net.Socket; queries: Set<string> }>();
+  private lifetimeBurnedUsov: bigint = 0n;
+  private lifetimeMintedUsov: bigint = 0n;
+  private minTxFeeUsov: bigint = 100n;
+  private feeBurnBps: bigint = 5000n;
+  private unbondingPeriodSeconds: number = 14 * 86400;
 
   constructor(options?: {
     rpcPort?: number;
@@ -129,6 +134,10 @@ export class L1ChainSupervisor {
       this.accounts.set('sovra1cb55be9a3d2afab1c9bcbffb88367bec797d11cb', 7_500_000_000_000n);
       this.accounts.set('sovra1d96f6140a4c4ae797d9e3a5badf467eb756d3d20', 7_500_000_000_000n);
     }
+    let initSum = 0n;
+    for (const bal of this.accounts.values()) initSum += bal;
+    this.lifetimeMintedUsov = initSum;
+    this.lifetimeBurnedUsov = 0n;
   }
 
   /**
@@ -639,11 +648,14 @@ export class L1ChainSupervisor {
         chain_id: this.chainId,
         genesis_time: 1792061459,
         height: this.height,
-        lifetime_burn: '0',
-        lifetime_mint: totalUsov.toString(),
+        lifetime_burn: this.lifetimeBurnedUsov.toString(),
+        lifetime_mint: this.lifetimeMintedUsov.toString(),
+        fee_burn_bps: Number(this.feeBurnBps),
+        min_tx_fee_usov: Number(this.minTxFeeUsov),
+        unbonding_period_sec: this.unbondingPeriodSeconds,
         moniker: 'validator-0',
         node_id: '2a806ca82d506a025d580d40600abc77a69e10e7',
-        supply_correct: true,
+        supply_correct: totalUsov === this.lifetimeMintedUsov - this.lifetimeBurnedUsov,
         total_supply: totalUsov.toString(),
         sync_info: {
           latest_block_height: String(this.height),
@@ -675,11 +687,34 @@ export class L1ChainSupervisor {
       sendJson(200, {
         total_supply: totalUsov.toString(),
         total_sov: totalSov,
+        lifetime_minted: this.lifetimeMintedUsov.toString(),
+        lifetime_burned: this.lifetimeBurnedUsov.toString(),
         denom: 'usov',
         block_height: this.height,
         app_hash: this.appHash,
-        supply_correct: true,
-        invariant_equation: `${totalUsov.toString()} uSOV == ${totalUsov.toString()} uSOV`,
+        supply_correct: totalUsov === this.lifetimeMintedUsov - this.lifetimeBurnedUsov,
+        invariant_equation: `${totalUsov.toString()} uSOV == ${this.lifetimeMintedUsov.toString()} uSOV - ${this.lifetimeBurnedUsov.toString()} uSOV`,
+      });
+      return;
+    }
+
+    // 3b. GET /query/economy
+    if (url.pathname === '/query/economy') {
+      let totalUsov = 0n;
+      for (const bal of this.accounts.values()) totalUsov += bal;
+      const feeCollector = this.accounts.get('sovra_module_fee_collector') || 0n;
+      sendJson(200, {
+        height: this.height,
+        chain_id: this.chainId,
+        global_lifetime_cap: '100000000000000',
+        lifetime_minted: this.lifetimeMintedUsov.toString(),
+        lifetime_burned: this.lifetimeBurnedUsov.toString(),
+        total_supply: totalUsov.toString(),
+        fee_collector_usov: feeCollector.toString(),
+        fee_burn_bps: Number(this.feeBurnBps),
+        min_tx_fee_usov: Number(this.minTxFeeUsov),
+        unbonding_period_seconds: this.unbondingPeriodSeconds,
+        supply_invariant_holds: totalUsov === this.lifetimeMintedUsov - this.lifetimeBurnedUsov,
       });
       return;
     }
@@ -866,9 +901,13 @@ export class L1ChainSupervisor {
       return { ok: false, error: 'CheckTx: Cryptographic signature decoding failure: ' + e?.message };
     }
 
-    // Balance check
+    // Balance & minimum fee checks
+    const feeBig = BigInt(fee);
+    if (feeBig < this.minTxFeeUsov) {
+      return { ok: false, error: `CheckTx: Transaction fee ${feeBig} uSOV below protocol minimum ${this.minTxFeeUsov} uSOV` };
+    }
     const senderBal = this.accounts.get(sender) || 0n;
-    const requiredTotal = BigInt(amount) + BigInt(fee);
+    const requiredTotal = BigInt(amount) + feeBig;
     if (senderBal < requiredTotal) {
       return { ok: false, error: `CheckTx: Insufficient funds (balance: ${senderBal}, required: ${requiredTotal})` };
     }
@@ -886,19 +925,30 @@ export class L1ChainSupervisor {
     const fee = BigInt(String(tx.fee || tx.Fee || '100'));
     const type = tx.type || tx.Type || 'send';
 
+    if (fee < this.minTxFeeUsov) {
+      return { ok: false, error: `DeliverTx: Fee ${fee} below minimum ${this.minTxFeeUsov}` };
+    }
     const senderBal = this.accounts.get(sender) || 0n;
     if (senderBal < amount + fee) {
       return { ok: false, error: 'DeliverTx: Insufficient funds' };
     }
 
-    // Apply state change
+    // Apply EIP-1559 50% fee burn + 50% validator/staker fee_collector credit
+    const feeBurn = (fee * this.feeBurnBps) / 10000n;
+    const feeYield = fee - feeBurn;
     this.accounts.set(sender, senderBal - (amount + fee));
+    this.lifetimeBurnedUsov += feeBurn;
+    if (feeYield > 0n) {
+      const fcAddr = 'sovra_module_fee_collector';
+      this.accounts.set(fcAddr, (this.accounts.get(fcAddr) || 0n) + feeYield);
+    }
 
     if (type === 'send' && recipient) {
       const recipientBal = this.accounts.get(recipient) || 0n;
       this.accounts.set(recipient, recipientBal + amount);
+    } else if (type === 'burn') {
+      this.lifetimeBurnedUsov += amount;
     }
-    // If type === 'burn', the amount is deducted from sender and not credited to anyone (deflationary)
 
     // Increment nonce
     const currentNonce = this.nonces.get(sender) || 0;

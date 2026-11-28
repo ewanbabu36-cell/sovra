@@ -20,17 +20,27 @@ import android.provider.Settings
 import android.util.Base64
 import android.view.View
 import android.view.WindowManager
+import android.net.http.SslError
 import android.webkit.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import network.sovra.mobile.ble.SovraBleForegroundService
 import network.sovra.mobile.ble.SovraBleModule
+import network.sovra.mobile.net.SovraHttpBridge
+import network.sovra.mobile.p2p.SovraWifiDirectModule
+import network.sovra.mobile.push.SovraUnifiedPushHub
+import network.sovra.mobile.push.SovraUnifiedPushJsBridge
+import network.sovra.mobile.security.SovraHardwareKeystore
+import network.sovra.mobile.update.SovraUpdaterJsBridge
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var bleModule: SovraBleModule
+    private lateinit var wifiDirectModule: SovraWifiDirectModule
+    private lateinit var hardwareKeystore: SovraHardwareKeystore
     private var callWakeLock: PowerManager.WakeLock? = null
 
     companion object {
@@ -64,7 +74,10 @@ class MainActivity : AppCompatActivity() {
 
         createCallNotificationChannel()
 
-        bleModule = (application as MainApplication).bleModule
+        val app = application as MainApplication
+        bleModule = app.bleModule
+        wifiDirectModule = app.wifiDirectModule
+        hardwareKeystore = app.hardwareKeystore
 
         webView = WebView(this).apply {
             setBackgroundColor(Color.parseColor("#090d16"))
@@ -73,6 +86,10 @@ class MainActivity : AppCompatActivity() {
                 domStorageEnabled = true
                 databaseEnabled = true
                 allowFileAccess = true
+                @Suppress("DEPRECATION")
+                allowFileAccessFromFileURLs = false
+                @Suppress("DEPRECATION")
+                allowUniversalAccessFromFileURLs = false
                 allowContentAccess = true
                 mediaPlaybackRequiresUserGesture = false
                 cacheMode = WebSettings.LOAD_DEFAULT
@@ -81,25 +98,115 @@ class MainActivity : AppCompatActivity() {
             }
 
             webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                    val targetUrl = request?.url?.toString() ?: return false
+                    if (targetUrl.startsWith("file:///android_asset/")) {
+                        return false
+                    }
+                    return try {
+                        val externalIntent = Intent(Intent.ACTION_VIEW, request.url).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(externalIntent)
+                        true
+                    } catch (_: Exception) {
+                        true
+                    }
+                }
+
                 override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                     super.onReceivedError(view, request, error)
+                }
+
+                override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
+                    val approvedByPin = SovraHttpBridge.verifyWebViewSslErrorIfPinned(
+                        error?.url,
+                        error?.certificate,
+                        handler
+                    )
+                    if (!approvedByPin) {
+                        handler?.cancel()
+                    }
                 }
             }
 
             webChromeClient = object : WebChromeClient() {
                 override fun onPermissionRequest(request: PermissionRequest?) {
-                    request?.grant(request.resources)
+                    val origin = request?.origin?.toString() ?: ""
+                    if (origin.startsWith("file://") || origin == "null") {
+                        request?.grant(request.resources)
+                    } else {
+                        request?.deny()
+                    }
                 }
             }
         }
 
-        // Bridge native Android BLE module directly into web JavaScript runtime
+        // Bridge native Android BLE, Call, Wi-Fi Direct, HTTP/TLS/Tor, UnifiedPush, and Hardware Keystore directly into WebView runtime
         val bridge = SovraBleJsBridge(this, bleModule, webView)
         webView.addJavascriptInterface(bridge, "SovraBleNative")
 
-        // Bridge native Android Call & Lockscreen Notifications
         val callBridge = SovraCallJsBridge(this)
         webView.addJavascriptInterface(callBridge, "SovraCallNative")
+
+        val wifiDirectBridge = SovraWifiDirectJsBridge(this, wifiDirectModule, webView)
+        webView.addJavascriptInterface(wifiDirectBridge, "SovraWifiDirectNative")
+
+        val keystoreBridge = SovraKeystoreJsBridge(hardwareKeystore)
+        webView.addJavascriptInterface(keystoreBridge, "SovraKeystoreNative")
+
+        val httpBridge = SovraHttpBridge(this, webView)
+        webView.addJavascriptInterface(httpBridge, "SovraHttpNative")
+
+        val unifiedPushBridge = SovraUnifiedPushJsBridge(this)
+        webView.addJavascriptInterface(unifiedPushBridge, "SovraUnifiedPushNative")
+        SovraUnifiedPushHub.attachUi(this, webView)
+
+        val updaterBridge = SovraUpdaterJsBridge(this)
+        webView.addJavascriptInterface(updaterBridge, "SovraUpdaterNative")
+
+        // Forward Wi-Fi Direct async discovery & media events into DOM CustomEvents
+        wifiDirectModule.onDeviceDiscovered = { address, name, primaryType, status ->
+            val json = org.json.JSONObject().apply {
+                put("address", address)
+                put("name", name)
+                put("primaryType", primaryType)
+                put("status", status)
+            }
+            runOnUiThread {
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('onWifiP2pDeviceDiscovered', { detail: $json }));",
+                    null
+                )
+            }
+        }
+        wifiDirectModule.onConnectionChanged = { isConn, isGo, goAddr ->
+            val json = org.json.JSONObject().apply {
+                put("isConnected", isConn)
+                put("isGroupOwner", isGo)
+                put("groupOwnerAddress", goAddr ?: "")
+            }
+            runOnUiThread {
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('onWifiP2pConnectionChanged', { detail: $json }));",
+                    null
+                )
+            }
+        }
+        wifiDirectModule.onIncomingMediaReceived = { transferId, senderAddr, dataB64, shaHex ->
+            val json = org.json.JSONObject().apply {
+                put("transferId", transferId)
+                put("senderAddress", senderAddr)
+                put("dataBase64", dataB64)
+                put("sha256Hex", shaHex)
+            }
+            runOnUiThread {
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('onWifiP2pIncomingMedia', { detail: $json }));",
+                    null
+                )
+            }
+        }
 
         // Forward native asynchronous BLE events to window event listeners in web runtime
         bleModule.onDeviceDiscovered = { address, rssi, serviceData, name ->
@@ -164,6 +271,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleCallIntent(intent: Intent?) {
         if (intent == null) return
+        val deepLinkUri = intent.data
+        if (deepLinkUri != null) {
+            val urlJson = org.json.JSONObject.quote(deepLinkUri.toString())
+            runOnUiThread {
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('sovraDeepLink', { detail: { url: $urlJson } }));",
+                    null
+                )
+            }
+        }
         val autoAnswerCallId = intent.getStringExtra("autoAnswerCall")
         val declineCallId = intent.getStringExtra("declineCall")
 
@@ -313,6 +430,9 @@ class MainActivity : AppCompatActivity() {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 permissions.add(Manifest.permission.POST_NOTIFICATIONS)
             }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
+            }
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -336,7 +456,17 @@ class MainActivity : AppCompatActivity() {
 
         if (permissions.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissions.toTypedArray(), PERMISSION_REQUEST_CODE)
+        } else {
+            startMeshForegroundServiceSafely()
         }
+    }
+
+    fun startMeshForegroundServiceSafely() {
+        try {
+            if (bleModule.hasPermissions()) {
+                SovraBleForegroundService.start(this)
+            }
+        } catch (_: Exception) {}
     }
 
     fun requestEnableBluetooth() {
@@ -374,6 +504,7 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == PERMISSION_REQUEST_CODE) {
             val allGranted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
             if (allGranted) {
+                startMeshForegroundServiceSafely()
                 runOnUiThread {
                     webView.evaluateJavascript("if (typeof initBleNative === 'function') { initBleNative(); }", null)
                 }
@@ -474,11 +605,23 @@ class SovraBleJsBridge(
         } catch (e: Exception) {
             ""
         }
-        var success = true
-        bleModule.startAdvertising(serviceUuid, bytes, username) { ok, _ ->
-            success = ok
+        if (!bleModule.hasPermissions() || !bleModule.isBluetoothEnabled()) {
+            return false
         }
-        return success
+        activity.startMeshForegroundServiceSafely()
+        bleModule.startAdvertising(serviceUuid, bytes, username) { ok, errMsg ->
+            val json = org.json.JSONObject().apply {
+                put("ok", ok)
+                put("error", errMsg ?: "")
+            }
+            activity.runOnUiThread {
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('onBleAdvertiseResult', { detail: $json }));",
+                    null
+                )
+            }
+        }
+        return true
     }
 
     @JavascriptInterface
@@ -488,11 +631,23 @@ class SovraBleJsBridge(
 
     @JavascriptInterface
     fun startScanning(serviceUuid: String): Boolean {
-        var success = true
-        bleModule.startScanning(serviceUuid) { ok, _ ->
-            success = ok
+        if (!bleModule.hasPermissions() || !bleModule.isBluetoothEnabled()) {
+            return false
         }
-        return success
+        activity.startMeshForegroundServiceSafely()
+        bleModule.startScanning(serviceUuid) { ok, errMsg ->
+            val json = org.json.JSONObject().apply {
+                put("ok", ok)
+                put("error", errMsg ?: "")
+            }
+            activity.runOnUiThread {
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('onBleScanResult', { detail: $json }));",
+                    null
+                )
+            }
+        }
+        return true
     }
 
     @JavascriptInterface
@@ -524,18 +679,26 @@ class SovraBleJsBridge(
 
     @JavascriptInterface
     fun connectGatt(targetAddress: String): Boolean {
-        var initiated = true
-        bleModule.connectGatt(targetAddress) { ok, gattId, mtu, _ ->
-            if (ok && gattId != null) {
-                activity.runOnUiThread {
+        if (!bleModule.hasPermissions() || !bleModule.isBluetoothEnabled()) {
+            return false
+        }
+        bleModule.connectGatt(targetAddress) { ok, gattId, mtu, errMsg ->
+            activity.runOnUiThread {
+                if (ok && gattId != null) {
                     webView.evaluateJavascript(
                         "window.dispatchEvent(new CustomEvent('onGattConnected', { detail: { gattId: '$gattId', address: '$targetAddress', mtu: $mtu } }));",
+                        null
+                    )
+                } else {
+                    val errJson = org.json.JSONObject.quote(errMsg ?: "GATT connection failed")
+                    webView.evaluateJavascript(
+                        "window.dispatchEvent(new CustomEvent('onGattError', { detail: { address: '$targetAddress', error: $errJson } }));",
                         null
                     )
                 }
             }
         }
-        return initiated
+        return true
     }
 
     @JavascriptInterface
@@ -550,11 +713,20 @@ class SovraBleJsBridge(
         } catch (e: Exception) {
             ByteArray(0)
         }
-        var success = true
-        bleModule.writeCharacteristic(gattId, bytes) { ok, _ ->
-            success = ok
+        bleModule.writeCharacteristic(gattId, bytes) { ok, errMsg ->
+            val json = org.json.JSONObject().apply {
+                put("gattId", gattId)
+                put("ok", ok)
+                put("error", errMsg ?: "")
+            }
+            activity.runOnUiThread {
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('onGattWriteResult', { detail: $json }));",
+                    null
+                )
+            }
         }
-        return success
+        return true
     }
 }
 
@@ -572,4 +744,96 @@ class SovraCallJsBridge(private val activity: MainActivity) {
             activity.dismissIncomingCallSystemNotification(callId)
         }
     }
+}
+
+class SovraWifiDirectJsBridge(
+    private val activity: MainActivity,
+    private val wifiDirect: SovraWifiDirectModule,
+    private val webView: WebView
+) {
+    @JavascriptInterface
+    fun isAvailable(): Boolean = wifiDirect.isAvailable()
+
+    @JavascriptInterface
+    fun hasPermissions(): Boolean = wifiDirect.hasPermissions()
+
+    @JavascriptInterface
+    fun discoverPeers(): Boolean {
+        if (!wifiDirect.hasPermissions()) return false
+        wifiDirect.discoverPeers { ok, errMsg ->
+            val json = org.json.JSONObject().apply {
+                put("ok", ok)
+                put("error", errMsg ?: "")
+            }
+            activity.runOnUiThread {
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('onWifiP2pDiscoverResult', { detail: $json }));",
+                    null
+                )
+            }
+        }
+        return true
+    }
+
+    @JavascriptInterface
+    fun connectPeer(deviceAddress: String): Boolean {
+        if (!wifiDirect.hasPermissions()) return false
+        wifiDirect.connectPeer(deviceAddress) { ok, errMsg ->
+            val json = org.json.JSONObject().apply {
+                put("ok", ok)
+                put("address", deviceAddress)
+                put("error", errMsg ?: "")
+            }
+            activity.runOnUiThread {
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('onWifiP2pConnectResult', { detail: $json }));",
+                    null
+                )
+            }
+        }
+        return true
+    }
+
+    @JavascriptInterface
+    fun createGroup(): Boolean {
+        wifiDirect.createGroup { _, _ -> }
+        return true
+    }
+
+    @JavascriptInterface
+    fun removeGroup() {
+        wifiDirect.removeGroup { _ -> }
+    }
+
+    @JavascriptInterface
+    fun sendMediaPayload(targetHost: String, port: Int, transferId: String, base64Payload: String): Boolean {
+        wifiDirect.sendMediaPayload(targetHost, port, transferId, base64Payload) { ok, resultOrErr ->
+            val json = org.json.JSONObject().apply {
+                put("transferId", transferId)
+                put("ok", ok)
+                put("result", resultOrErr ?: "")
+            }
+            activity.runOnUiThread {
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('onWifiP2pSendResult', { detail: $json }));",
+                    null
+                )
+            }
+        }
+        return true
+    }
+}
+
+class SovraKeystoreJsBridge(private val hardwareKeystore: SovraHardwareKeystore) {
+    @JavascriptInterface
+    fun isHardwareBacked(): Boolean = hardwareKeystore.isHardwareBacked()
+
+    @JavascriptInterface
+    fun isStrongBoxOrTee(): Boolean = hardwareKeystore.isStrongBoxOrTee()
+
+    @JavascriptInterface
+    fun wrapSecret(secretBase64: String): String = hardwareKeystore.wrapSecret(secretBase64)
+
+    @JavascriptInterface
+    fun unwrapSecret(wrappedJson: String): String = hardwareKeystore.unwrapSecret(wrappedJson)
 }

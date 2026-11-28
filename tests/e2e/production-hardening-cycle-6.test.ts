@@ -10,7 +10,7 @@
  * 5. PWA install prompt & haptic vibration contracts.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import {
   LocalSchemaMigrator,
   SovraLocalDatabase,
@@ -18,6 +18,7 @@ import {
   type CachedChannel,
 } from '../../apps/sovra-mobile/src/services/local-database.js';
 import {
+  setActiveSession,
   startLiveStream,
   fetchLiveStreams,
   endLiveStream,
@@ -30,6 +31,35 @@ import { triggerHapticFeedback } from '../../apps/sovra-mobile/src/navigation/Bo
 
 describe('Production Hardening Cycle 6 Verification Suite', () => {
   let db: SovraLocalDatabase;
+
+  beforeAll(async () => {
+    const baseUrl = process.env.SOVRA_BASE_URL || 'http://127.0.0.1:3001';
+    try {
+      const regRes = await fetch(`${baseUrl}/api/user/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: '@cycle6_mobile_' + Date.now(), name: 'Cycle 6 Mobile User' }),
+      });
+      if (regRes.ok) {
+        const regData = await regRes.json();
+        if (regData.sessionToken && regData.user?.did) {
+          setActiveSession(regData.sessionToken, regData.user.did);
+          await fetch(`${baseUrl}/api/wallet/faucet/claim`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${regData.sessionToken}`,
+            },
+            body: JSON.stringify({ did: regData.user.did }),
+          });
+        }
+      }
+    } catch (_) {}
+  });
+
+  afterAll(() => {
+    setActiveSession(null);
+  });
 
   beforeEach(() => {
     db = SovraLocalDatabase.getInstance();

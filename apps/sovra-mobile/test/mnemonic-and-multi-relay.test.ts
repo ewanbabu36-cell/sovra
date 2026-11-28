@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import {
   generateMnemonic,
   validateMnemonic,
@@ -6,7 +6,7 @@ import {
   mnemonicToIdentity,
 } from '../src/services/mnemonic.js';
 import { secureKeyStore } from '../src/services/secure-keystore.js';
-import { multiRelayManager } from '../src/services/multi-relay-manager.js';
+import { MultiRelayManager, multiRelayManager } from '../src/services/multi-relay-manager.js';
 
 describe('Step A: Mnemonic Seed Phrases & Multi-Relay Fallback Swarm', () => {
   beforeEach(() => {
@@ -136,6 +136,14 @@ describe('Step A: Mnemonic Seed Phrases & Multi-Relay Fallback Swarm', () => {
   });
 
   describe('4. Zero-Domain Autonomous P2P Bootstrap & Permanent Free STUN Infrastructure', () => {
+    beforeAll(() => {
+      multiRelayManager.setZeroDomainOnly(false);
+    });
+
+    afterAll(() => {
+      multiRelayManager.setZeroDomainOnly(true);
+    });
+
     it('hardcodes permanent free Google and Cloudflare STUN servers in mobile client', () => {
       const stunServers = multiRelayManager.getStunServers();
       expect(stunServers.length).toBeGreaterThanOrEqual(3);
@@ -180,6 +188,21 @@ describe('Step A: Mnemonic Seed Phrases & Multi-Relay Fallback Swarm', () => {
       expect(status.dhtSeedCount).toBeGreaterThanOrEqual(2);
       expect(status.stunProviders).toContain('Google');
       expect(status.stunProviders).toContain('Cloudflare');
+    });
+  });
+
+  describe('5. Strict Zero-Domain Default Mode (Phase 1 Purification)', () => {
+    it('never returns third-party Google/Cloudflare/Mozilla STUN or /dns4/ seeds by default', () => {
+      const freshMgr = new MultiRelayManager();
+      expect(freshMgr.isZeroDomainOnly()).toBe(true);
+      expect(freshMgr.getStunServers()).toEqual([]);
+      expect(freshMgr.getRtcIceServers()).toEqual([]);
+      const seeds = freshMgr.getPublicDhtSeeds();
+      expect(seeds.some(s => s.multiaddrOrIp.includes('/dns4/') || s.multiaddrOrIp.includes('142.250.') || s.multiaddrOrIp.includes('104.16.'))).toBe(false);
+
+      freshMgr.addCustomStunServer('stun:192.168.1.50:3478');
+      expect(freshMgr.getStunServers().map(s => s.url)).toEqual(['stun:192.168.1.50:3478']);
+      expect(freshMgr.getRtcIceServers()).toEqual([{ urls: 'stun:192.168.1.50:3478' }]);
     });
   });
 });

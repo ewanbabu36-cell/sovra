@@ -99,6 +99,9 @@ describe('Phase 11 Production Deployment Drill (19-Step Lifecycle)', { timeout: 
     expect(loginRes.status).toBe(200);
     const loginData = await loginRes.json();
     expect(loginData.ok).toBe(true);
+    if (loginData.sessionToken) {
+      userToken = loginData.sessionToken;
+    }
     console.log('[Step 4] User login verified.');
 
     // -------------------------------------------------------------

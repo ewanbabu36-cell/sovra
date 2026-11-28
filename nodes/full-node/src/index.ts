@@ -137,3 +137,5 @@ export class FullNodeDaemon {
     return this.blockstore;
   }
 }
+
+export * from './sovra-node-api.js';

@@ -40,4 +40,5 @@ export const ADMIN_SECTIONS = [
   'Audit Logs',
   'Admin Accounts',
   'Incidents',
+  'Risk Management',
 ] as const;

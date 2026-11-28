@@ -14,9 +14,10 @@
 
 import http from 'node:http';
 import crypto from 'node:crypto';
+import pg from 'pg';
 import { SecurityMiddleware, type SecurityConfig } from './middleware/security.middleware.js';
 import { SecretRotationManager } from './monitoring/secret-rotation.js';
-import { ConsensusMonitor } from './monitoring/consensus-monitor.js';
+import { ConsensusMonitor, type EnterprisePrometheusTelemetry } from './monitoring/consensus-monitor.js';
 import { securityEventCollector } from './monitoring/security-events.js';
 import {
   SharedSecurityStore,
@@ -33,8 +34,12 @@ export interface ApiServerOptions {
   rateLimitMaxRequests?: number;
   rateLimitWindowMs?: number;
   allowedOrigins?: string[];
-  sharedStore?: SharedSecurityStore;
-  sharedDbPath?: string;
+  sharedStore?: SharedSecurityStore | undefined;
+  sharedDbPath?: string | undefined;
+  redisUrl?: string | undefined;
+  databaseUrl?: string | undefined;
+  pgPool?: any;
+  telemetryProvider?: (() => Promise<Partial<EnterprisePrometheusTelemetry>> | Partial<EnterprisePrometheusTelemetry>) | undefined;
 }
 
 const KNOWN_DEFAULT_SECRETS = new Set([
@@ -101,6 +106,11 @@ export class DecoupledApiServer {
   private isShuttingDown = false;
   private startTime = Date.now();
   private strictSecurity = false;
+  private httpRequestsTotal = 0;
+  private latencySamplesMs: number[] = [];
+  private pgPool: any | null = null;
+  private ownsPgPool = false;
+  private telemetryProvider: ((() => Promise<Partial<EnterprisePrometheusTelemetry>> | Partial<EnterprisePrometheusTelemetry>) | undefined);
   private securityMiddleware: SecurityMiddleware;
   public readonly secretManager: SecretRotationManager;
   public readonly consensusMonitor: ConsensusMonitor;
@@ -133,11 +143,25 @@ export class DecoupledApiServer {
     this.consensusMonitor = new ConsensusMonitor({ rpcUrls: this.l1RpcUrls });
     this.drainTimeoutMs = options.drainTimeoutMs || 10000;
 
+    this.telemetryProvider = options.telemetryProvider;
+    const dbUrl = (options.databaseUrl ?? process.env.DATABASE_URL ?? '').trim();
+    if (options.pgPool) {
+      this.pgPool = options.pgPool;
+      this.ownsPgPool = false;
+    } else if (dbUrl) {
+      const PoolCtor = (pg as any).Pool || (pg as any).default?.Pool;
+      if (PoolCtor) {
+        this.pgPool = new PoolCtor({ connectionString: dbUrl, max: 10, connectionTimeoutMillis: 3000 });
+        this.ownsPgPool = true;
+      }
+    }
+
     this.sharedStore =
       options.sharedStore ||
-      (options.sharedDbPath
-        ? new SharedSecurityStore({ dbPath: options.sharedDbPath })
-        : new SharedSecurityStore());
+      new SharedSecurityStore({
+        ...(options.sharedDbPath ? { dbPath: options.sharedDbPath } : {}),
+        ...(options.redisUrl ? { redisUrl: options.redisUrl } : {}),
+      });
 
     const secConfig: Partial<SecurityConfig> = {
       rateLimitMaxRequests: options.rateLimitMaxRequests ?? 120,
@@ -426,7 +450,8 @@ export class DecoupledApiServer {
         }
 
         // Distributed Rate limiting check
-        if (!this.securityMiddleware.checkRateLimit(req)) {
+        const allowed = await this.securityMiddleware.checkRateLimitAsync(req);
+        if (!allowed) {
           securityEventCollector.recordEvent(
             'WARN',
             'RATE_LIMIT_TRIPPED',
@@ -442,9 +467,16 @@ export class DecoupledApiServer {
           return;
         }
 
+        const reqStartNs = process.hrtime.bigint();
+        this.httpRequestsTotal++;
         this.activeRequests++;
         res.on('finish', () => {
           this.activeRequests--;
+          const durationMs = Number(process.hrtime.bigint() - reqStartNs) / 1_000_000;
+          this.latencySamplesMs.push(durationMs);
+          if (this.latencySamplesMs.length > 500) {
+            this.latencySamplesMs.shift();
+          }
         });
 
         try {
@@ -469,21 +501,35 @@ export class DecoupledApiServer {
             return;
           }
 
-          if (pathname === '/health/liveness' && req.method === 'GET') {
+          if ((pathname === '/health/liveness' || pathname === '/livez') && req.method === 'GET') {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ alive: true, pid: process.pid }));
             return;
           }
 
-          if (pathname === '/health/readiness' && req.method === 'GET') {
+          if ((pathname === '/health/readiness' || pathname === '/readyz') && req.method === 'GET') {
             const rpcInfo = await this.getHealthyValidatorRpc();
-            if (rpcInfo) {
+            const storeHealth = await this.sharedStore.healthCheck();
+            let pgHealthy = true;
+            let pgConfigured = false;
+            if (this.pgPool) {
+              pgConfigured = true;
+              try {
+                await this.pgPool.query('SELECT 1 AS ok');
+              } catch {
+                pgHealthy = false;
+              }
+            }
+            const redisOk = !this.sharedStore.isRedisConfigured() || storeHealth.redisHealthy;
+            if (rpcInfo && redisOk && pgHealthy) {
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(
                 JSON.stringify({
                   ready: true,
                   activeRpc: rpcInfo.url,
                   blockHeight: rpcInfo.status.height || rpcInfo.status.sync_info?.latest_block_height,
+                  redis: { configured: this.sharedStore.isRedisConfigured(), healthy: storeHealth.redisHealthy },
+                  postgres: { configured: pgConfigured, healthy: pgHealthy },
                 })
               );
             } else {
@@ -491,7 +537,13 @@ export class DecoupledApiServer {
               res.end(
                 JSON.stringify({
                   ready: false,
-                  error: 'No healthy CometBFT validator RPC endpoint available',
+                  error: !rpcInfo
+                    ? 'No healthy CometBFT validator RPC endpoint available'
+                    : !redisOk
+                      ? 'Redis security store unhealthy'
+                      : 'PostgreSQL primary database unhealthy',
+                  redis: { configured: this.sharedStore.isRedisConfigured(), healthy: storeHealth.redisHealthy },
+                  postgres: { configured: pgConfigured, healthy: pgHealthy },
                 })
               );
             }
@@ -528,7 +580,27 @@ export class DecoupledApiServer {
 
           if (pathname === '/metrics' && req.method === 'GET') {
             const summary = await this.consensusMonitor.evaluateHealth();
-            const metricsText = this.consensusMonitor.generatePrometheusMetrics(summary);
+            const storeHealth = await this.sharedStore.healthCheck();
+            let pgHealthy = 0;
+            if (this.pgPool) {
+              try {
+                await this.pgPool.query('SELECT 1 AS ok');
+                pgHealthy = 1;
+              } catch {
+                pgHealthy = 0;
+              }
+            }
+            const sorted = [...this.latencySamplesMs].sort((a, b) => a - b);
+            const p95Idx = sorted.length > 0 ? Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95)) : 0;
+            const p95Ms = sorted.length > 0 ? sorted[p95Idx] : 0;
+            const extra = this.telemetryProvider ? await this.telemetryProvider() : {};
+            const metricsText = this.consensusMonitor.generatePrometheusMetrics(summary, {
+              httpRequestsTotal: this.httpRequestsTotal,
+              httpLatencyP95Ms: p95Ms,
+              postgresHealthy: pgHealthy,
+              redisHealthy: storeHealth.redisHealthy ? 1 : 0,
+              ...extra,
+            });
             res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
             res.end(metricsText);
             return;
@@ -645,6 +717,10 @@ export class DecoupledApiServer {
       this.server?.close(() => {
         clearTimeout(forceTimer);
         this.server = null;
+        this.sharedStore.closeAsync().catch(() => {});
+        if (this.pgPool && this.ownsPgPool) {
+          this.pgPool.end?.().catch(() => {});
+        }
         resolve();
       });
     });

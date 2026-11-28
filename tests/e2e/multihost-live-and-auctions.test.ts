@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import http from 'node:http';
 import { handleLiveStreamingRoutes, type LiveRouteContext } from '../../scripts/routes/live.routes.ts';
+import { sovraDb } from '../../scripts/database-engine.ts';
 
 function createMockLiveContext(method: string, pathname: string, bodyObj?: any, queryParams: Record<string, string> = {}): {
   ctx: LiveRouteContext;
@@ -61,6 +62,15 @@ function createMockLiveContext(method: string, pathname: string, bodyObj?: any, 
 
 describe('Cycle 3: Multi-Host Live Broadcast Swarm & 3D Spatial Audio Stages', () => {
   const testSessionId = `session_live_${Date.now()}`;
+
+  beforeAll(() => {
+    sovraDb.registerUser({
+      did: 'did:key:z6MkoVmKwZQZ9GyXrNEyztNNuYK3e36NqvfHri1vSTRQEFDD',
+      handle: '@test_streamer',
+      displayName: 'Alpha Collector',
+      balanceSov: 500.0,
+    });
+  });
 
   it('POST /api/live/cohost/invite adds up to 3 co-hosts (max 4 total)', async () => {
     const { ctx, getResponse } = createMockLiveContext('POST', '/api/live/cohost/invite', {

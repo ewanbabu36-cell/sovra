@@ -17,24 +17,30 @@ import {
   BleHardwareUnavailableError,
 } from '@sovra/p2p';
 
-// Polyfill/safe-getter for React Native NativeModules
-function getNativeBleModule(): any {
+// Safe cross-runtime getter supporting Capacitor/Android WebView (@JavascriptInterface window.SovraBleNative)
+// and React Native TurboModule / NativeModules.SovraBleNative
+function getNativeBleRuntime(): { module: any; isWebViewBridge: boolean } {
   try {
+    if (typeof window !== 'undefined' && (window as any).SovraBleNative) {
+      return { module: (window as any).SovraBleNative, isWebViewBridge: true };
+    }
     const RN = (globalThis as any).ReactNative || (globalThis as any).reactNative;
     if (RN && RN.NativeModules && RN.NativeModules.SovraBleNative) {
-      return RN.NativeModules.SovraBleNative;
+      return { module: RN.NativeModules.SovraBleNative, isWebViewBridge: false };
     }
-    // Check global NativeModules if injected by TurboModule runtime
     if ((globalThis as any).NativeModules?.SovraBleNative) {
-      return (globalThis as any).NativeModules.SovraBleNative;
+      return { module: (globalThis as any).NativeModules.SovraBleNative, isWebViewBridge: false };
     }
   } catch {}
-  return null;
+  return { module: null, isWebViewBridge: false };
 }
 
 export class NativeMobileBleAdapter implements BlePlatformAdapter {
   public readonly platformName: 'android' | 'ios' | 'virtual';
   private nativeModule: any;
+  private isWebViewBridge = false;
+  private domCleanupFns: Array<() => void> = [];
+  private domDiscoveryCleanup: (() => void) | null = null;
   private activeChannels = new Map<string, ActiveBleChannel>();
   private incomingConnectionHandlers: Array<(channel: BleConnectionChannel) => void> = [];
   private isScanning = false;
@@ -59,7 +65,9 @@ export class NativeMobileBleAdapter implements BlePlatformAdapter {
   }
 
   constructor() {
-    this.nativeModule = getNativeBleModule();
+    const rt = getNativeBleRuntime();
+    this.nativeModule = rt.module;
+    this.isWebViewBridge = rt.isWebViewBridge;
     const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
     this.platformName = isAndroid ? 'android' : 'ios';
     this.setupEventListeners();
@@ -68,27 +76,42 @@ export class NativeMobileBleAdapter implements BlePlatformAdapter {
   private setupEventListeners(): void {
     if (!this.nativeModule) return;
 
+    const handleIncomingData = (event: { gattId?: string; data?: string }) => {
+      if (!event?.gattId || !event?.data) return;
+      const channel = this.activeChannels.get(event.gattId);
+      if (channel) {
+        channel.injectIncomingBytes?.(this.base64ToBytes(event.data));
+      }
+    };
+
+    const handleDisconnect = (event: { gattId?: string }) => {
+      if (!event?.gattId) return;
+      const channel = this.activeChannels.get(event.gattId);
+      if (channel) {
+        channel.close();
+        this.activeChannels.delete(event.gattId);
+      }
+    };
+
+    if (this.isWebViewBridge && typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      const dataListener = (ev: any) => handleIncomingData(ev?.detail);
+      const discListener = (ev: any) => handleDisconnect(ev?.detail);
+      window.addEventListener('onIncomingDataReceived', dataListener);
+      window.addEventListener('onPeerDisconnected', discListener);
+      this.domCleanupFns.push(
+        () => window.removeEventListener('onIncomingDataReceived', dataListener),
+        () => window.removeEventListener('onPeerDisconnected', discListener),
+      );
+      return;
+    }
+
     try {
       const RN = (globalThis as any).ReactNative || (globalThis as any).reactNative;
       const EventEmitter = RN?.NativeEventEmitter || (globalThis as any).NativeEventEmitter;
       if (EventEmitter) {
         const emitter = new EventEmitter(this.nativeModule);
-
-        emitter.addListener('onIncomingDataReceived', (event: { gattId: string; data: string }) => {
-          const channel = this.activeChannels.get(event.gattId);
-          if (channel) {
-            const rawBytes = this.base64ToBytes(event.data);
-            channel.injectIncomingBytes?.(rawBytes);
-          }
-        });
-
-        emitter.addListener('onPeerDisconnected', (event: { gattId: string }) => {
-          const channel = this.activeChannels.get(event.gattId);
-          if (channel) {
-            channel.close();
-            this.activeChannels.delete(event.gattId);
-          }
-        });
+        emitter.addListener('onIncomingDataReceived', handleIncomingData);
+        emitter.addListener('onPeerDisconnected', handleDisconnect);
       }
     } catch (e) {
       console.warn('[NativeBleBridge] Could not attach NativeEventEmitter:', e);
@@ -185,23 +208,30 @@ export class NativeMobileBleAdapter implements BlePlatformAdapter {
       return false;
     }
     try {
-      const RN = (globalThis as any).ReactNative || (globalThis as any).reactNative;
-      const EventEmitter = RN?.NativeEventEmitter || (globalThis as any).NativeEventEmitter;
-      if (EventEmitter) {
-        const emitter = new EventEmitter(this.nativeModule);
-        emitter.addListener(
-          'onDeviceDiscovered',
-          (event: { address: string; rssi: number; txPower?: number; serviceData: string; name?: string }) => {
-            const serviceBytes = this.base64ToBytes(event.serviceData || '');
-            onDiscovered({
-              address: event.address,
-              rssi: event.rssi,
-              txPower: event.txPower,
-              serviceData: serviceBytes,
-              name: event.name,
-            });
-          },
-        );
+      const dispatchDiscovered = (event: { address: string; rssi: number; txPower?: number; serviceData?: string; name?: string }) => {
+        if (!event?.address) return;
+        const serviceBytes = this.base64ToBytes(event.serviceData || '');
+        onDiscovered({
+          address: event.address,
+          rssi: event.rssi,
+          txPower: event.txPower,
+          serviceData: serviceBytes,
+          name: event.name,
+        });
+      };
+
+      if (this.isWebViewBridge && typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+        if (this.domDiscoveryCleanup) this.domDiscoveryCleanup();
+        const listener = (ev: any) => dispatchDiscovered(ev?.detail);
+        window.addEventListener('onDeviceDiscovered', listener);
+        this.domDiscoveryCleanup = () => window.removeEventListener('onDeviceDiscovered', listener);
+      } else {
+        const RN = (globalThis as any).ReactNative || (globalThis as any).reactNative;
+        const EventEmitter = RN?.NativeEventEmitter || (globalThis as any).NativeEventEmitter;
+        if (EventEmitter) {
+          const emitter = new EventEmitter(this.nativeModule);
+          emitter.addListener('onDeviceDiscovered', dispatchDiscovered);
+        }
       }
 
       const res = await this.nativeModule.startScanning(serviceUuid);
@@ -214,6 +244,10 @@ export class NativeMobileBleAdapter implements BlePlatformAdapter {
   }
 
   public async stopScanning(): Promise<void> {
+    if (this.domDiscoveryCleanup) {
+      this.domDiscoveryCleanup();
+      this.domDiscoveryCleanup = null;
+    }
     if (!this.nativeModule) return;
     try {
       await this.nativeModule.stopScanning();
@@ -241,9 +275,49 @@ export class NativeMobileBleAdapter implements BlePlatformAdapter {
     }
 
     const resolvedAddress = this.resolveAddressForDid(targetAddress);
-    const connRes = await this.nativeModule.connectGatt(resolvedAddress);
-    const gattId = connRes.gattId;
-    const mtu = connRes.mtu || 23;
+    let gattId = '';
+    let mtu = 23;
+
+    if (this.isWebViewBridge && typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      const connRes = await new Promise<{ gattId: string; mtu: number }>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(new Error(`BLE GATT connection to ${resolvedAddress} timed out`));
+        }, 6000);
+        const onOk = (ev: any) => {
+          const d = ev?.detail;
+          if (d?.address === resolvedAddress && d?.gattId) {
+            cleanup();
+            resolve({ gattId: String(d.gattId), mtu: Number(d.mtu || 512) });
+          }
+        };
+        const onErr = (ev: any) => {
+          const d = ev?.detail;
+          if (!d?.address || d.address === resolvedAddress) {
+            cleanup();
+            reject(new Error(String(d?.error || `GATT connect failed for ${resolvedAddress}`)));
+          }
+        };
+        const cleanup = () => {
+          clearTimeout(timer);
+          window.removeEventListener('onGattConnected', onOk);
+          window.removeEventListener('onGattError', onErr);
+        };
+        window.addEventListener('onGattConnected', onOk);
+        window.addEventListener('onGattError', onErr);
+        const started = Boolean(this.nativeModule.connectGatt(resolvedAddress));
+        if (!started) {
+          cleanup();
+          reject(new Error(`GATT connect rejected for ${resolvedAddress}`));
+        }
+      });
+      gattId = connRes.gattId;
+      mtu = connRes.mtu;
+    } else {
+      const connRes = await this.nativeModule.connectGatt(resolvedAddress);
+      gattId = connRes.gattId;
+      mtu = connRes.mtu || 23;
+    }
 
     const channel = new ActiveBleChannel(
       targetAddress,

@@ -32,6 +32,7 @@ import {
   removeSavedVideo,
   checkIsVideoSaved,
 } from '../services/api.js';
+import { multiRelayManager } from '../services/multi-relay-manager.js';
 
 export interface WatchVideoComment {
   id: string;
@@ -522,11 +523,17 @@ export function LiveStreamViewerModal({
 
       if (typeof RTCPeerConnection !== 'undefined') {
         try {
+          const w = typeof window !== 'undefined' ? (window as any) : undefined;
+          const zeroDomainIce = multiRelayManager.getZeroDomainRtcIceServers();
+          const configuredIce = Array.isArray(w?.SOVRA_ICE_SERVERS)
+            ? w.SOVRA_ICE_SERVERS
+            : (zeroDomainIce.length > 0
+              ? zeroDomainIce
+              : (w?.SOVRA_ALLOW_PUBLIC_STUN === true || (typeof localStorage !== 'undefined' && localStorage.getItem('sovra_allow_public_stun') === 'true')
+                ? [{ urls: 'stun:stun.l.google.com:19302' }]
+                : []));
           pc = new RTCPeerConnection({
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' },
-            ],
+            iceServers: configuredIce,
           });
           pcRef.current = pc;
 

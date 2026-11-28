@@ -1,0 +1,135 @@
+version: '3.8'
+
+# ============================================================
+#   SOVRA GLOBAL MULTI-REGION BOOTSTRAP SEED NODES
+#   Geographically Distributed Seeds: US-East, Frankfurt & Singapore
+#   Guarantees <100ms peer rendezvous for any global node.
+# ============================================================
+
+services:
+  # ------------------------------------------------------------
+  # Region 1: US-East (North Virginia / Americas)
+  # ------------------------------------------------------------
+  seed-us-east:
+    build:
+      context: ..
+      dockerfile: deploy/seed-nodes/Dockerfile
+    container_name: sovra-seed-us-east
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - SOVRA_P2P_HOST=0.0.0.0
+      - SOVRA_P2P_PORT=4001
+      - SOVRA_HTTP_PORT=8080
+      - SOVRA_PUBLIC_IP=${SOVRA_SEED_US_IP:-seed-us-east.sovra.network}
+      - SOVRA_DATA_DIR=/app/data
+      - SOVRA_REGION=us-east
+    volumes:
+      - seed-us-east-data:/app/data
+    ports:
+      - "4001:4001" # TCP Noise_XX P2P & Circuit Relay
+      - "8080:8080" # Prometheus /health & /metrics
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 4s
+      retries: 3
+    networks:
+      - sovra-global-seed-net
+
+  # ------------------------------------------------------------
+  # Region 2: EU-Central (Frankfurt / Europe)
+  # ------------------------------------------------------------
+  seed-eu-central:
+    build:
+      context: ..
+      dockerfile: deploy/seed-nodes/Dockerfile
+    container_name: sovra-seed-eu-central
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - SOVRA_P2P_HOST=0.0.0.0
+      - SOVRA_P2P_PORT=4002
+      - SOVRA_HTTP_PORT=8081
+      - SOVRA_PUBLIC_IP=${SOVRA_SEED_EU_IP:-seed-eu-central.sovra.network}
+      - SOVRA_DATA_DIR=/app/data
+      - SOVRA_REGION=eu-central
+    volumes:
+      - seed-eu-central-data:/app/data
+    ports:
+      - "4002:4002" # TCP Noise_XX P2P & Circuit Relay
+      - "8081:8081" # Prometheus /health & /metrics
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8081/health"]
+      interval: 10s
+      timeout: 4s
+      retries: 3
+    networks:
+      - sovra-global-seed-net
+
+  # ------------------------------------------------------------
+  # Region 3: AP-East (Singapore / Asia-Pacific)
+  # ------------------------------------------------------------
+  seed-ap-east:
+    build:
+      context: ..
+      dockerfile: deploy/seed-nodes/Dockerfile
+    container_name: sovra-seed-ap-east
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - SOVRA_P2P_HOST=0.0.0.0
+      - SOVRA_P2P_PORT=4003
+      - SOVRA_HTTP_PORT=8082
+      - SOVRA_PUBLIC_IP=${SOVRA_SEED_AP_IP:-seed-ap-east.sovra.network}
+      - SOVRA_DATA_DIR=/app/data
+      - SOVRA_REGION=ap-east
+    volumes:
+      - seed-ap-east-data:/app/data
+    ports:
+      - "4003:4003" # TCP Noise_XX P2P & Circuit Relay
+      - "8082:8082" # Prometheus /health & /metrics
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8082/health"]
+      interval: 10s
+      timeout: 4s
+      retries: 3
+    networks:
+      - sovra-global-seed-net
+
+volumes:
+  seed-us-east-data:
+    name: sovra-seed-us-east-data
+  seed-eu-central-data:
+    name: sovra-seed-eu-central-data
+  seed-ap-east-data:
+    name: sovra-seed-ap-east-data
+
+networks:
+  sovra-global-seed-net:
+    name: sovra-global-seed-net
+    driver: bridge

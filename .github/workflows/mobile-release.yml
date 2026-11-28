@@ -82,6 +82,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build Workspace Packages & Sync Android WebView Assets
+        run: |
+          pnpm -r build
+          pnpm run build:mobile
+          test -f apps/sovra-mobile/android/app/src/main/assets/bundle.js
+          test -f apps/sovra-mobile/android/app/src/main/assets/index.html
+
+      - name: Verify Android Signing Secrets (Production Tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          if [ -z "${{ secrets.SOVRA_RELEASE_KEYSTORE_BASE64 }}" ] || [ -z "${{ secrets.SOVRA_RELEASE_KEYSTORE_PASSWORD }}" ] || [ -z "${{ secrets.SOVRA_RELEASE_KEY_ALIAS }}" ] || [ -z "${{ secrets.SOVRA_RELEASE_KEY_PASSWORD }}" ]; then
+            echo "ERROR: Production release signing secrets must all be configured (zero hardcoded passwords)."
+            exit 1
+          fi
+
       - name: Prepare Keystore File
         run: |
           if [ -n "${{ secrets.SOVRA_RELEASE_KEYSTORE_BASE64 }}" ]; then
@@ -92,12 +107,16 @@ jobs:
         working-directory: apps/sovra-mobile/android
         env:
           SOVRA_RELEASE_KEYSTORE_FILE: sovra-release-key.jks
-          SOVRA_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.SOVRA_RELEASE_KEYSTORE_PASSWORD || 'sovraSecure2026!' }}
-          SOVRA_RELEASE_KEY_ALIAS: ${{ secrets.SOVRA_RELEASE_KEY_ALIAS || 'sovra-upload' }}
-          SOVRA_RELEASE_KEY_PASSWORD: ${{ secrets.SOVRA_RELEASE_KEY_PASSWORD || 'sovraSecure2026!' }}
+          SOVRA_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.SOVRA_RELEASE_KEYSTORE_PASSWORD }}
+          SOVRA_RELEASE_KEY_ALIAS: ${{ secrets.SOVRA_RELEASE_KEY_ALIAS }}
+          SOVRA_RELEASE_KEY_PASSWORD: ${{ secrets.SOVRA_RELEASE_KEY_PASSWORD }}
         run: |
-          chmod +x ./gradlew || true
-          ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace || true
+          chmod +x ./gradlew
+          if [ -f "app/sovra-release-key.jks" ]; then
+            ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace
+          else
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          fi
 
       - name: Upload Android Release Artifacts
         uses: actions/upload-artifact@v4

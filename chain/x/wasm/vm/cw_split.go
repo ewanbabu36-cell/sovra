@@ -10,10 +10,27 @@ import (
 )
 
 var (
-	KeySplitConfig         = []byte("split_config")
-	PrefixSplitEarnings    = []byte("split_earn_")
-	KeySplitTotalReceived  = []byte("split_total_received")
+	KeySplitConfig        = []byte("split_config")
+	PrefixSplitEarnings   = []byte("split_earn_")
+	KeySplitTotalReceived = []byte("split_total_received")
 )
+
+const (
+	// DefaultSplitProtocolBurnBps enforces a 5% mandatory protocol burn sink on creator revenue distributions.
+	DefaultSplitProtocolBurnBps uint64 = 500
+	MinSplitProtocolBurnBps     uint64 = 500
+	MaxSplitProtocolBurnBps     uint64 = 5000
+)
+
+func resolveSplitProtocolBurnBps(requested uint64) uint64 {
+	if requested < MinSplitProtocolBurnBps {
+		return DefaultSplitProtocolBurnBps
+	}
+	if requested > MaxSplitProtocolBurnBps {
+		return MaxSplitProtocolBurnBps
+	}
+	return requested
+}
 
 // SplitRecipient defines a payout destination and its relative weight/share
 type SplitRecipient struct {
@@ -28,15 +45,50 @@ type SplitConfig struct {
 	Recipients       []SplitRecipient `json:"recipients"`
 	TotalWeight      uint64           `json:"total_weight"`
 	MinPayout        string           `json:"min_payout"`        // Minimum distributable threshold in uSOV
+	ProtocolBurnBps  uint64           `json:"protocol_burn_bps"` // Mandatory protocol burn share in basis points (min 500 = 5%)
 	TotalDistributed string           `json:"total_distributed"` // Cumulative uSOV distributed
+	TotalBurned      string           `json:"total_burned"`      // Cumulative uSOV permanently burned
 }
 
 // SplitInstantiateMsg initializes a new creator revenue-sharing split contract
 type SplitInstantiateMsg struct {
-	Admin      string           `json:"admin,omitempty"`
-	Title      string           `json:"title,omitempty"`
-	Recipients []SplitRecipient `json:"recipients"`
-	MinPayout  string           `json:"min_payout,omitempty"`
+	Admin           string           `json:"admin,omitempty"`
+	Title           string           `json:"title,omitempty"`
+	Recipients      []SplitRecipient `json:"recipients"`
+	MinPayout       string           `json:"min_payout,omitempty"`
+	ProtocolBurnBps uint64           `json:"protocol_burn_bps,omitempty"`
+}
+
+type splitPayoutRecord struct {
+	Address string
+	Amount  *big.Int
+}
+
+func computeSplitDistribution(distAmount *big.Int, burnBps uint64, recipients []SplitRecipient, totalWeight uint64) (burnAmt *big.Int, netDist *big.Int, payouts []splitPayoutRecord) {
+	effectiveBps := resolveSplitProtocolBurnBps(burnBps)
+	burnAmt = new(big.Int).Div(new(big.Int).Mul(distAmount, new(big.Int).SetUint64(effectiveBps)), big.NewInt(10000))
+	netDist = new(big.Int).Sub(distAmount, burnAmt)
+
+	totWeight := new(big.Int).SetUint64(totalWeight)
+	distributedSum := big.NewInt(0)
+
+	for _, r := range recipients {
+		w := new(big.Int).SetUint64(r.Weight)
+		share := new(big.Int).Div(new(big.Int).Mul(netDist, w), totWeight)
+		if share.Sign() > 0 {
+			distributedSum.Add(distributedSum, share)
+			payouts = append(payouts, splitPayoutRecord{
+				Address: r.Address,
+				Amount:  share,
+			})
+		}
+	}
+
+	remainder := new(big.Int).Sub(netDist, distributedSum)
+	if remainder.Sign() > 0 && len(payouts) > 0 {
+		payouts[0].Amount.Add(payouts[0].Amount, remainder)
+	}
+	return burnAmt, netDist, payouts
 }
 
 type DistributeMsg struct {
@@ -98,6 +150,7 @@ func ExecuteSplitInstantiate(storage StorageDriver, env types.Env, info types.Me
 	if minPayout == "" {
 		minPayout = "1" // Default: 1 uSOV
 	}
+	protocolBurnBps := resolveSplitProtocolBurnBps(msg.ProtocolBurnBps)
 
 	cfg := SplitConfig{
 		Admin:            admin,
@@ -105,7 +158,9 @@ func ExecuteSplitInstantiate(storage StorageDriver, env types.Env, info types.Me
 		Recipients:       msg.Recipients,
 		TotalWeight:      totalWeight,
 		MinPayout:        minPayout,
+		ProtocolBurnBps:  protocolBurnBps,
 		TotalDistributed: "0",
+		TotalBurned:      "0",
 	}
 
 	cfgBz, err := json.Marshal(cfg)
@@ -121,6 +176,7 @@ func ExecuteSplitInstantiate(storage StorageDriver, env types.Env, info types.Me
 			{Key: "title", Value: title},
 			{Key: "recipients_count", Value: fmt.Sprintf("%d", len(msg.Recipients))},
 			{Key: "total_weight", Value: fmt.Sprintf("%d", totalWeight)},
+			{Key: "protocol_burn_bps", Value: fmt.Sprintf("%d", protocolBurnBps)},
 		},
 	}, nil
 }
@@ -169,37 +225,22 @@ func ExecuteSplitExecute(storage StorageDriver, env types.Env, info types.Messag
 			return nil, fmt.Errorf("distributable amount %s uSOV is below minimum payout threshold %s uSOV", distAmount.String(), cfg.MinPayout)
 		}
 
-		// Calculate exact integer distribution per recipient
-		totWeight := new(big.Int).SetUint64(cfg.TotalWeight)
+		// Deduct mandatory protocol burn share (min 5% / 500 bps) before splitting remainder to recipients
+		burnAmt, netDist, payouts := computeSplitDistribution(distAmount, cfg.ProtocolBurnBps, cfg.Recipients, cfg.TotalWeight)
 		var subMsgs []types.SubMsg
-		distributedSum := big.NewInt(0)
 
-		type PayoutRecord struct {
-			Address string
-			Amount  *big.Int
-		}
-		var payouts []PayoutRecord
-
-		for _, r := range cfg.Recipients {
-			w := new(big.Int).SetUint64(r.Weight)
-			// share = (distAmount * weight) / totalWeight
-			num := new(big.Int).Mul(distAmount, w)
-			share := new(big.Int).Div(num, totWeight)
-
-			if share.Sign() > 0 {
-				distributedSum.Add(distributedSum, share)
-				payouts = append(payouts, PayoutRecord{
-					Address: r.Address,
-					Amount:  share,
-				})
-			}
-		}
-
-		// Handle integer division dust remainder: assign remainder to primary recipient (first in list)
-		remainder := new(big.Int).Sub(distAmount, distributedSum)
-		if remainder.Sign() > 0 && len(payouts) > 0 {
-			payouts[0].Amount.Add(payouts[0].Amount, remainder)
-			distributedSum.Add(distributedSum, remainder)
+		if burnAmt.Sign() > 0 {
+			subMsgs = append(subMsgs, types.SubMsg{
+				Msg: types.CosmosMsg{
+					Bank: &types.BankMsg{
+						Burn: &types.BankBurnMsg{
+							Amount: []types.Coin{
+								{Denom: "usov", Amount: burnAmt.String()},
+							},
+						},
+					},
+				},
+			})
 		}
 
 		// Build atomic Bank.Send submessages and update cumulative earnings
@@ -227,13 +268,20 @@ func ExecuteSplitExecute(storage StorageDriver, env types.Env, info types.Messag
 			storage.Set(earnKey, []byte(currentEarn.String()))
 		}
 
-		// Update cumulative total distributed in contract config
+		// Update cumulative totals distributed and burned in contract config
 		curTotDist, _ := new(big.Int).SetString(cfg.TotalDistributed, 10)
 		if curTotDist == nil {
 			curTotDist = big.NewInt(0)
 		}
-		curTotDist.Add(curTotDist, distAmount)
+		curTotDist.Add(curTotDist, netDist)
 		cfg.TotalDistributed = curTotDist.String()
+
+		curTotBurned, _ := new(big.Int).SetString(cfg.TotalBurned, 10)
+		if curTotBurned == nil {
+			curTotBurned = big.NewInt(0)
+		}
+		curTotBurned.Add(curTotBurned, burnAmt)
+		cfg.TotalBurned = curTotBurned.String()
 
 		updatedCfgBz, _ := json.Marshal(cfg)
 		storage.Set(KeySplitConfig, updatedCfgBz)
@@ -243,8 +291,12 @@ func ExecuteSplitExecute(storage StorageDriver, env types.Env, info types.Messag
 			Attributes: []types.EventAttribute{
 				{Key: "action", Value: "distribute_revenue"},
 				{Key: "total_distributed", Value: distAmount.String()},
+				{Key: "protocol_burn_bps", Value: fmt.Sprintf("%d", resolveSplitProtocolBurnBps(cfg.ProtocolBurnBps))},
+				{Key: "protocol_burned", Value: burnAmt.String()},
+				{Key: "net_distributed", Value: netDist.String()},
 				{Key: "payouts_count", Value: fmt.Sprintf("%d", len(payouts))},
 				{Key: "cumulative_distributed", Value: cfg.TotalDistributed},
+				{Key: "cumulative_burned", Value: cfg.TotalBurned},
 			},
 		}, nil
 	}
@@ -415,38 +467,31 @@ func ExecuteSplitQuery(storage StorageDriver, env types.Env, queryBz []byte) ([]
 			return nil, fmt.Errorf("invalid simulation amount: %s", qMsg.SimulateDistribute.Amount)
 		}
 
-		totWeight := new(big.Int).SetUint64(cfg.TotalWeight)
+		burnAmt, netDist, rawPayouts := computeSplitDistribution(amt, cfg.ProtocolBurnBps, cfg.Recipients, cfg.TotalWeight)
 		type SimPayout struct {
 			Address string `json:"address"`
 			Amount  string `json:"amount"`
 		}
-		var simPayouts []SimPayout
-		distributedSum := big.NewInt(0)
-
-		for _, r := range cfg.Recipients {
-			w := new(big.Int).SetUint64(r.Weight)
-			share := new(big.Int).Div(new(big.Int).Mul(amt, w), totWeight)
-			distributedSum.Add(distributedSum, share)
+		simPayouts := make([]SimPayout, 0, len(rawPayouts))
+		for _, p := range rawPayouts {
 			simPayouts = append(simPayouts, SimPayout{
-				Address: r.Address,
-				Amount:  share.String(),
+				Address: p.Address,
+				Amount:  p.Amount.String(),
 			})
 		}
 
-		// Allocate remainder to first recipient
-		rem := new(big.Int).Sub(amt, distributedSum)
-		if rem.Sign() > 0 && len(simPayouts) > 0 {
-			curFirst, _ := new(big.Int).SetString(simPayouts[0].Amount, 10)
-			curFirst.Add(curFirst, rem)
-			simPayouts[0].Amount = curFirst.String()
-		}
-
 		return json.Marshal(struct {
-			DistributableAmount string      `json:"distributable_amount"`
-			Payouts             []SimPayout `json:"payouts"`
+			DistributableAmount    string      `json:"distributable_amount"`
+			ProtocolBurnBps        uint64      `json:"protocol_burn_bps"`
+			ProtocolBurnAmount     string      `json:"protocol_burn_amount"`
+			NetDistributableAmount string      `json:"net_distributable_amount"`
+			Payouts                []SimPayout `json:"payouts"`
 		}{
-			DistributableAmount: amt.String(),
-			Payouts:             simPayouts,
+			DistributableAmount:    amt.String(),
+			ProtocolBurnBps:        resolveSplitProtocolBurnBps(cfg.ProtocolBurnBps),
+			ProtocolBurnAmount:     burnAmt.String(),
+			NetDistributableAmount: netDist.String(),
+			Payouts:                simPayouts,
 		})
 	}
 

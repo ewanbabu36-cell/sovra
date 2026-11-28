@@ -487,7 +487,7 @@ export class LocalSchemaMigrator {
       store_purchases: {},
       financial_ledger: {},
       balance_privacy_masked: false,
-      cached_balance: '450.50 SOV',
+      cached_balance: '0.00 SOV',
       active_persona: null,
       personas: [],
       cache_quota: { usedMb: 420, totalMb: 500 },
@@ -1524,7 +1524,7 @@ export class SovraLocalDatabase {
   }
 
   public getCachedBalance(): string {
-    return this.state.cached_balance || '450.50 SOV';
+    return this.state.cached_balance || '0.00 SOV';
   }
 
   public async setCachedBalance(balance: string): Promise<void> {

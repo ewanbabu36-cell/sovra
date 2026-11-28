@@ -16,4 +16,5 @@ export * from './principal.js';
 export * from './admin.js';
 export * from './governance/index.js';
 export * from './psi-discovery.js';
+export * from './sovra-id.js';
 

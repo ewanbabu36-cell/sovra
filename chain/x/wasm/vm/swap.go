@@ -12,7 +12,16 @@ import (
 var (
 	KeyPoolInfo     = []byte("pool_info")
 	PrefixLpBalance = []byte("lp_balance_")
+	PrefixPolLock   = []byte("pol_lock_")
 )
+
+// PolLockRecord tracks locked LP shares under Protocol-Owned Liquidity (POL).
+type PolLockRecord struct {
+	Address       string `json:"address"`
+	LockedLp      string `json:"locked_lp"`
+	UnlockAt      int64  `json:"unlock_at"`
+	PermanentLock bool   `json:"permanent_lock"`
+}
 
 // PoolInfo holds the state of the AMM pair pool
 type PoolInfo struct {
@@ -51,6 +60,11 @@ type RemoveLiquidityMsg struct {
 	Amount   string `json:"amount"` // LP shares to burn
 	MinSov   string `json:"min_sov,omitempty"`
 	MinToken string `json:"min_token,omitempty"`
+}
+
+type LockPolLiquidityMsg struct {
+	DurationSeconds int64 `json:"duration_seconds,omitempty"`
+	Permanent       bool  `json:"permanent,omitempty"`
 }
 
 // ExecuteSwapInstantiate initializes an AMM Swap Pair between Native SOV and a CW20 Token
@@ -462,6 +476,17 @@ func ExecuteSwapExecute(storage StorageDriver, env types.Env, info types.Message
 			return nil, fmt.Errorf("insufficient LP balance: have %s, need %s", userLp.String(), burnLp.String())
 		}
 
+		// Enforce Protocol-Owned Liquidity (POL) lock before allowing LP removal
+		if lockRec := getPolLockRecord(storage, info.Sender); lockRec != nil {
+			lockedLp, _ := new(big.Int).SetString(lockRec.LockedLp, 10)
+			if lockedLp != nil && lockedLp.Sign() > 0 && (lockRec.PermanentLock || env.Block.Time < lockRec.UnlockAt) {
+				freeLp := new(big.Int).Sub(userLp, lockedLp)
+				if freeLp.Cmp(burnLp) < 0 {
+					return nil, fmt.Errorf("protocol-owned liquidity lock active: free LP %s < requested burn %s", freeLp.String(), burnLp.String())
+				}
+			}
+		}
+
 		totalLp, _ := new(big.Int).SetString(pool.TotalLp, 10)
 		if totalLp == nil || totalLp.Sign() <= 0 {
 			return nil, fmt.Errorf("invalid pool total_lp")
@@ -538,6 +563,42 @@ func ExecuteSwapExecute(storage StorageDriver, env types.Env, info types.Message
 				{Key: "pool_total_lp", Value: pool.TotalLp},
 				{Key: "reserve_sov", Value: pool.ReserveSov},
 				{Key: "reserve_token", Value: pool.ReserveToken},
+			},
+		}, nil
+	}
+
+	// 5. Lock LP Shares under Protocol-Owned Liquidity (POL)
+	if polRaw, ok := raw["lock_pol_liquidity"]; ok {
+		var polMsg LockPolLiquidityMsg
+		if len(polRaw) > 0 {
+			_ = json.Unmarshal(polRaw, &polMsg)
+		}
+		userLp := getLpBalance(storage, info.Sender)
+		if userLp.Sign() <= 0 {
+			return nil, fmt.Errorf("no LP shares available to lock for %s", info.Sender)
+		}
+		unlockAt := int64(0)
+		if !polMsg.Permanent {
+			dur := polMsg.DurationSeconds
+			if dur <= 0 {
+				dur = 365 * 86400
+			}
+			unlockAt = env.Block.Time + dur
+		}
+		rec := PolLockRecord{
+			Address:       info.Sender,
+			LockedLp:      userLp.String(),
+			UnlockAt:      unlockAt,
+			PermanentLock: polMsg.Permanent,
+		}
+		setPolLockRecord(storage, rec)
+		return &types.Response{
+			Attributes: []types.EventAttribute{
+				{Key: "action", Value: "lock_pol_liquidity"},
+				{Key: "provider", Value: info.Sender},
+				{Key: "locked_lp", Value: rec.LockedLp},
+				{Key: "permanent_lock", Value: fmt.Sprintf("%t", rec.PermanentLock)},
+				{Key: "unlock_at", Value: fmt.Sprintf("%d", rec.UnlockAt)},
 			},
 		}, nil
 	}
@@ -677,6 +738,31 @@ func ExecuteSwapQuery(storage StorageDriver, env types.Env, queryBz []byte) ([]b
 		})
 	}
 
+	// 5. Protocol-Owned Liquidity lock status query: {"pol_status": {"address": "sovra1..."}}
+	if polQueryRaw, ok := raw["pol_status"]; ok {
+		var req struct {
+			Address string `json:"address"`
+		}
+		_ = json.Unmarshal(polQueryRaw, &req)
+		rec := getPolLockRecord(storage, req.Address)
+		if rec == nil {
+			return json.Marshal(map[string]interface{}{
+				"address":        req.Address,
+				"locked_lp":      "0",
+				"permanent_lock": false,
+				"unlock_at":      0,
+				"lock_active":    false,
+			})
+		}
+		return json.Marshal(map[string]interface{}{
+			"address":        rec.Address,
+			"locked_lp":      rec.LockedLp,
+			"permanent_lock": rec.PermanentLock,
+			"unlock_at":      rec.UnlockAt,
+			"lock_active":    rec.PermanentLock || env.Block.Time < rec.UnlockAt,
+		})
+	}
+
 	return nil, fmt.Errorf("unknown swap query: %s", string(queryBz))
 }
 
@@ -722,6 +808,25 @@ func setLpBalance(storage StorageDriver, userAddr string, amount *big.Int) {
 		return
 	}
 	storage.Set(key, []byte(amount.String()))
+}
+
+func getPolLockRecord(storage StorageDriver, userAddr string) *PolLockRecord {
+	key := append(PrefixPolLock, []byte(userAddr)...)
+	bz := storage.Get(key)
+	if len(bz) == 0 {
+		return nil
+	}
+	var rec PolLockRecord
+	if err := json.Unmarshal(bz, &rec); err != nil {
+		return nil
+	}
+	return &rec
+}
+
+func setPolLockRecord(storage StorageDriver, rec PolLockRecord) {
+	key := append(PrefixPolLock, []byte(rec.Address)...)
+	bz, _ := json.Marshal(rec)
+	storage.Set(key, bz)
 }
 
 func sqrtBigInt(n *big.Int) *big.Int {

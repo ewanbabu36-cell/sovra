@@ -31,6 +31,11 @@ import {
   sendP2PTokenTransfer,
   fetchValidators,
   delegateTokensToValidator,
+  fetchEconomyOverview,
+  fetchStakingPositions,
+  undelegateTokens,
+  claimStakingRewards,
+  bondSeederCollateral,
   type SovereignValidator,
 } from '../services/api.js';
 import { localDb } from '../services/local-database.js';
@@ -600,23 +605,50 @@ export function StakingDrawerModal({
   const [validators, setValidators] = useState<SovereignValidator[]>([]);
   const [selectedValidator, setSelectedValidator] = useState<SovereignValidator | null>(null);
   const [amount, setAmount] = useState('50');
+  const [lockDays, setLockDays] = useState<0 | 90 | 365 | 730>(365);
   const [isDelegating, setIsDelegating] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [statusNote, setStatusNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [claimedRewards, setClaimedRewards] = useState(false);
+  const [aprPercent, setAprPercent] = useState<number>(0);
+  const [claimableSov, setClaimableSov] = useState<number>(0);
+  const [delegations, setDelegations] = useState<any[]>([]);
+  const [unbondings, setUnbondings] = useState<any[]>([]);
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [seederBondAmt, setSeederBondAmt] = useState('100');
+
+  const refreshStakingState = async () => {
+    const [vals, econ, pos] = await Promise.all([
+      fetchValidators(),
+      fetchEconomyOverview(),
+      fetchStakingPositions(),
+    ]);
+    setValidators(vals);
+    if (vals.length > 0 && !selectedValidator) {
+      setSelectedValidator(vals[0] || null);
+    }
+    if (econ?.ok && econ.economy) {
+      setAprPercent(Number(econ.economy.estimatedStakingAprPercent || 0));
+    }
+    setDelegations(pos.delegations || []);
+    setUnbondings(pos.unbondings || []);
+    setClaimableSov(Number(pos.claimableSov || 0));
+  };
 
   useEffect(() => {
     if (isOpen) {
-      fetchValidators().then(vals => {
-        setValidators(vals);
-        if (vals.length > 0 && !selectedValidator) {
-          setSelectedValidator(vals[0] || null);
-        }
-      });
+      refreshStakingState();
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const lockOptions: Array<{ days: 0 | 90 | 365 | 730; label: string; mult: string }> = [
+    { days: 0, label: 'Flexible (0d)', mult: '1.0x' },
+    { days: 90, label: '90 Days', mult: '1.5x' },
+    { days: 365, label: '1 Year', mult: '2.5x' },
+    { days: 730, label: '2 Years', mult: '3.0x' },
+  ];
 
   const handleDelegate = async () => {
     if (!selectedValidator) return;
@@ -626,19 +658,23 @@ export function StakingDrawerModal({
       return;
     }
     if (num > Number(balance)) {
-      setError(`Insufficient SOV balance. Available: ₹${balance}`);
+      setError(`Insufficient SOV balance. Available: ${balance} SOV`);
       return;
     }
 
     setIsDelegating(true);
     setError(null);
+    setStatusNote(null);
     try {
       const res = await delegateTokensToValidator({
         validatorAddress: selectedValidator.address,
         amount: String(num),
+        lockDays,
       });
       if (res.ok) {
-        setTxHash(res.txHash || '0x' + Math.random().toString(16).substring(2));
+        setTxHash(res.txHash || null);
+        setStatusNote(`Locked ${num} SOV (${res.multiplier ?? 1}x veSOV) · 14d unbonding applies on unlock`);
+        await refreshStakingState();
         if (onDelegationSuccess) onDelegationSuccess();
       } else {
         throw new Error(res.error || 'Delegation failed');
@@ -647,6 +683,43 @@ export function StakingDrawerModal({
       setError(err.message || 'Delegation error');
     } finally {
       setIsDelegating(false);
+    }
+  };
+
+  const handleClaimRewards = async () => {
+    setIsClaiming(true);
+    setError(null);
+    const res = await claimStakingRewards();
+    setIsClaiming(false);
+    if (res.ok) {
+      setStatusNote(`Claimed ${res.claimedSov} SOV real protocol fee yield!`);
+      await refreshStakingState();
+      if (onDelegationSuccess) onDelegationSuccess();
+    } else {
+      setError(res.error || 'No claimable yield available yet');
+    }
+  };
+
+  const handleUnstake = async (valAddr: string, valAmt: string) => {
+    setError(null);
+    const res = await undelegateTokens({ validatorAddress: valAddr, amount: valAmt });
+    if (res.ok) {
+      setStatusNote(`Entered 14-day unbonding queue (${valAmt} SOV).`);
+      await refreshStakingState();
+    } else {
+      setError(res.error || 'Undelegate blocked');
+    }
+  };
+
+  const handleBondSeeder = async () => {
+    setError(null);
+    const amt = Number(seederBondAmt || 100);
+    const res = await bondSeederCollateral({ amountSov: amt, storageCapacityGb: Math.max(10, Math.floor(amt / 10)) });
+    if (res.ok) {
+      setStatusNote(`DePIN Seeder collateral bonded (${res.bondedSov} SOV). Stake-to-Work active.`);
+      if (onDelegationSuccess) onDelegationSuccess();
+    } else {
+      setError(res.error || 'Seeder collateral bond failed');
     }
   };
 
@@ -678,14 +751,14 @@ export function StakingDrawerModal({
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: 16,
+          gap: 14,
           color: '#e2e8f0',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>⚡ Sovereign L1 Validator Staking</h3>
-            <span style={{ fontSize: 11, color: '#38bdf8' }}>Earn up to 15.1% APR with Zero Middlemen</span>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>⚡ Sovereign veSOV Staking & DePIN Bond</h3>
+            <span style={{ fontSize: 11, color: '#38bdf8' }}>50% Fee Burn · Real Yield · 14-Day Unbonding Cooldown</span>
           </div>
           <button
             onClick={onClose}
@@ -695,7 +768,7 @@ export function StakingDrawerModal({
           </button>
         </div>
 
-        {/* Staking APR Banner */}
+        {/* Live Staking Yield Banner */}
         <div
           style={{
             background: 'linear-gradient(135deg, #065f46 0%, #047857 100%)',
@@ -707,24 +780,29 @@ export function StakingDrawerModal({
           }}
         >
           <div>
-            <div style={{ fontSize: 11, color: '#a7f3d0', fontWeight: 600 }}>NETWORK STAKING REWARDS</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', marginTop: 2 }}>14.2% APR</div>
+            <div style={{ fontSize: 11, color: '#a7f3d0', fontWeight: 600 }}>LIVE FEE YIELD & STAKING APR</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', marginTop: 2 }}>
+              {aprPercent > 0 ? `${aprPercent}% Est. APR` : 'Fee-Driven Yield'}
+            </div>
+            <div style={{ fontSize: 11, color: '#d1fae5', marginTop: 2 }}>
+              Claimable: {claimableSov.toFixed(4)} SOV
+            </div>
           </div>
           <button
-            onClick={() => setClaimedRewards(true)}
-            disabled={claimedRewards}
+            onClick={handleClaimRewards}
+            disabled={isClaiming}
             style={{
               padding: '6px 14px',
-              backgroundColor: claimedRewards ? '#064e3b' : '#34d399',
-              color: claimedRewards ? '#94a3b8' : '#000',
+              backgroundColor: claimableSov > 0 ? '#34d399' : '#1e293b',
+              color: claimableSov > 0 ? '#000' : '#94a3b8',
               fontWeight: 700,
               fontSize: 11,
               borderRadius: 20,
               border: 'none',
-              cursor: claimedRewards ? 'default' : 'pointer',
+              cursor: isClaiming ? 'wait' : 'pointer',
             }}
           >
-            {claimedRewards ? '✓ Claimed' : 'Claim Rewards 🎁'}
+            {isClaiming ? 'Claiming...' : 'Claim Rewards'}
           </button>
         </div>
 
@@ -734,21 +812,54 @@ export function StakingDrawerModal({
           </div>
         )}
 
-        {txHash && (
+        {(txHash || statusNote) && (
           <div style={{ padding: '10px 14px', backgroundColor: 'rgba(16, 185, 129, 0.2)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: 10, fontSize: 12, color: '#34d399' }}>
-            ✓ Successfully delegated {amount} SOV!
-            <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#94a3b8', marginTop: 4, wordBreak: 'break-all' }}>
-              Tx: {txHash}
-            </div>
+            {statusNote || `✓ Delegated ${amount} SOV!`}
+            {txHash && (
+              <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#94a3b8', marginTop: 4, wordBreak: 'break-all' }}>
+                Tx: {txHash}
+              </div>
+            )}
           </div>
         )}
+
+        {/* veSOV Lock Duration Tiers */}
+        <div>
+          <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+            veSOV Time-Lock Boost (Higher Real Yield + Governance Weight)
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+            {lockOptions.map(opt => {
+              const active = lockDays === opt.days;
+              return (
+                <button
+                  key={opt.days}
+                  onClick={() => setLockDays(opt.days)}
+                  style={{
+                    padding: '8px 4px',
+                    borderRadius: 10,
+                    backgroundColor: active ? 'rgba(56, 189, 248, 0.2)' : '#1e293b',
+                    border: active ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)',
+                    color: active ? '#38bdf8' : '#cbd5e1',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div>{opt.label}</div>
+                  <div style={{ color: '#34d399', marginTop: 2 }}>{opt.mult}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Validator Selector */}
         <div>
           <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 8 }}>
             Select Sovereign Validator ({validators.length})
           </label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 160, overflowY: 'auto' }}>
             {validators.map(v => {
               const isSelected = selectedValidator?.id === v.id;
               return (
@@ -787,7 +898,7 @@ export function StakingDrawerModal({
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
             <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>Delegation Amount (SOV)</label>
             <span style={{ fontSize: 11, color: '#38bdf8', cursor: 'pointer' }} onClick={() => setAmount(balance)}>
-              Max: ₹{balance}
+              Max: {balance} SOV
             </span>
           </div>
           <input
@@ -827,8 +938,45 @@ export function StakingDrawerModal({
             gap: 6,
           }}
         >
-          <span>{isDelegating ? 'Delegating on Chain...' : 'Delegate Tokens ⚡'}</span>
+          <span>{isDelegating ? 'Delegating on Chain...' : `Delegate Tokens (${lockOptions.find(o => o.days === lockDays)?.mult ?? '1.0x'}) ⚡`}</span>
         </button>
+
+        {/* Active Positions & 14-Day Unbonding Queue */}
+        {(delegations.length > 0 || unbondings.length > 0) && (
+          <div style={{ backgroundColor: '#1e293b', padding: 10, borderRadius: 10, fontSize: 11 }}>
+            <div style={{ fontWeight: 700, color: '#cbd5e1', marginBottom: 4 }}>
+              Active Stakes ({delegations.length}) · 14d Unbonding ({unbondings.length})
+            </div>
+            {delegations.map((d: any, i: number) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                <span>{d.amountSov} SOV ({d.lockTier} · {d.multiplier}x)</span>
+                <button
+                  onClick={() => handleUnstake(d.validatorAddress, String(d.amountSov))}
+                  style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, border: '1px solid #475569', backgroundColor: '#0f172a', color: '#f8fafc', cursor: 'pointer' }}
+                >
+                  Unbond (14d)
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* DePIN Seeder Stake-to-Work Collateral Quick Bond */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            type="number"
+            value={seederBondAmt}
+            onChange={e => setSeederBondAmt(e.target.value)}
+            placeholder="100"
+            style={{ width: 90, padding: '6px 8px', backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, color: '#fff', fontSize: 12 }}
+          />
+          <button
+            onClick={handleBondSeeder}
+            style={{ flex: 1, padding: '8px 10px', borderRadius: 10, border: '1px solid #34d399', backgroundColor: 'rgba(16,185,129,0.12)', color: '#34d399', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+          >
+            Bond DePIN Seeder Collateral (100+ SOV)
+          </button>
+        </div>
       </div>
     </div>
   );

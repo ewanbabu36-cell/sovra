@@ -40,11 +40,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     window.SOVRA_HOST_SESSION = {
       did: '${masterKey.did}',
       handle: '${hostUser ? hostUser.handle : "@laptop_host"}',
-      token: '${hostSessionToken}',
+      token: '',
     };
 
     var _knownHandleDids = ${safeJsonForScript(Object.fromEntries(sovraDb.getAllUsers().map(u => [u.handle.toLowerCase(), u.did])))};
-    var _knownUserTokens = ${safeJsonForScript(Object.fromEntries(sovraDb.getAllUsers().filter(u => u.sessionToken).map(u => [u.did, u.sessionToken])))};
 
     // SESS-02: Purge legacy or logged-out session artifacts from localStorage
     try {
@@ -181,20 +180,30 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       },
 
       directPing: function(peerDid, peerHandle) {
+        var t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        var targetLabel = peerHandle || (peerDid ? peerDid.slice(0, 12) : 'node');
         fetch('/api/mesh/ping', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ recipientDid: peerDid })
         })
-        .then(function(r) { return r.json(); })
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
         .then(function(data) {
-          if (typeof showAccountToast === 'function') {
-            showAccountToast('⚡ Direct 2.4GHz ping ACK received from ' + (peerHandle || (peerDid ? peerDid.slice(0, 12) : 'node')) + ' in 1.4ms', 'success');
+          var elapsedMs = Math.max(1, Math.round(((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0));
+          if (data && data.ok) {
+            if (typeof showAccountToast === 'function') {
+              showAccountToast('⚡ Direct ping ACK from ' + targetLabel + ' (' + elapsedMs + 'ms)', 'success');
+            }
+          } else if (typeof showAccountToast === 'function') {
+            showAccountToast('⚠️ Peer ping rejected by ' + targetLabel, 'warning');
           }
         })
         .catch(function() {
           if (typeof showAccountToast === 'function') {
-            showAccountToast('⚡ Direct BLE ping ACK received in 1.8ms', 'success');
+            showAccountToast('⚠️ Peer unreachable over mesh — ping failed for ' + targetLabel, 'error');
           }
         });
       }
@@ -670,7 +679,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         if (localStorage.getItem('sovra_logged_out') === 'true') return false;
         var authActive = localStorage.getItem('sovra_auth_active');
         var profile = localStorage.getItem('sovra_user_profile');
-        if (authActive === 'true' || profile) {
+        var sessionToken = localStorage.getItem('sovra_session_token');
+        if (authActive === 'true' || profile || sessionToken) {
           try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
           return true;
         }
@@ -679,6 +689,16 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       if (p && !p.isGuest) {
         try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
         return true;
+      }
+      if (typeof window !== 'undefined') {
+        if (window.SOVRA_HOST_SESSION && window.SOVRA_HOST_SESSION.token) {
+          try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+          return true;
+        }
+        if (window.__SOVRA_HYDRATED_STATE__ && window.__SOVRA_HYDRATED_STATE__.hostSession && window.__SOVRA_HYDRATED_STATE__.hostSession.token) {
+          try { document.documentElement.classList.remove('sovra-unauthenticated'); } catch(e) {}
+          return true;
+        }
       }
       return false;
     };
@@ -734,9 +754,6 @@ export function renderClientScripts(ctx: AppScriptContext): string {
             if (_knownHandleDids && _knownHandleDids[_cleanH] && myProfile.did !== _knownHandleDids[_cleanH]) {
               myProfile.did = _knownHandleDids[_cleanH];
             }
-          }
-          if (_knownUserTokens && myProfile.did && _knownUserTokens[myProfile.did]) {
-            myProfile.sessionToken = _knownUserTokens[myProfile.did];
           }
           if (myProfile.sessionToken) {
             try { localStorage.setItem('sovra_session_token', myProfile.sessionToken); } catch(e) {}
@@ -898,11 +915,18 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         }
         return response;
       } catch (err) {
-        console.error('[AuthenticatedFetch] Network failure for endpoint:', input, err);
+        if (!window.__sovraPageUnloading && (!err || err.name !== 'AbortError')) {
+          console.error('[AuthenticatedFetch] Network failure for endpoint:', input, err);
+        }
         throw err;
       }
     };
     window.fetch = window.authenticatedFetch;
+    window.__sovraPageUnloading = false;
+    if (typeof window !== 'undefined' && window.addEventListener) {
+      window.addEventListener('beforeunload', function() { window.__sovraPageUnloading = true; });
+      window.addEventListener('pagehide', function() { window.__sovraPageUnloading = true; });
+    }
     window.getAuthHeaders = function() {
       var token = (typeof window.getEffectiveSessionToken === 'function') ? window.getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || '');
       if (token === 'undefined' || token === 'null') token = '';
@@ -10674,7 +10698,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         }
         const banner = document.getElementById('pwaInstallBanner');
         if (banner) {
-          banner.style.display = isStandalone ? 'none' : (sessionStorage.getItem('pwa_dismissed') ? 'none' : 'flex');
+          var isDismissed = sessionStorage.getItem('pwa_dismissed') || localStorage.getItem('sovra_pwa_dismissed');
+          var hasPrompt = typeof deferredInstallPrompt !== 'undefined' && Boolean(deferredInstallPrompt);
+          var hasAuth = typeof isUserAuthenticated === 'function' ? isUserAuthenticated() : !document.documentElement.classList.contains('sovra-unauthenticated');
+          banner.style.display = (isStandalone || isInstalled || isDismissed || !hasPrompt || !hasAuth) ? 'none' : 'flex';
         }
         const womChip = document.getElementById('womPwaInstallChip');
         if (womChip) {
@@ -12944,43 +12971,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     window.autoRegisterAndLogin = autoRegisterAndLogin;
 
     function skipOnboardingAsHost() {
-      localStorage.removeItem('sovra_logged_out');
-      const hostDid = '${masterKey.did}';
-      const hostHandle = isMobileDevice ? '@phone_user' : '@laptop_host';
-      myProfile = {
-        did: hostDid,
-        handle: hostHandle,
-        displayName: isMobileDevice ? 'Mobile Peer' : 'Host Node',
-        name: isMobileDevice ? 'Mobile Peer' : 'Host Node',
-        avatar: isMobileDevice ? '📱' : '💻',
-        avatarBg: '#6366f1',
-        bio: 'Sovereign P2P Node Operator',
-        deviceType: isMobileDevice ? 'Mobile' : 'Desktop',
-        device: isMobileDevice ? 'Mobile' : 'Desktop',
-        isOnline: true,
-        sessionToken: '${hostSessionToken}',
-      };
-      window.myProfile = myProfile;
-      try {
-        localStorage.setItem('sovra_user_profile', JSON.stringify(myProfile));
-        if (myProfile.sessionToken) localStorage.setItem('sovra_auth_active', 'true');
-      } catch(e) {}
-      currentUserHandle = myProfile.handle;
-      contactsData = [];
-      chatMessages = [];
-      lastContactsSignature = '__RESET__';
-      lastChatSyncTimestamp = 0;
-      activeContactDid = 'self';
-      if (typeof syncPeersAndContacts === 'function') syncPeersAndContacts();
-      if (typeof syncChatMessages === 'function') syncChatMessages();
-      if (typeof renderChatContactsList === 'function') renderChatContactsList();
-      showAuthenticatedAppView();
-      if (window.SovraAndroidOS && typeof window.SovraAndroidOS.openApp === 'function') {
-        window.SovraAndroidOS.openApp('feed');
-      } else if (typeof switchTab === 'function') {
-        switchTab('feed');
+      if (typeof showAuthLandingGate === 'function') {
+        showAuthLandingGate('login');
       }
-      showAccountToast('💻 Connected as Local Node Operator (' + myProfile.handle + ')');
+      showAccountToast('🔑 Please sign in or create an account to continue.', 'info');
     }
 
     let selectedEditAvatarBg = '#6366f1';
@@ -13238,29 +13232,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         } catch (_) {}
       }
 
-      // Seamless Auto-Login: ONLY if directly accessing on localhost host machine (not remote clients/ngrok)
-      if (isLocalHostMachine && !isExplicitlyLoggedOut && !savedProfile && window.__SOVRA_HYDRATED_STATE__ && window.__SOVRA_HYDRATED_STATE__.hostSession) {
-        try {
-          const _hs = window.__SOVRA_HYDRATED_STATE__.hostSession;
-          const _autoProf = {
-            did: _hs.did,
-            handle: _hs.handle || '@laptop_host',
-            displayName: 'Host Node',
-            name: 'Host Node',
-            avatar: '💻',
-            avatarBg: '#6366f1',
-            bio: 'Sovereign P2P Node Operator',
-            deviceType: isMobileDevice ? 'Mobile' : 'Desktop',
-            isOnline: true,
-            sessionToken: _hs.token
-          };
-          localStorage.setItem('sovra_user_profile', JSON.stringify(_autoProf));
-          localStorage.setItem('sovra_auth_active', 'true');
-          if (_hs.token) localStorage.setItem('sovra_session_token', _hs.token);
-          savedProfile = JSON.stringify(_autoProf);
-          sessionToken = _hs.token || '';
-        } catch(e) {}
-      }
+      // Explicit login via Sovereign Landing Gate is required (zero unauthenticated host auto-login)
 
       if (isExplicitlyLoggedOut || !savedProfile) {
         myProfile = null;
@@ -13377,16 +13349,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           }
         });
 
-      if (!isSovraAppInstalled()) {
-        setTimeout(function() {
-          if (isSovraAppInstalled()) return;
-          const banner = document.getElementById('pwaInstallBanner');
-          if (banner) {
-            banner.style.display = 'flex';
-          }
-          const topBtn = document.getElementById('pwaInstallBtn');
-          if (topBtn) topBtn.style.display = 'none';
-        }, 800);
+      if (typeof syncPwaInstallState === 'function') {
+        syncPwaInstallState();
       }
       setTimeout(function() {
         if (typeof syncFriendsRelationships === 'function') syncFriendsRelationships();
@@ -14937,12 +14901,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     }
 
     function unlockSessionBypassForgot() {
-      const storedPin = localStorage.getItem('sovra_lock_pin') || '1234';
-      if (confirm('Need help unlocking? Your default PIN is "' + storedPin + '". Unlock now?')) {
-        isSessionLockedState = false;
-        const overlay = document.getElementById('screenLockOverlay');
-        if (overlay) overlay.style.display = 'none';
-        showAccountToast('🔓 Session unlocked via verified backup challenge.', 'success');
+      showAccountToast('🔑 Enter your Security PIN or use Biometric Passkey / 12-word recovery phrase to unlock.', 'info');
+      var pinInput = document.getElementById('screenLockPinInput') || document.getElementById('lockPinInput');
+      if (pinInput && typeof pinInput.focus === 'function') {
+        pinInput.focus();
       }
     }
 
@@ -17655,8 +17617,11 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     };
 
     function switchTab(tab) {
+      if (tab === 'dashboard') tab = 'studio';
       if (tab === 'explore') tab = 'hub';
-      if (tab === 'vault' || tab === 'profile' || tab === 'you') tab = 'me';
+      if (tab === 'market' || tab === 'marketplace') tab = 'market';
+      if (tab === 'vault') tab = 'vault';
+      if (tab === 'profile' || tab === 'you') tab = 'me';
       if (tab === 'watch') tab = 'youtube';
 
       if (typeof triggerHapticFeedback === 'function') triggerHapticFeedback([8]);
@@ -17695,11 +17660,17 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       document.body.classList.remove('sovra-mode-home');
       document.body.classList.add('sovra-mode-app');
       if (tab === 'studio') {
-        // Universal access: all users enter Studio Dashboard seamlessly (YouTube Studio Parity)
+        const curUser = (window.SovraState && window.SovraState.currentUser) || (typeof myProfile !== 'undefined' ? myProfile : null);
+        const isCreator = Boolean(curUser && curUser.isCreator);
         var onboardingView = document.getElementById('studioChannelOnboardingView');
         var dashboardShell = document.getElementById('studioDashboardShell');
-        if (dashboardShell) dashboardShell.style.display = 'block';
-        if (onboardingView) onboardingView.style.display = 'none';
+        if (!isCreator) {
+          if (onboardingView) onboardingView.style.display = 'block';
+          if (dashboardShell) dashboardShell.style.display = 'none';
+        } else {
+          if (dashboardShell) dashboardShell.style.display = 'block';
+          if (onboardingView) onboardingView.style.display = 'none';
+        }
       }
       if (tab === 'saved') {
         switchTab('me');
@@ -17732,6 +17703,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         youtube: document.getElementById('youtube-view'),
         chat: document.getElementById('chat-view'),
         me: document.getElementById('profile-view'),
+        vault: document.getElementById('vault-view'),
+        market: document.getElementById('market-view'),
         admin: document.getElementById('admin-view'),
         'peer-profile': document.getElementById('peer-profile-view'),
         channel: document.getElementById('channel-hub-view'),
@@ -17753,6 +17726,8 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         youtube: document.getElementById('tab-youtube'),
         chat: document.getElementById('tab-chat'),
         me: document.getElementById('tab-me'),
+        vault: document.getElementById('tab-me'),
+        market: document.getElementById('tab-marketplace'),
         admin: document.getElementById('tab-admin'),
         hub: document.getElementById('tab-hub'),
         studio: document.getElementById('tab-studio'),
@@ -17900,6 +17875,13 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       const tabContentWatch = document.getElementById('tabContentWatch');
       if (tabContentWatch) tabContentWatch.style.display = 'contents';
       if (tab === 'settings' && typeof loadUserSettingsIntoForm === 'function') { loadUserSettingsIntoForm(); }
+      if (tab === 'market' && window.SovraMarketplace && typeof window.SovraMarketplace.loadItems === 'function') {
+        window.SovraMarketplace.loadItems();
+      }
+      if (tab === 'vault') {
+        if (typeof refreshWalletBalanceLive === 'function') refreshWalletBalanceLive();
+        if (typeof updateProfileDynamicStats === 'function') updateProfileDynamicStats();
+      }
 
       for (const key of Object.keys(bnavs)) {
         if (bnavs[key]) {
@@ -18456,16 +18438,35 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
     function syncGlobalLiveHud() {
       const hud = document.getElementById('sovraGlobalLiveBroadcastHud');
+      const drawerLiveItem = document.getElementById('drawerActiveLiveItem');
+      const dashBanner = document.getElementById('studioDashboardLiveStreamBanner');
       if (!hud) return;
-      if (_activeLiveMediaStream) {
+
+      const activeSessionId = window._currentLiveSessionId ||
+        (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('sovra_active_live_session_id') : null) ||
+        (typeof localStorage !== 'undefined' ? localStorage.getItem('sovra_active_live_session_id') : null);
+
+      const isLive = Boolean(_activeLiveMediaStream || activeSessionId);
+
+      if (isLive) {
         hud.style.display = 'block';
+        if (drawerLiveItem) drawerLiveItem.style.display = 'flex';
+        if (dashBanner) dashBanner.style.display = 'flex';
+
         const titleEl = document.getElementById('globalLiveBroadcastTitle');
         const studioTitle = document.getElementById('studioLiveTitleInput');
-        if (titleEl && studioTitle && studioTitle.value) {
-          titleEl.textContent = studioTitle.value.trim();
-        }
+        const savedTitle = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('sovra_active_live_title') : null) || 'Live Broadcast';
+        const displayTitle = (studioTitle && studioTitle.value) ? studioTitle.value.trim() : savedTitle;
+        if (titleEl) titleEl.textContent = displayTitle;
+
+        const dashTitle = document.getElementById('studioDashboardLiveBannerTitle');
+        if (dashTitle) dashTitle.textContent = displayTitle;
+        const drawerTitle = document.getElementById('drawerActiveLiveTitle');
+        if (drawerTitle) drawerTitle.textContent = displayTitle;
       } else {
         hud.style.display = 'none';
+        if (drawerLiveItem) drawerLiveItem.style.display = 'none';
+        if (dashBanner) dashBanner.style.display = 'none';
       }
     }
     window.syncGlobalLiveHud = syncGlobalLiveHud;
@@ -18576,7 +18577,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       const ok = confirm('🔴 End your Live Broadcast now?\\n\\nYour live stream will conclude, and view/tip statistics will be finalized on the ledger.');
       if (!ok) return;
 
-      const targetId = sessionId || window._currentLiveSessionId;
+      const targetId = sessionId || window._currentLiveSessionId ||
+        (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('sovra_active_live_session_id') : null) ||
+        (typeof localStorage !== 'undefined' ? localStorage.getItem('sovra_active_live_session_id') : null);
+
       if (targetId) {
         const authHeaders = (typeof getAuthHeaders === 'function') ? getAuthHeaders() : { 'Content-Type': 'application/json' };
         const token = (typeof window.getEffectiveSessionToken === 'function') ? window.getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || '');
@@ -18594,10 +18598,44 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         window._currentLiveSessionId = null;
       }
 
+      try {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem('sovra_active_live_session_id');
+          sessionStorage.removeItem('sovra_active_live_title');
+          sessionStorage.removeItem('sovra_active_live_start_time');
+        }
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem('sovra_active_live_session_id');
+        }
+      } catch (_) {}
+
       stopSovereignLiveBroadcast();
 
+      const hud = document.getElementById('sovraGlobalLiveBroadcastHud');
+      if (hud) hud.style.display = 'none';
+      const drawerLiveItem = document.getElementById('drawerActiveLiveItem');
+      if (drawerLiveItem) drawerLiveItem.style.display = 'none';
+      const dashBanner = document.getElementById('studioDashboardLiveStreamBanner');
+      if (dashBanner) dashBanner.style.display = 'none';
+
+      // Update Studio Live Command Center UI buttons
+      const btnStart = document.getElementById('studioBtnStartBroadcast');
+      const btnEnd = document.getElementById('studioBtnEndBroadcast');
+      const liveBadge = document.getElementById('studioLiveBadge');
+      const statusText = document.getElementById('studioLiveStatusText');
+      const statusDot = document.getElementById('studioLiveStatusDot');
+      if (btnStart) btnStart.style.display = 'flex';
+      if (btnEnd) btnEnd.style.display = 'none';
+      if (statusText) statusText.textContent = 'CONCLUDED';
+      if (statusDot) statusDot.style.background = '#64748b';
+      if (liveBadge) {
+        liveBadge.style.background = 'rgba(100, 116, 139, 0.15)';
+        liveBadge.style.color = '#94a3b8';
+        liveBadge.style.borderColor = 'rgba(100, 116, 139, 0.35)';
+      }
+
       if (typeof showAccountToast === 'function') {
-        showAccountToast('⏹️ Live broadcast successfully ended.');
+        showAccountToast('⏹️ Live broadcast successfully ended. Statistics finalized on ledger.');
       }
     };
 
@@ -18625,6 +18663,12 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         const data = await res.json();
         if (data && data.ok && data.session) {
           window._currentLiveSessionId = data.session.id;
+          try {
+            sessionStorage.setItem('sovra_active_live_session_id', data.session.id);
+            sessionStorage.setItem('sovra_active_live_title', data.session.title || title);
+            sessionStorage.setItem('sovra_active_live_start_time', Date.now().toString());
+            localStorage.setItem('sovra_active_live_session_id', data.session.id);
+          } catch (_) {}
           await fetch('/api/live/status', {
             method: 'POST',
             headers: authHeaders,
@@ -18632,6 +18676,12 @@ export function renderClientScripts(ctx: AppScriptContext): string {
           });
         }
       } catch(_) {}
+
+      await startSovereignLiveBroadcast();
+
+      if (window.SovraCreatorStudioEngine) {
+        window.SovraCreatorStudioEngine.loadLiveCommandCenter();
+      }
 
       await startSovereignLiveBroadcast();
 
@@ -24251,7 +24301,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
                 '</span>' +
                 (post.updatedAt ? '<span style="color: #f59e0b; font-size: 0.68rem; margin-left: 2px;">(Edited)</span>' : '') +
               '</div>' +
-              (post.audioTrack ? '<div style="font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center; gap: 4px; margin-top: 2px;"><span>🎵</span> <span>' + post.audioTrack + '</span></div>' : '') +
+              ((post.audioTrack && (post.postType === 'video' || post.postType === 'reel' || post.postType === 'audio')) ? '<div style="font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center; gap: 4px; margin-top: 2px;"><span>🎵</span> <span>' + post.audioTrack + '</span></div>' : '') +
             '</div>' +
           '</div>' +
           '<button class="chat-btn-round btn-opt-' + post.id + '" style="width: 32px; height: 32px; font-size: 1.1rem; color: #94a3b8; background: transparent; border: none; cursor: pointer;" title="Post Options">⋮</button>' +
@@ -27089,35 +27139,27 @@ export function renderClientScripts(ctx: AppScriptContext): string {
     window.openProfileSettingsHub = openProfileSettingsHub;
 
     function openFullPageWallet() {
-      const modal = document.getElementById('fullPageWalletModal');
-      if (!modal) {
-        if (typeof switchTab === 'function') switchTab('me');
+      if (typeof switchTab === 'function') {
+        switchTab('vault');
+        if (typeof refreshWalletBalanceLive === 'function') {
+          refreshWalletBalanceLive();
+        }
+        if (typeof updateProfileDynamicStats === 'function') {
+          updateProfileDynamicStats();
+        }
         return;
       }
-      modal.style.display = 'flex';
-      modal.style.position = 'fixed';
-      modal.style.inset = '0';
-      modal.style.width = '100vw';
-      modal.style.height = '100vh';
-      modal.style.zIndex = '100060';
-      modal.scrollTop = 0;
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
-      if (typeof refreshWalletBalanceLive === 'function') {
-        refreshWalletBalanceLive();
-      }
-      if (typeof updateProfileDynamicStats === 'function') {
-        updateProfileDynamicStats();
-      }
+      const v = document.getElementById('vault-view');
+      if (v) v.style.display = 'flex';
     }
 
     function closeFullPageWallet() {
-      const modal = document.getElementById('fullPageWalletModal');
-      if (modal) {
-        modal.style.display = 'none';
+      if (typeof switchTab === 'function') {
+        switchTab('feed');
+        return;
       }
-      if (document.body && document.body.style) document.body.style.overflow = '';
-      if (document.documentElement && document.documentElement.style) document.documentElement.style.overflow = '';
+      const v = document.getElementById('vault-view');
+      if (v) v.style.display = 'none';
       if (window.SovraAndroidOS && typeof window.SovraAndroidOS.goHome === 'function') {
         window.SovraAndroidOS.goHome();
       }
@@ -30142,7 +30184,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
         followersCount: '48.2K',
         followingCount: 120,
         bio: 'Sovra Decentralized Creator & Seeder',
-        externalLink: 'https://sovra.network/' + rawKey,
+        externalLink: (typeof window !== 'undefined' && window.location?.origin ? window.location.origin + '/' : 'sovra://profile/') + rawKey,
         highlights: [
           { name: '⚡ Highlights', emoji: '✨' },
           { name: '🎬 Reels', emoji: '🎥' }
@@ -30290,7 +30332,7 @@ export function renderClientScripts(ctx: AppScriptContext): string {
 
     function shareCreatorProfile() {
       const r = reelsData[currentReelIndex];
-      const link = 'https://sovra.network/@' + (r ? r.creatorHandle : 'creator');
+      const link = (typeof window !== 'undefined' && window.location?.origin ? window.location.origin + '/@' : 'sovra://@') + (r ? r.creatorHandle : 'creator');
       navigator.clipboard.writeText(link);
       showAccountToast('Creator profile link copied to clipboard:\\n' + link);
     }
@@ -31900,7 +31942,10 @@ export function renderClientScripts(ctx: AppScriptContext): string {
       updateUI: function() {
         const banner = document.getElementById('wellbeingStatusBanner');
         if (banner) {
-          if (this.isQuietHours()) {
+          const isGuest = typeof document !== 'undefined' && document.documentElement && document.documentElement.classList.contains('sovra-unauthenticated');
+          if (isGuest) {
+            banner.style.display = 'none';
+          } else if (this.isQuietHours()) {
             banner.style.display = 'flex';
             banner.innerHTML = '🌙 <b>Quiet Hours Active</b> &bull; Wind-down mode until ' + this.limits.quietHoursEnd;
           } else if (this.usage.appUsageSeconds > this.limits.dailyAppLimitMinutes * 60 * 0.8) {
@@ -33392,33 +33437,19 @@ _scheduleTargetContext: 'workspace',
             var myChannels = (data && data.ok && Array.isArray(data.channels)) ? data.channels : [];
             self.channelsList = myChannels;
 
+            var curUser = (window.SovraState && window.SovraState.currentUser) || (typeof myProfile !== 'undefined' ? myProfile : null);
+            var isCreator = Boolean((curUser && curUser.isCreator) || myChannels.length > 0);
+            if (!isCreator || window.__forceStudioOnboardingTest) {
+              // 🎬 Display YouTube-style Onboarding Gateway for users without an existing channel
+              if (onboardingView) onboardingView.style.display = 'block';
+              if (dashboardShell) dashboardShell.style.display = 'none';
+              return;
+            }
             if (!myChannels.length) {
-              // Real-World YouTube Studio Parity: Auto-link personal channel so creator enters Dashboard directly
-              var profName = (typeof myProfile !== 'undefined' && myProfile && (myProfile.displayName || myProfile.name)) ? (myProfile.displayName || myProfile.name) : 'Personal Channel';
-              var profHandle = (typeof myProfile !== 'undefined' && myProfile && myProfile.handle) ? myProfile.handle : '@creator';
-              var profAvatar = (typeof myProfile !== 'undefined' && myProfile && myProfile.avatar) ? myProfile.avatar : '🎬';
-              var effectiveDid = myDid || (typeof myProfile !== 'undefined' && myProfile && myProfile.did) || 'did:sovra:creator_primary';
-
-              var defaultChan = {
-                id: 'ch-personal-' + (effectiveDid.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8) || 'primary'),
-                name: profName,
-                handle: profHandle.startsWith('@') ? profHandle : '@' + profHandle,
-                channelType: 'video',
-                avatar: profAvatar,
-                category: 'tech',
-                desc: profName + ' Sovereign Video Channel',
-                ownerDid: effectiveDid,
-                count: 0,
-                isSubbed: true,
-                createdAt: Date.now()
-              };
-              myChannels = [defaultChan];
-              self.channelsList = myChannels;
-              fetch('/api/social/channels', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(defaultChan)
-              }).catch(function() {});
+              // 🎬 Display YouTube-style Onboarding Gateway when user has 0 channels yet
+              if (onboardingView) onboardingView.style.display = 'block';
+              if (dashboardShell) dashboardShell.style.display = 'none';
+              return;
             }
 
             // 🎬 STATE 2: Channel exists -> Show Full Creator Studio Dashboard
@@ -33799,7 +33830,9 @@ _scheduleTargetContext: 'workspace',
       },
 
       loadLiveCommandCenter: function() {
-        var isBroadcasting = Boolean(window._activeLiveMediaStream);
+        var activeStoredSessionId = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('sovra_active_live_session_id') : null) ||
+                                    (typeof localStorage !== 'undefined' ? localStorage.getItem('sovra_active_live_session_id') : null);
+        var isBroadcasting = Boolean(window._activeLiveMediaStream || window._currentLiveSessionId || activeStoredSessionId);
         var btnStart = document.getElementById('studioBtnStartBroadcast');
         var btnEnd = document.getElementById('studioBtnEndBroadcast');
         var statusDot = document.getElementById('studioLiveStatusDot');
@@ -33813,16 +33846,30 @@ _scheduleTargetContext: 'workspace',
           if (btnStart) btnStart.style.display = 'none';
           if (btnEnd) btnEnd.style.display = 'inline-flex';
           if (statusDot) statusDot.style.background = '#ef4444';
-          if (statusText) statusText.textContent = 'LIVE NOW';
+          if (statusText) statusText.textContent = window._activeLiveMediaStream ? 'LIVE NOW' : 'LIVE (ON AIR)';
           if (badge) {
             badge.style.background = 'rgba(239, 68, 68, 0.2)';
             badge.style.color = '#ef4444';
             badge.style.borderColor = '#ef4444';
           }
-          if (standbyCover) standbyCover.style.display = 'none';
-          if (videoEl) {
-            videoEl.style.display = 'block';
-            videoEl.srcObject = window._activeLiveMediaStream;
+          if (window._activeLiveMediaStream) {
+            if (standbyCover) standbyCover.style.display = 'none';
+            if (videoEl) {
+              videoEl.style.display = 'block';
+              videoEl.srcObject = window._activeLiveMediaStream;
+            }
+          } else {
+            if (standbyCover) {
+              standbyCover.style.display = 'block';
+              standbyCover.innerHTML = '<div style="font-size: 3rem; margin-bottom: 8px;">📡</div>' +
+                '<div style="font-size: 1.15rem; font-weight: 800; color: #ef4444;">Live Stream In Progress</div>' +
+                '<div style="font-size: 0.84rem; color: #cbd5e1; margin-top: 6px; max-width: 440px; margin-left: auto; margin-right: auto;">Your broadcast is currently live on the mesh. You can reconnect your camera or end the broadcast at any time using the button above.</div>' +
+                '<div style="margin-top: 16px; display: flex; justify-content: center; gap: 10px;">' +
+                '<button type="button" class="btn btn-secondary" onclick="window.startSovereignLiveBroadcast()" style="padding: 7px 16px; font-weight: 700; border-radius: 8px;">📹 Reconnect Camera</button>' +
+                '<button type="button" class="btn btn-danger" onclick="window.confirmAndEndLiveBroadcast()" style="padding: 7px 18px; font-weight: 800; border-radius: 8px; background: #ef4444; border: none; color: #fff;">🔴 End Live Broadcast</button>' +
+                '</div>';
+            }
+            if (videoEl) videoEl.style.display = 'none';
           }
           if (ind) {
             ind.style.display = 'inline-block';
@@ -33838,7 +33885,12 @@ _scheduleTargetContext: 'workspace',
             badge.style.color = '#94a3b8';
             badge.style.borderColor = 'rgba(148, 163, 184, 0.3)';
           }
-          if (standbyCover) standbyCover.style.display = 'block';
+          if (standbyCover) {
+            standbyCover.style.display = 'block';
+            standbyCover.innerHTML = '<div style="font-size: 3.5rem; margin-bottom: 12px;">📡</div>' +
+              '<div style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">Broadcast Stage Ready</div>' +
+              '<div style="font-size: 0.82rem; color: #94a3b8; margin-top: 6px; max-width: 380px; margin-left: auto; margin-right: auto;">Click &quot;Start Live&quot; above to activate your camera and stream directly to peer mesh viewers.</div>';
+          }
           if (videoEl) videoEl.style.display = 'none';
           if (ind) ind.style.background = '#64748b';
         }
@@ -33867,6 +33919,7 @@ _scheduleTargetContext: 'workspace',
 
       loadDashboard: function() {
         var self = this;
+        if (typeof syncGlobalLiveHud === 'function') syncGlobalLiveHud();
         var url = '/api/studio/dashboard' + (this.activeChannelId ? '?channelId=' + encodeURIComponent(this.activeChannelId) : '');
         fetch(url)
           .then(function(res) { return res.json(); })
@@ -37168,19 +37221,21 @@ _scheduleTargetContext: 'workspace',
     };
 
     window.toggleNodeOperatorMode = function(forcedState) {
+      var wasOp = document.body.classList.contains('node-operator-mode');
       var isOp = typeof forcedState === 'boolean'
         ? forcedState
-        : !document.body.classList.contains('node-operator-mode');
+        : !wasOp;
+      var shouldToast = (typeof forcedState !== 'boolean') || (wasOp !== isOp);
       if (isOp) {
         document.body.classList.add('node-operator-mode');
         startDevHudTelemetryStream();
-        if (typeof showAccountToast === 'function') {
+        if (shouldToast && typeof showAccountToast === 'function') {
           showAccountToast('🛠️ Developer & Node Operator HUD activated (Ctrl+Shift+D)');
         }
       } else {
         document.body.classList.remove('node-operator-mode');
         stopDevHudTelemetryStream();
-        if (typeof showAccountToast === 'function') {
+        if (shouldToast && typeof showAccountToast === 'function') {
           showAccountToast('✨ Returned to pristine Consumer Mode');
         }
       }
@@ -37870,11 +37925,9 @@ _scheduleTargetContext: 'workspace',
       viewerPc: null,
       processedSignalIds: new Set(),
       rtcConfig: {
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:stun1.l.google.com:19302" },
-          { urls: "stun:stun2.l.google.com:19302" }
-        ]
+        iceServers: (window.SOVRA_ICE_SERVERS && Array.isArray(window.SOVRA_ICE_SERVERS))
+          ? window.SOVRA_ICE_SERVERS
+          : []
       },
 
       openModal: function(sessionId, isHost) {
@@ -38400,6 +38453,22 @@ _scheduleTargetContext: 'workspace',
             .then(function(res) { return res.json(); })
             .then(function(data) {
               if (data && data.ok) {
+                if (data.status === 'ENDED' || data.status === 'DISCONNECTED') {
+                  if (self.pollTimer) { clearInterval(self.pollTimer); self.pollTimer = null; }
+                  var badge = document.getElementById("liveWebRtcStatusBadge");
+                  if (badge) {
+                    badge.textContent = "⏹️ Stream Concluded";
+                    badge.style.color = "#f43f5e";
+                  }
+                  if (typeof showAccountToast === "function") {
+                    showAccountToast("⏹️ The live broadcast has ended.");
+                  }
+                  if (self.viewerPc) {
+                    try { self.viewerPc.close(); } catch(e) {}
+                    self.viewerPc = null;
+                  }
+                  return;
+                }
                 self.lastEventTimestamp = data.timestamp || Date.now();
                 var countEl = document.getElementById("liveViewerCount");
                 var tipsEl = document.getElementById("liveTipsTotalSov");
@@ -44471,15 +44540,27 @@ _scheduleTargetContext: 'workspace',
       let pc = null;
       var isShieldActive = localStorage.getItem('sovra_privacy_shield') === 'true';
       try {
+        var customStunList = [];
+        try {
+          var savedCustomStun = JSON.parse(localStorage.getItem('sovra_custom_stun_v1') || '[]');
+          if (Array.isArray(savedCustomStun)) {
+            customStunList = savedCustomStun.map(function(u) {
+              var s = String(u || '').trim();
+              if (!s) return null;
+              return { urls: /^(stun|stuns|turn|turns):/i.test(s) ? s : ('stun:' + s) };
+            }).filter(Boolean);
+          }
+        } catch (_) {}
         var configuredIceServers = (window.SOVRA_ICE_SERVERS && Array.isArray(window.SOVRA_ICE_SERVERS))
           ? window.SOVRA_ICE_SERVERS
-          : [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' },
-              { urls: 'stun:stun2.l.google.com:19302' },
-              { urls: 'stun:global.stun.twilio.com:3478' },
-              { urls: ['turn:openrelay.metered.ca:443?transport=tcp', 'turns:openrelay.metered.ca:443?transport=tcp'], username: 'openrelay', credential: 'openrelay' }
-            ];
+          : (customStunList.length > 0
+              ? customStunList
+              : (window.SOVRA_ALLOW_PUBLIC_STUN === true
+                  ? [
+                      { urls: 'stun:stun.l.google.com:19302' },
+                      { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                  : []));
         if (isShieldActive) {
           configuredIceServers = configuredIceServers.filter(function(s) {
             var urls = Array.isArray(s.urls) ? s.urls : [s.urls];
@@ -49192,7 +49273,7 @@ _scheduleTargetContext: 'workspace',
       if (!v) return;
       const check = document.getElementById('ytShareStartAtCheck');
       const input = document.getElementById('ytShareUrlInput');
-      const baseOrigin = window.location.origin || 'https://sovra.network';
+      const baseOrigin = window.location.origin || 'http://127.0.0.1:3001';
       let shareUrl = baseOrigin + '/?tab=youtube&v=' + encodeURIComponent(v.id);
       if (check && check.checked) {
         shareUrl += '&t=' + Math.max(0, Math.floor(ytCurrentTimeSec)) + 's';
@@ -49229,7 +49310,7 @@ _scheduleTargetContext: 'workspace',
     function copyYtEmbedCode() {
       const v = ytVideosCatalog[activeYtVideoIndex];
       if (!v) return;
-      const origin = window.location.origin || 'https://sovra.network';
+      const origin = window.location.origin || 'http://127.0.0.1:3001';
       const embedCode = '<iframe width="560" height="315" src="' + origin + '/embed/watch?v=' + encodeURIComponent(v.id) + '" title="' + (v.title || '').replace(/"/g, '&quot;') + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>';
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(embedCode);
@@ -49361,7 +49442,7 @@ _scheduleTargetContext: 'workspace',
       const start = startSlider ? parseInt(startSlider.value, 10) : 0;
       const end = endSlider ? parseInt(endSlider.value, 10) : 30;
 
-      const origin = window.location.origin || 'https://sovra.network';
+      const origin = window.location.origin || 'http://127.0.0.1:3001';
       const clipUrl = origin + '/?tab=youtube&v=' + encodeURIComponent(v.id) + '&clip=' + encodeURIComponent(title) + '&start=' + start + '&end=' + end;
 
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -51446,13 +51527,13 @@ _scheduleTargetContext: 'workspace',
       const input = document.getElementById('headerFriendSearchInput');
       if (!input) return;
       const placeholders = {
-        feed: '🔍 Search posts, friends, tags...',
-        reels: '🎬 Search creators, shorts, audio tracks...',
-        youtube: '📺 Search videos, channels, topics...',
-        chat: '💬 Search chats, messages, contacts...',
-        friends: '👥 Search nearby mesh peers, DID, radar...',
-        me: '👤 Search my posts, saved media, settings...',
-        admin: '⚙️ Search node metrics, audits, peers...'
+        feed: 'Search posts, friends, tags...',
+        reels: 'Search creators, shorts, audio tracks...',
+        youtube: 'Search videos, channels, topics...',
+        chat: 'Search chats, messages, contacts...',
+        friends: 'Search nearby mesh peers, DID, radar...',
+        me: 'Search my posts, saved media, settings...',
+        admin: 'Search node metrics, audits, peers...'
       };
       input.placeholder = placeholders[tab] || 'Search friends, mesh, tags...';
       const q = (input.value || '').trim();
@@ -53783,8 +53864,36 @@ _scheduleTargetContext: 'workspace',
       }
     });
 
-    // Browser address bar deep-linking: Auto-boot upon direct page load
+    // Browser address bar deep-linking & active broadcast recovery: Auto-boot upon direct page load
     window.addEventListener('DOMContentLoaded', function() {
+      // 1. Check for stored active live session to restore HUD & End Broadcast controls
+      try {
+        var activeStoredId = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('sovra_active_live_session_id') : null) ||
+                             (typeof localStorage !== 'undefined' ? localStorage.getItem('sovra_active_live_session_id') : null);
+        if (activeStoredId) {
+          window._currentLiveSessionId = activeStoredId;
+          fetch('/api/live/stream/events?sessionId=' + encodeURIComponent(activeStoredId))
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+              if (d && d.ok && d.status === 'LIVE') {
+                syncGlobalLiveHud();
+                if (window.SovraCreatorStudioEngine && typeof window.SovraCreatorStudioEngine.loadLiveCommandCenter === 'function') {
+                  window.SovraCreatorStudioEngine.loadLiveCommandCenter();
+                }
+              } else {
+                try {
+                  sessionStorage.removeItem('sovra_active_live_session_id');
+                  sessionStorage.removeItem('sovra_active_live_title');
+                  sessionStorage.removeItem('sovra_active_live_start_time');
+                  localStorage.removeItem('sovra_active_live_session_id');
+                } catch(_) {}
+                syncGlobalLiveHud();
+              }
+            })
+            .catch(function() {});
+        }
+      } catch(_) {}
+
       if (window.location.pathname.startsWith('/@') || window.location.pathname.startsWith('/channel/')) {
         var target = window.location.pathname.startsWith('/@')
           ? ('@' + window.location.pathname.slice(2))
@@ -55892,7 +56001,7 @@ _scheduleTargetContext: 'workspace',
       if (page.ctaType === 'tip') {
         if (typeof openTipModal === 'function') openTipModal();
       } else if (page.ctaType === 'website') {
-        window.open('https://sovra.network', '_blank');
+        window.open(page.websiteUrl || (window.location?.origin || 'http://127.0.0.1:3001'), '_blank');
       } else {
         closePublicPageShowcase();
         switchTab('messages');
@@ -56784,10 +56893,6 @@ _scheduleTargetContext: 'workspace',
       e.preventDefault();
       deferredInstallPrompt = e;
       syncPwaInstallState();
-      const banner = document.getElementById('pwaInstallBanner');
-      if (banner && !sessionStorage.getItem('pwa_dismissed')) {
-        banner.style.display = 'flex';
-      }
       const pwaMeBtn = document.getElementById('pwaMeInstallBtn') || document.getElementById('pwaInstallBtn') || document.getElementById('pwaDirectTriggerBtn');
       if (pwaMeBtn) pwaMeBtn.style.display = 'inline-flex';
     });
@@ -56886,6 +56991,7 @@ _scheduleTargetContext: 'workspace',
       const banner = document.getElementById('pwaInstallBanner');
       if (banner) banner.style.display = 'none';
       sessionStorage.setItem('pwa_dismissed', '1');
+      try { localStorage.setItem('sovra_pwa_dismissed', '1'); } catch (e) {}
     }
 
     function updateOnlineStatus() {
@@ -57241,9 +57347,13 @@ _scheduleTargetContext: 'workspace',
           ? String(Math.floor(parseFloat(amtStr) * 1000000))
           : String(Math.floor(parseFloat(amtStr) * 1000000));
 
+        const _swapToken = (typeof window.getEffectiveSessionToken === 'function') ? window.getEffectiveSessionToken() : (localStorage.getItem('sovra_session_token') || '');
+        const _swapHeaders = { 'Content-Type': 'application/json' };
+        if (_swapToken) _swapHeaders['Authorization'] = 'Bearer ' + _swapToken;
+
         const res = await fetch('/api/wallet/swap', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: _swapHeaders,
           body: JSON.stringify({
             tokenAddress,
             direction,
@@ -62181,12 +62291,27 @@ _scheduleTargetContext: 'workspace',
         initTouchSwipe();
         refreshTelemetry();
 
-        // 🌟 Social Media First: If user is authenticated or has active session, boot directly into feed
-        if (typeof isUserAuthenticated === 'function' && isUserAuthenticated()) {
+        // 🌟 Deep Route Guard: Preserve explicit deep routes (/studio, /live, /watch, etc.)
+        var pathname = (window.location && window.location.pathname) ? window.location.pathname.toLowerCase().replace(/^[/]+/, '') : '';
+        var hash = (window.location && window.location.hash) ? window.location.hash.toLowerCase() : '';
+        var isDeepRoute = Boolean(
+          pathname.startsWith('studio') || pathname.startsWith('live') || pathname.startsWith('watch') ||
+          pathname.startsWith('reels') || pathname.startsWith('chat') || pathname.startsWith('admin') ||
+          pathname.startsWith('settings') || pathname.startsWith('profile') || pathname.startsWith('me') ||
+          hash.includes('studio') || hash.includes('dashboard') || hash.includes('live') || hash.includes('watch') || hash.includes('reels') || hash.includes('chat')
+        );
+
+        if (!isDeepRoute && typeof isUserAuthenticated === 'function' && isUserAuthenticated()) {
           const explicitChoice = localStorage.getItem('sovra_explicit_os_mode');
           if (explicitChoice !== 'home') {
             if (typeof openApp === 'function') openApp('feed');
             else if (typeof switchTab === 'function') switchTab('feed');
+          }
+        } else if (isDeepRoute) {
+          if (pathname.startsWith('studio') || hash.includes('studio') || hash.includes('dashboard')) {
+            if (typeof switchTab === 'function') switchTab('studio');
+          } else if (pathname.startsWith('live') || hash.includes('live')) {
+            if (typeof switchTab === 'function') switchTab('live');
           }
         }
       }
@@ -63492,9 +63617,10 @@ _scheduleTargetContext: 'workspace',
 
     // Fediverse Handle Copy Helper
     window.copyFediverseHandle = function(handle) {
-      const h = handle || (window.__SOVRA_SESSION && window.__SOVRA_SESSION.handle) || '@creator@sovra.network';
+      const nodeHost = (typeof window !== 'undefined' && window.location?.host) ? window.location.host : '127.0.0.1:3001';
+      const h = handle || (window.__SOVRA_SESSION && window.__SOVRA_SESSION.handle) || ('@creator@' + nodeHost);
       const cleanH = h.startsWith('@') ? h : '@' + h;
-      const fullFedi = cleanH.includes('@sovra.network') ? cleanH : cleanH + '@sovra.network';
+      const fullFedi = cleanH.slice(1).includes('@') ? cleanH : cleanH + '@' + nodeHost;
       if (typeof navigator !== 'undefined' && navigator.clipboard) {
         navigator.clipboard.writeText(fullFedi);
       }
@@ -63559,14 +63685,22 @@ _scheduleTargetContext: 'workspace',
       userLon: -122.4194,
 
       openDrawer: function() {
-        const el = document.getElementById('marketplaceDrawer');
-        if (el) el.style.display = 'block';
+        if (typeof switchTab === 'function') {
+          switchTab('market');
+        } else {
+          const el = document.getElementById('market-view') || document.getElementById('marketplaceDrawer');
+          if (el) el.style.display = 'flex';
+        }
         this.loadItems();
       },
 
       closeDrawer: function() {
-        const el = document.getElementById('marketplaceDrawer');
-        if (el) el.style.display = 'none';
+        if (typeof switchTab === 'function') {
+          switchTab('feed');
+        } else {
+          const el = document.getElementById('market-view') || document.getElementById('marketplaceDrawer');
+          if (el) el.style.display = 'none';
+        }
       },
 
       switchTab: function(tab) {
@@ -63705,16 +63839,19 @@ _scheduleTargetContext: 'workspace',
       const cat = document.getElementById('listingCategoryInput') ? document.getElementById('listingCategoryInput').value : 'general';
 
       if (!title || price <= 0) {
-        alert('Please provide a valid title and price in SOV');
+        if (typeof showAccountToast === 'function') {
+          showAccountToast('⚠️ Please provide a valid title and positive price in SOV', 'warning');
+        }
         return;
       }
 
       try {
+        const token = (typeof window.getEffectiveSessionToken === 'function' ? window.getEffectiveSessionToken() : '') || (window.__SOVRA_SESSION ? window.__SOVRA_SESSION.token : '') || localStorage.getItem('sovra_session_token') || '';
         const res = await fetch('/api/marketplace/items', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + (window.__SOVRA_SESSION ? window.__SOVRA_SESSION.token : '')
+            'Authorization': 'Bearer ' + token
           },
           body: JSON.stringify({
             title: title,
@@ -63729,45 +63866,193 @@ _scheduleTargetContext: 'workspace',
         if (data.ok) {
           window.closeCreateListingModal();
           window.SovraMarketplace.loadItems();
-        } else {
-          alert('Listing error: ' + (data.error || 'Failed'));
+          if (typeof showAccountToast === 'function') showAccountToast('🛍️ Marketplace item listed!', 'success');
+        } else if (typeof showAccountToast === 'function') {
+          showAccountToast('⚠️ Listing error: ' + (data.error || 'Failed'), 'error');
         }
       } catch (err) {
-        alert('Listing error: ' + err.message);
+        if (typeof showAccountToast === 'function') showAccountToast('⚠️ Listing error: ' + (err.message || err), 'error');
       }
     };
 
     window.buyItemWithEscrow = async function(itemId) {
-      if (!confirm('Lock funds in Trustless P2P Escrow for this item?')) return;
-      try {
-        const res = await fetch('/api/marketplace/escrow/create', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + (window.__SOVRA_SESSION ? window.__SOVRA_SESSION.token : '')
-          },
-          body: JSON.stringify({ itemId: itemId })
-        });
-        const data = await res.json();
-        if (data.ok) {
-          const qrModal = document.getElementById('mktEscrowQrModal');
-          const secretDisplay = document.getElementById('mktEscrowSecretDisplay');
-          const qrBox = document.getElementById('mktQrPlaceholder');
-          if (secretDisplay) secretDisplay.textContent = data.deliverySecret;
-          if (qrBox) qrBox.textContent = 'SOVRA-ESCROW:' + data.escrow.id + ':' + data.deliverySecret;
-          if (qrModal) qrModal.style.display = 'flex';
-          window.SovraMarketplace.loadItems();
-        } else {
-          alert('Escrow failed: ' + (data.error || 'Insufficient funds or item unavailable'));
+      const executeEscrow = async () => {
+        try {
+          const token = (typeof window.getEffectiveSessionToken === 'function' ? window.getEffectiveSessionToken() : '') || (window.__SOVRA_SESSION ? window.__SOVRA_SESSION.token : '') || localStorage.getItem('sovra_session_token') || '';
+          const res = await fetch('/api/marketplace/escrow/create', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify({ itemId: itemId })
+          });
+          const data = await res.json();
+          if (data.ok) {
+            const qrModal = document.getElementById('mktEscrowQrModal');
+            const secretDisplay = document.getElementById('mktEscrowSecretDisplay');
+            const qrBox = document.getElementById('mktQrPlaceholder');
+            if (secretDisplay) secretDisplay.textContent = data.deliverySecret;
+            if (qrBox) qrBox.textContent = 'SOVRA-ESCROW:' + data.escrow.id + ':' + data.deliverySecret;
+            if (qrModal) qrModal.style.display = 'flex';
+            window.SovraMarketplace.loadItems();
+          } else if (typeof showAccountToast === 'function') {
+            showAccountToast('⚠️ Escrow failed: ' + (data.error || 'Insufficient funds or item unavailable'), 'error');
+          }
+        } catch (err) {
+          if (typeof showAccountToast === 'function') showAccountToast('⚠️ Escrow error: ' + (err.message || err), 'error');
         }
-      } catch (err) {
-        alert('Escrow error: ' + err.message);
+      };
+
+      if (typeof openSovereignConfirmModal === 'function') {
+        openSovereignConfirmModal({
+          icon: '🔒',
+          title: 'Lock Funds in P2P Escrow',
+          message: 'Lock funds in Trustless P2P Escrow for this item until physical handover?',
+          confirmText: 'Lock Escrow',
+          danger: false,
+          onConfirm: executeEscrow
+        });
+      } else {
+        executeEscrow();
       }
     };
 
     window.closeEscrowQrModal = function() {
       const qrModal = document.getElementById('mktEscrowQrModal');
       if (qrModal) qrModal.style.display = 'none';
+    };
+
+    window.openStory = function(creatorName, highlightTitle, avatarBg) {
+      if (typeof openStoryViewer === 'function') {
+        try {
+          openStoryViewer(creatorName, highlightTitle, avatarBg);
+          return;
+        } catch (_) {}
+      }
+      if (typeof showAccountToast === 'function') {
+        showAccountToast('✨ ' + (creatorName || 'Creator') + ': ' + (highlightTitle || 'Story Highlight'), 'info');
+      }
+    };
+
+    window.openCreateGroupModal = async function() {
+      if (typeof checkGuestWriteAction === 'function' && checkGuestWriteAction('create a local neighborhood group')) return;
+      const modalId = 'mktCreateGroupModal';
+      let modal = document.getElementById(modalId);
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = modalId;
+        modal.style.cssText = 'position: fixed; inset: 0; z-index: 99996; background: rgba(0,0,0,0.8); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: center;';
+        modal.innerHTML =
+          '<div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.18); border-radius: 20px; padding: 1.5rem; max-width: 440px; width: 90%;">' +
+            '<div style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 1rem;">Create Neighborhood Circle</div>' +
+            '<div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.25rem;">' +
+              '<input type="text" id="mktNewGroupNameInput" placeholder="Circle name (e.g. Downtown Tech Circle)" style="padding: 9px 12px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); color: #fff; font-size: 0.85rem; outline: none;" />' +
+              '<textarea id="mktNewGroupDescInput" placeholder="Description & meetup focus..." rows="3" style="padding: 9px 12px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); color: #fff; font-size: 0.85rem; outline: none; resize: none;"></textarea>' +
+            '</div>' +
+            '<div style="display: flex; gap: 10px; justify-content: flex-end;">' +
+              '<button type="button" onclick="document.getElementById(&quot;mktCreateGroupModal&quot;).style.display=&quot;none&quot;" style="padding: 8px 14px; border-radius: 8px; background: rgba(255,255,255,0.08); border: none; color: #cbd5e1; font-weight: 700; cursor: pointer;">Cancel</button>' +
+              '<button type="button" id="mktSubmitNewGroupBtn" style="padding: 8px 16px; border-radius: 8px; background: #6366f1; border: none; color: #fff; font-weight: 700; cursor: pointer;">Create Circle</button>' +
+            '</div>' +
+          '</div>';
+        document.body.appendChild(modal);
+        const submitBtn = document.getElementById('mktSubmitNewGroupBtn');
+        if (submitBtn) {
+          submitBtn.onclick = async function() {
+            const nameEl = document.getElementById('mktNewGroupNameInput');
+            const descEl = document.getElementById('mktNewGroupDescInput');
+            const gName = nameEl ? nameEl.value.trim() : '';
+            const gDesc = descEl ? descEl.value.trim() : '';
+            if (gName.length < 3) {
+              if (typeof showAccountToast === 'function') showAccountToast('⚠️ Circle name must be at least 3 characters', 'warning');
+              return;
+            }
+            try {
+              const token = (typeof window.getEffectiveSessionToken === 'function' ? window.getEffectiveSessionToken() : '') || localStorage.getItem('sovra_session_token') || '';
+              const res = await fetch('/api/groups/create-local', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({
+                  name: gName,
+                  description: gDesc,
+                  latitude: window.SovraMarketplace?.userLat || 0,
+                  longitude: window.SovraMarketplace?.userLon || 0
+                })
+              });
+              const data = await res.json();
+              if (data && data.ok) {
+                modal.style.display = 'none';
+                if (nameEl) nameEl.value = '';
+                if (descEl) descEl.value = '';
+                if (window.SovraMarketplace?.loadGroups) window.SovraMarketplace.loadGroups();
+                if (typeof showAccountToast === 'function') showAccountToast('🏘️ Neighborhood circle created!', 'success');
+              } else if (typeof showAccountToast === 'function') {
+                showAccountToast('⚠️ ' + (data?.error || 'Failed to create group'), 'error');
+              }
+            } catch (err) {
+              if (typeof showAccountToast === 'function') showAccountToast('⚠️ Group error: ' + (err.message || err), 'error');
+            }
+          };
+        }
+      }
+      modal.style.display = 'flex';
+    };
+
+    window.requestLightningInvoice = async function(amountSats) {
+      try {
+        const token = (typeof window.getEffectiveSessionToken === 'function' ? window.getEffectiveSessionToken() : '') || localStorage.getItem('sovra_session_token') || '';
+        const did = (typeof myProfile !== 'undefined' && myProfile?.did) || '';
+        const res = await fetch('/api/bridge/lightning/invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': 'Bearer ' + token } : {}) },
+          body: JSON.stringify({ recipientDid: did, amountSats: Number(amountSats || 10000), memo: 'Creator Cashout' })
+        });
+        const data = await res.json();
+        if (typeof showAccountToast === 'function') {
+          showAccountToast(data.ok ? ('⚡ Lightning invoice generated: ' + (data.invoice || data.paymentHash || 'ready').slice(0, 28) + '...') : ('⚠️ ' + (data.error || 'Invoice failed')), data.ok ? 'success' : 'error');
+        }
+        return data;
+      } catch (err) {
+        if (typeof showAccountToast === 'function') showAccountToast('⚠️ Lightning bridge error: ' + (err.message || err), 'error');
+      }
+    };
+
+    window.settleBaseUsdc = async function(amountSov) {
+      try {
+        const token = (typeof window.getEffectiveSessionToken === 'function' ? window.getEffectiveSessionToken() : '') || localStorage.getItem('sovra_session_token') || '';
+        const did = (typeof myProfile !== 'undefined' && myProfile?.did) || '';
+        const res = await fetch('/api/bridge/base/settle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': 'Bearer ' + token } : {}) },
+          body: JSON.stringify({ creatorDid: did, amountSov: Number(amountSov || 10) })
+        });
+        const data = await res.json();
+        if (typeof showAccountToast === 'function') {
+          showAccountToast(data.ok ? ('🟦 Base USDC settled: $' + (data.settledUsdc || 0)) : ('⚠️ ' + (data.error || 'Base settlement failed')), data.ok ? 'success' : 'error');
+        }
+        return data;
+      } catch (err) {
+        if (typeof showAccountToast === 'function') showAccountToast('⚠️ Base bridge error: ' + (err.message || err), 'error');
+      }
+    };
+
+    window.quoteSolanaSwap = async function(amountSov) {
+      try {
+        const token = (typeof window.getEffectiveSessionToken === 'function' ? window.getEffectiveSessionToken() : '') || localStorage.getItem('sovra_session_token') || '';
+        const did = (typeof myProfile !== 'undefined' && myProfile?.did) || '';
+        const res = await fetch('/api/bridge/solana/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': 'Bearer ' + token } : {}) },
+          body: JSON.stringify({ creatorDid: did, amountSov: Number(amountSov || 20) })
+        });
+        const data = await res.json();
+        if (typeof showAccountToast === 'function') {
+          showAccountToast(data.ok ? ('🟣 Solana Quote: ' + (data.solAmount || 0) + ' SOL (1 SOV = ' + (data.rate || 0.05) + ' SOL)') : ('⚠️ ' + (data.error || 'Solana quote failed')), data.ok ? 'success' : 'error');
+        }
+        return data;
+      } catch (err) {
+        if (typeof showAccountToast === 'function') showAccountToast('⚠️ Solana bridge error: ' + (err.message || err), 'error');
+      }
     };
 
 </script>

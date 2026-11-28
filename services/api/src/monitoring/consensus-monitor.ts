@@ -46,6 +46,16 @@ export interface ConsensusHealthSummary {
   validators: ValidatorStatus[];
 }
 
+export interface EnterprisePrometheusTelemetry {
+  httpRequestsTotal?: number | undefined;
+  httpLatencyP95Ms?: number | undefined;
+  postgresHealthy?: number | undefined;
+  redisHealthy?: number | undefined;
+  pendingSettlementIntents?: number | undefined;
+  riskNetPnlSov?: number | undefined;
+  riskExposureSov?: number | undefined;
+}
+
 export class ConsensusMonitor {
   private rpcUrls: string[];
   private pollIntervalMs: number;
@@ -190,9 +200,10 @@ export class ConsensusMonitor {
       }
     }
 
-    // Detect consensus stall (> 30s without block advance on responsive nodes)
+    // Detect consensus stall (fail closed when zero validators configured or quorum lost or > 30s without advance)
     const stallDuration = Date.now() - this.lastHeightAdvanceTime;
     const consensusHalted =
+      totalCount === 0 ||
       activeCount < Math.ceil((2 / 3) * totalCount) ||
       (networkHeight > 0 && stallDuration > this.maxStallDurationMs);
 
@@ -260,9 +271,9 @@ export class ConsensusMonitor {
 
     this.activeAlerts = alerts;
 
-    // Check supply invariant on first responsive node
-    let totalSupplyUsov = '30139348240070';
-    let masterInvariantHolds = true;
+    // Check supply invariant on first responsive node (fail closed when unreachable; never fabricate supply)
+    let totalSupplyUsov = '0';
+    let masterInvariantHolds = false;
     const primaryResponsive = responsiveNodes[0];
     if (primaryResponsive) {
       try {
@@ -270,15 +281,15 @@ export class ConsensusMonitor {
         if (supRes.ok) {
           const sup = await supRes.json();
           totalSupplyUsov = sup.bank_supply || sup.total_supply || totalSupplyUsov;
-          masterInvariantHolds = sup.master_invariant_holds ?? true;
+          masterInvariantHolds = sup.master_invariant_holds ?? false;
         }
       } catch {
-        // use default
+        // Fail closed on unreachable /query/supply
       }
     }
 
     return {
-      healthy: !consensusHalted && maxLag <= this.lagThresholdBlocks && activeCount >= Math.ceil((2 / 3) * totalCount),
+      healthy: totalCount > 0 && !consensusHalted && maxLag <= this.lagThresholdBlocks && activeCount >= Math.ceil((2 / 3) * totalCount),
       networkHeight,
       minHeight,
       maxLagBlocks: maxLag,
@@ -295,13 +306,16 @@ export class ConsensusMonitor {
   /**
    * Generates Prometheus-compatible metrics text
    */
-  public generatePrometheusMetrics(summary: ConsensusHealthSummary): string {
+  public generatePrometheusMetrics(
+    summary: ConsensusHealthSummary,
+    telemetry?: EnterprisePrometheusTelemetry,
+  ): string {
     const lines: string[] = [
       '# HELP sovra_network_height Current maximum block height across CometBFT validators',
       '# TYPE sovra_network_height gauge',
       `sovra_network_height ${summary.networkHeight}`,
       '',
-      '# HELP sovra_consensus_healthy 1 if network consensus is active and within lag threshold, 0 otherwise',
+      '# HELP sovra_consensus_healthy Binary health gauge (1=consensus active within lag threshold, 0=halted or degraded)',
       '# TYPE sovra_consensus_healthy gauge',
       `sovra_consensus_healthy ${summary.healthy ? 1 : 0}`,
       '',
@@ -326,6 +340,33 @@ export class ConsensusMonitor {
         `sovra_validator_responsive{${labels}} ${val.responsive ? 1 : 0}`,
         `sovra_validator_response_time_ms{${labels}} ${val.responseTimeMs}`,
         `sovra_validator_peers{${labels}} ${val.peers}`
+      );
+    }
+
+    if (telemetry) {
+      lines.push(
+        '',
+        '# HELP sovra_http_requests_total Total HTTP requests handled by API node',
+        '# TYPE sovra_http_requests_total counter',
+        `sovra_http_requests_total ${telemetry.httpRequestsTotal ?? 0}`,
+        '# HELP sovra_http_request_duration_p95_ms Observed 95th percentile HTTP request duration in ms',
+        '# TYPE sovra_http_request_duration_p95_ms gauge',
+        `sovra_http_request_duration_p95_ms ${(telemetry.httpLatencyP95Ms ?? 0).toFixed(2)}`,
+        '# HELP sovra_postgres_healthy PostgreSQL primary store health status (1=up, 0=down/unconfigured)',
+        '# TYPE sovra_postgres_healthy gauge',
+        `sovra_postgres_healthy ${telemetry.postgresHealthy ?? 0}`,
+        '# HELP sovra_redis_healthy Redis cluster security cache health status (1=up, 0=down/unconfigured)',
+        '# TYPE sovra_redis_healthy gauge',
+        `sovra_redis_healthy ${telemetry.redisHealthy ?? 0}`,
+        '# HELP sovra_settlement_pending_intents Count of SUBMITTED or RECONCILIATION_REQUIRED L1 settlement intents',
+        '# TYPE sovra_settlement_pending_intents gauge',
+        `sovra_settlement_pending_intents ${telemetry.pendingSettlementIntents ?? 0}`,
+        '# HELP sovra_risk_net_pnl_sov Real-time protocol company Net P&L in SOV',
+        '# TYPE sovra_risk_net_pnl_sov gauge',
+        `sovra_risk_net_pnl_sov ${(telemetry.riskNetPnlSov ?? 0).toFixed(4)}`,
+        '# HELP sovra_risk_exposure_sov Real-time tracked financial risk exposure in SOV',
+        '# TYPE sovra_risk_exposure_sov gauge',
+        `sovra_risk_exposure_sov ${(telemetry.riskExposureSov ?? 0).toFixed(4)}`
       );
     }
 

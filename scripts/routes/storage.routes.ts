@@ -9,6 +9,7 @@
 import http from 'node:http';
 import type { CID } from 'multiformats/cid';
 import type { AuthenticatedPrincipal } from '../../packages/identity/dist/index.js';
+import { executeStorageRentBurnSink } from './economy.routes.ts';
 
 export interface StorageRouteContext {
   req: http.IncomingMessage;
@@ -29,7 +30,7 @@ export async function handleStorageRoutes(ctx: StorageRouteContext): Promise<boo
     const { body, ok } = await readBoundedBody(req, res, 25 * 1024 * 1024);
     if (!ok) return true;
     try {
-      let parsed: { content?: string; mimeType?: string };
+      let parsed: { content?: string; mimeType?: string; rentMonths?: number; seederDid?: string; storageFeeSov?: number; storageGb?: number };
       try {
         parsed = JSON.parse(body);
       } catch {
@@ -38,6 +39,26 @@ export async function handleStorageRoutes(ctx: StorageRouteContext): Promise<boo
       const principal = enforceAuth(req, res, parsed as Record<string, any>);
       if (!principal) return true;
       const dataBytes = new TextEncoder().encode(parsed.content ?? 'Default Sovra Media Asset');
+
+      let storageRentReceipt: any = null;
+      if (Number(parsed.rentMonths || 0) > 0 || parsed.seederDid || Number(parsed.storageFeeSov || 0) > 0) {
+        const gb = Math.max(1, Number(parsed.storageGb || Math.ceil(dataBytes.byteLength / (1024 * 1024 * 1024)) || 1));
+        const months = Math.max(1, Number(parsed.rentMonths || 1));
+        const sinkRes = executeStorageRentBurnSink(
+          principal.did,
+          gb,
+          months,
+          parsed.seederDid,
+          parsed.storageFeeSov !== undefined ? Number(parsed.storageFeeSov) : undefined,
+        );
+        if (!sinkRes.ok) {
+          res.writeHead(sinkRes.statusCode, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(sinkRes));
+          return true;
+        }
+        storageRentReceipt = sinkRes;
+      }
+
       const pubRes = await storageDaemon.storageService.publishMedia(
         dataBytes,
         parsed.mimeType ?? 'text/plain',
@@ -48,6 +69,7 @@ export async function handleStorageRoutes(ctx: StorageRouteContext): Promise<boo
         res.end(
           JSON.stringify({
             ok: true,
+            storageRentReceipt,
             asset: {
               cid: pubRes.value.cid.toString(),
               mimeType: pubRes.value.mimeType,

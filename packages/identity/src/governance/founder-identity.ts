@@ -35,6 +35,7 @@ export interface FounderIdentityRecord {
   readonly publicDisclosureStatement?: string | undefined;
   readonly statutoryComplianceRegistered: boolean;
   readonly complianceJurisdiction?: string | undefined;
+  readonly hasProtocolPrivilege: false;
 }
 
 export interface PublicFounderProfile {
@@ -45,6 +46,7 @@ export interface PublicFounderProfile {
   readonly revealStatus: FounderRevealStatus;
   readonly publicDisclosureStatement?: string | undefined;
   readonly registeredAt: number;
+  readonly hasProtocolPrivilege: false;
 }
 
 export interface MilestoneAdvanceRequest {
@@ -91,6 +93,7 @@ export class FounderIdentityRegistry {
       revealStatus: 'PSEUDONYMOUS',
       statutoryComplianceRegistered: params.statutoryComplianceRegistered ?? true,
       complianceJurisdiction: params.complianceJurisdiction ?? 'Sovereign / Multi-Jurisdictional Trust',
+      hasProtocolPrivilege: false,
     };
 
     return this.record;
@@ -116,7 +119,17 @@ export class FounderIdentityRegistry {
       revealStatus: rec.revealStatus,
       publicDisclosureStatement: rec.publicDisclosureStatement,
       registeredAt: rec.registeredAt,
+      hasProtocolPrivilege: false,
     };
+  }
+
+  /**
+   * Enforces Invariant 8 / Section 11: founder identity NEVER holds special protocol authority.
+   */
+  public static assertZeroProtocolPrivilege(profile: { readonly hasProtocolPrivilege?: boolean }): void {
+    if (profile.hasProtocolPrivilege) {
+      throw new ValidationError('Constitutional violation: founder identity cannot carry protocol privileges');
+    }
   }
 
   /**

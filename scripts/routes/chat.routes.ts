@@ -483,7 +483,12 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
           res.end(JSON.stringify({ ok: false, error: 'Bad Request: Invalid ivHex/nonceHex format (must be valid hex string of at least 8 bytes)', code: 'ERR_INVALID_IV' }));
           return true;
         }
-        if (!clientTagHex || !hexRegex.test(clientTagHex) || clientTagHex.length !== 32) {
+        const isCombinedDoubleRatchet =
+          !clientTagHex &&
+          Number.isInteger(parsed.sequenceNumber) &&
+          clientIvHex.length >= 24 &&
+          clientCiphertextHex.length >= 32;
+        if (!isCombinedDoubleRatchet && (!clientTagHex || !hexRegex.test(clientTagHex) || clientTagHex.length !== 32)) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Bad Request: Invalid tagHex format (must be 32 hex characters for 128-bit AEAD tag)', code: 'ERR_INVALID_AUTH_TAG' }));
           return true;
@@ -491,7 +496,7 @@ export async function handleChatRoutes(ctx: ChatRouteContext): Promise<boolean> 
 
         ciphertextHex = clientCiphertextHex;
         ivHex = clientIvHex;
-        tagHex = clientTagHex;
+        tagHex = clientTagHex || clientCiphertextHex.slice(-32);
         isE2EE = true;
         safeText = '🔒 [End-to-End Encrypted: Client-Side]';
       } else if (isStrictE2EERequested) {

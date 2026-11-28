@@ -8,6 +8,8 @@
 
 import http from 'node:http';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { sovraDb } from '../database-engine.ts';
 import type { AuthenticatedPrincipal } from '../../packages/identity/dist/index.js';
 
@@ -23,26 +25,87 @@ export interface MediaRouteContext {
 }
 
 function resolveUserAddress(ctx: MediaRouteContext): string {
+  const principal = ctx.resolvePrincipal(ctx.req);
+  if (principal && principal.did) {
+    const qAddr = ctx.url.searchParams.get('address') || ctx.url.searchParams.get('addr');
+    return (qAddr && qAddr.trim().length > 0)
+      ? qAddr.trim()
+      : ('sovra1' + crypto.createHash('sha256').update(principal.did).digest('hex').slice(0, 38));
+  }
   const qAddr = ctx.url.searchParams.get('address') || ctx.url.searchParams.get('addr');
   if (qAddr && qAddr.trim().length > 0) {
     return qAddr.trim();
-  }
-  const principal = ctx.resolvePrincipal(ctx.req);
-  if (principal && principal.did) {
-    return 'sovra1' + crypto.createHash('sha256').update(principal.did).digest('hex').slice(0, 38);
   }
   const qDid = ctx.url.searchParams.get('did');
   if (qDid && qDid.trim().length > 0) {
     return 'sovra1' + crypto.createHash('sha256').update(qDid.trim()).digest('hex').slice(0, 38);
   }
-  return 'sovra12a806ca82d506a025d580d40600abc77a69e10e7';
+  return '';
 }
 
-const HLS_TICKET_SECRET = process.env.SOVRA_HLS_SECRET || 'sovra_hls_stream_anti_piracy_secret_2026';
+const cachedHlsSecretsByPath = new Map<string, { ticketSecret: string; keySecret: string }>();
 
-// Persistent or derived 16-byte AES-128 key per mediaId
+function resolveHlsSecretsFile(): string {
+  const storageDir = process.env.SOVRA_STORAGE_DIR
+    ? path.resolve(process.env.SOVRA_STORAGE_DIR)
+    : path.join(process.cwd(), '.sovra-storage-dev');
+  return path.join(storageDir, 'hls-secrets.json');
+}
+
+export function resetHlsSecretsCacheForTests(): void {
+  cachedHlsSecretsByPath.clear();
+}
+
+export function getHlsSecrets(): { ticketSecret: string; keySecret: string } {
+  const envTicket = process.env.SOVRA_HLS_SECRET?.trim();
+  const envKey = process.env.SOVRA_HLS_KEY_SECRET?.trim();
+  if (envTicket) {
+    return { ticketSecret: envTicket, keySecret: envKey || envTicket };
+  }
+
+  const secretsFile = resolveHlsSecretsFile();
+  const cached = cachedHlsSecretsByPath.get(secretsFile);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    if (fs.existsSync(secretsFile)) {
+      const parsed = JSON.parse(fs.readFileSync(secretsFile, 'utf8'));
+      if (parsed && typeof parsed.ticketSecret === 'string' && parsed.ticketSecret.length >= 32) {
+        const loaded = {
+          ticketSecret: parsed.ticketSecret,
+          keySecret: (typeof parsed.keySecret === 'string' && parsed.keySecret.length >= 32)
+            ? parsed.keySecret
+            : parsed.ticketSecret,
+        };
+        cachedHlsSecretsByPath.set(secretsFile, loaded);
+        return loaded;
+      }
+    }
+  } catch {}
+
+  const generated = {
+    ticketSecret: crypto.randomBytes(32).toString('hex'),
+    keySecret: envKey || crypto.randomBytes(32).toString('hex'),
+  };
+  try {
+    const dir = path.dirname(secretsFile);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const tmp = `${secretsFile}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify({ ...generated, createdAt: Date.now() }, null, 2), { mode: 0o600 });
+    fs.renameSync(tmp, secretsFile);
+  } catch {}
+  cachedHlsSecretsByPath.set(secretsFile, generated);
+  return generated;
+}
+
+// Persistent server-secret keyed 16-byte AES-128 key per mediaId
 export function getMediaEncryptionKey(mediaId: string): Buffer {
-  return crypto.createHash('sha256').update(`sovra_hls_aes128_key:${mediaId}`).digest().subarray(0, 16);
+  const { keySecret } = getHlsSecrets();
+  return crypto.createHmac('sha256', keySecret).update(`sovra_hls_aes128_key:${mediaId}`).digest().subarray(0, 16);
 }
 
 export interface StreamTicketPayload {
@@ -53,6 +116,7 @@ export interface StreamTicketPayload {
 }
 
 export function createSignedStreamTicket(mediaId: string, userAddress: string, ttlSeconds = 60): string {
+  const { ticketSecret } = getHlsSecrets();
   const data: StreamTicketPayload = {
     mediaId,
     userAddress,
@@ -60,7 +124,7 @@ export function createSignedStreamTicket(mediaId: string, userAddress: string, t
     nonce: crypto.randomBytes(8).toString('hex')
   };
   const payloadStr = JSON.stringify(data);
-  const sig = crypto.createHmac('sha256', HLS_TICKET_SECRET).update(payloadStr).digest('hex');
+  const sig = crypto.createHmac('sha256', ticketSecret).update(payloadStr).digest('hex');
   return Buffer.from(JSON.stringify({ data, sig }), 'utf8').toString('base64url');
 }
 
@@ -69,12 +133,13 @@ export function verifySignedStreamTicket(ticketStr: string, expectedMediaId?: st
     return { valid: false, error: 'Missing stream session ticket' };
   }
   try {
+    const { ticketSecret } = getHlsSecrets();
     const raw = Buffer.from(ticketStr.trim(), 'base64url').toString('utf8');
     const { data, sig } = JSON.parse(raw);
     if (!data || !sig || !data.mediaId || !data.exp) {
       return { valid: false, error: 'Malformed stream session ticket' };
     }
-    const expectedSig = crypto.createHmac('sha256', HLS_TICKET_SECRET).update(JSON.stringify(data)).digest('hex');
+    const expectedSig = crypto.createHmac('sha256', ticketSecret).update(JSON.stringify(data)).digest('hex');
     if (sig !== expectedSig) {
       return { valid: false, error: 'Invalid cryptographic ticket signature' };
     }
@@ -95,6 +160,9 @@ export async function checkTokenGatedAccess(
   minBalance: string,
   userAddress: string
 ): Promise<{ hasAccess: boolean; userBalance: string }> {
+  if (!userAddress || !userAddress.trim()) {
+    return { hasAccess: false, userBalance: '0' };
+  }
   let userBalance = '0';
   const dbAny = sovraDb as any;
   const token = (dbAny.db?.cw20_tokens || []).find((t: any) => t.contractAddress === contractAddress);
@@ -102,9 +170,7 @@ export async function checkTokenGatedAccess(
     token && (
       token.creator === userAddress ||
       token.creatorAddress === userAddress ||
-      token.creatorDid === userAddress ||
-      userAddress.includes('creator') ||
-      userAddress.includes('validator')
+      token.creatorDid === userAddress
     )
   );
 
@@ -539,16 +605,24 @@ export async function handleMediaTokenGatedRoutes(ctx: MediaRouteContext): Promi
 
   // 3. POST /api/media/token-gate - Creator configures token-gating on media or posts
   if (url.pathname === '/api/media/token-gate' && req.method === 'POST') {
+    const principal = ctx.enforceAuth(req, res);
+    if (!principal) return true;
+
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
 
     try {
       const parsed = JSON.parse(body);
+      if (parsed.creatorDid && String(parsed.creatorDid).trim() !== principal.did) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot configure token gate on behalf of another creator' }));
+        return true;
+      }
       const mediaId = (parsed.mediaId || parsed.id || '').trim();
       const contractAddress = (parsed.contractAddress || '').trim();
       const minBalance = String(parsed.minBalance || parsed.requiredBalance || '1000000');
       const tokenSymbol = (parsed.tokenSymbol || 'TOKEN').trim().toUpperCase();
-      const creatorDid = parsed.creatorDid || 'did:sovra:creator';
+      const creatorDid = principal.did;
       const title = parsed.title || 'VIP Exclusive Video';
       const cid = parsed.cid || `bafybeivip_${Date.now()}`;
 

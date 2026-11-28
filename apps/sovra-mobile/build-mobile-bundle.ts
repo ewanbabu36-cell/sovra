@@ -1,14 +1,30 @@
 /**
  * @file apps/sovra-mobile/build-mobile-bundle.ts
  * Standalone Mobile Hybrid App Production Bundler for Capacitor / Android APK.
+ * Syncs compiled dist/bundle.js + dist/index.html directly into android/app/src/main/assets/.
  */
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
+import { createBrowserNodeShimPlugin } from '../../scripts/esbuild-node-shim.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '../..');
+
+function syncBundleAssetsToAndroid(outDir: string): void {
+  const androidAssetsDir = path.resolve(__dirname, 'android/app/src/main/assets');
+  if (!fs.existsSync(androidAssetsDir)) {
+    fs.mkdirSync(androidAssetsDir, { recursive: true });
+  }
+  for (const fileName of ['index.html', 'bundle.js', 'bundle.js.map']) {
+    const srcPath = path.join(outDir, fileName);
+    if (fs.existsSync(srcPath)) {
+      fs.copyFileSync(srcPath, path.join(androidAssetsDir, fileName));
+    }
+  }
+  console.log(`[Mobile Build] Synced dist/ assets to ${androidAssetsDir}`);
+}
 
 export async function buildMobileBundle(): Promise<string> {
   const esbuildPath = path.resolve(rootDir, 'node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js');
@@ -41,57 +57,7 @@ export async function buildMobileBundle(): Promise<string> {
       '.js': 'js',
     },
     plugins: [
-      {
-        name: 'node-builtins-shim',
-        setup(build: any) {
-          build.onResolve({ filter: /^node:(fs|path|crypto|fs\/promises|os|buffer|util|events|http|net)|^(fs|path|http|net|crypto|events|os|buffer)$/ }, (args: any) => {
-            return { path: args.path, namespace: 'node-shim' };
-          });
-          build.onLoad({ filter: /.*/, namespace: 'node-shim' }, (args: any) => {
-            if (args.path.includes('crypto')) {
-              return {
-                contents: `
-                  const browserCrypto = typeof crypto !== 'undefined' ? crypto : {};
-                  export default browserCrypto;
-                  export const webcrypto = browserCrypto;
-                  export const subtle = browserCrypto.subtle;
-                  export function getRandomValues(arr) { return browserCrypto.getRandomValues(arr); }
-                  export function randomUUID() { return browserCrypto.randomUUID ? browserCrypto.randomUUID() : 'uuid-' + Math.random(); }
-                `,
-                loader: 'js',
-              };
-            }
-            if (args.path.includes('path')) {
-              return {
-                contents: `
-                  export default {
-                    join: (...args) => args.filter(Boolean).join('/'),
-                    resolve: (...args) => args.filter(Boolean).join('/'),
-                    basename: (p) => p.split(/[\\/]/).pop(),
-                    dirname: (p) => p.split(/[\\/]/).slice(0, -1).join('/') || '.',
-                  };
-                  export const join = (...args) => args.filter(Boolean).join('/');
-                  export const resolve = (...args) => args.filter(Boolean).join('/');
-                  export const basename = (p) => p.split(/[\\/]/).pop();
-                  export const dirname = (p) => p.split(/[\\/]/).slice(0, -1).join('/') || '.';
-                `,
-                loader: 'js',
-              };
-            }
-            return {
-              contents: `
-                export default {};
-                export const createServer = () => ({ listen: () => {}, close: () => {} });
-                export const existsSync = () => false;
-                export const readFileSync = () => '';
-                export const writeFileSync = () => {};
-                export const mkdirSync = () => {};
-              `,
-              loader: 'js',
-            };
-          });
-        },
-      },
+      createBrowserNodeShimPlugin({ includeMobileBuiltins: true }),
     ],
     alias: {
       '@sovra/shared': path.resolve(rootDir, 'packages/shared/dist/index.js'),
@@ -119,6 +85,9 @@ export async function buildMobileBundle(): Promise<string> {
     htmlContent = htmlContent.replace('/src/main.tsx', './bundle.js');
     fs.writeFileSync(htmlDest, htmlContent, 'utf8');
   }
+
+  // Always synchronize dist/ assets into native Android WebView assets directory
+  syncBundleAssetsToAndroid(outDir);
 
   const stats = fs.statSync(outFile);
   console.log(`[Mobile Build] Standalone mobile bundle generated: ${outFile} (${stats.size} bytes)`);

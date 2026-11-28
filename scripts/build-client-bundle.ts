@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
+import { createBrowserNodeShimPlugin } from './esbuild-node-shim.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -29,83 +30,7 @@ export async function buildClientBundle(): Promise<string> {
     platform: 'browser',
     target: ['es2022', 'chrome100', 'firefox100', 'safari15'],
     plugins: [
-      {
-        name: 'node-builtins-shim',
-        setup(build: any) {
-          build.onResolve({ filter: /^(node:)?(fs|path|crypto|net|http|https|tls|dgram|fs\/promises|os|buffer|util|events)/ }, (args: any) => {
-            return { path: args.path, namespace: 'node-shim' };
-          });
-          build.onLoad({ filter: /.*/, namespace: 'node-shim' }, (args: any) => {
-            if (args.path === 'node:crypto' || args.path === 'crypto') {
-              return {
-                contents: `
-                  const browserCrypto = typeof crypto !== 'undefined' ? crypto : {};
-                  export default browserCrypto;
-                  export const webcrypto = browserCrypto;
-                  export const subtle = browserCrypto.subtle;
-                  export function getRandomValues(arr) { return browserCrypto.getRandomValues ? browserCrypto.getRandomValues(arr) : arr; }
-                  export function randomUUID() { return browserCrypto.randomUUID ? browserCrypto.randomUUID() : 'uuid-' + Math.random(); }
-                  export function randomBytes(size) {
-                    const b = new Uint8Array(size);
-                    if (browserCrypto.getRandomValues) browserCrypto.getRandomValues(b);
-                    return b;
-                  }
-                  export function createHash() {
-                    let d = '';
-                    return {
-                      update(buf) { d += String(buf); return this; },
-                      digest(enc) { return enc === 'hex' ? '00'.repeat(32) : new Uint8Array(32); }
-                    };
-                  }
-                `,
-                loader: 'js',
-              };
-            }
-            if (args.path === 'node:net' || args.path === 'net' || args.path === 'node:http' || args.path === 'http' || args.path === 'node:https' || args.path === 'https' || args.path === 'node:tls' || args.path === 'tls') {
-              return {
-                contents: `
-                  export function createServer() { return { listen() {}, on() {}, close() {} }; }
-                  export function createConnection() { return { on() {}, write() {}, end() {}, destroy() {} }; }
-                  export function connect() { return createConnection(); }
-                  export default { createServer, createConnection, connect };
-                `,
-                loader: 'js',
-              };
-            }
-            if (args.path === 'node:path' || args.path === 'path') {
-              return {
-                contents: `
-                  export function join(...parts) { return parts.filter(Boolean).join('/'); }
-                  export function resolve(...parts) { return parts.filter(Boolean).join('/'); }
-                  export function dirname(p) { return p.split('/').slice(0, -1).join('/') || '.'; }
-                  export function basename(p) { return p.split('/').pop() || ''; }
-                  export default { join, resolve, dirname, basename };
-                `,
-                loader: 'js',
-              };
-            }
-            if (args.path === 'node:fs' || args.path === 'fs' || args.path === 'node:fs/promises' || args.path === 'fs/promises') {
-              return {
-                contents: `
-                  export const promises = {
-                    readFile: async () => new Uint8Array(0),
-                    writeFile: async () => {},
-                    unlink: async () => {},
-                    mkdir: async () => {},
-                  };
-                  export function existsSync() { return false; }
-                  export function readFileSync() { return ''; }
-                  export function writeFileSync() {}
-                  export function mkdirSync() {}
-                  export default { promises, existsSync, readFileSync, writeFileSync, mkdirSync };
-                `,
-                loader: 'js',
-              };
-            }
-            return { contents: 'export default {};', loader: 'js' };
-          });
-        },
-      },
+      createBrowserNodeShimPlugin({ includeMobileBuiltins: false }),
     ],
     alias: {
       '@sovra/shared': path.resolve(rootDir, 'packages/shared/dist/index.js'),
@@ -149,6 +74,20 @@ export async function buildClientBundle(): Promise<string> {
     });
     const cssStats = fs.statSync(outCssFile);
     console.log(`[Build] Stylesheet bundle successfully generated: ${outCssFile} (${cssStats.size} bytes)`);
+  }
+
+  // Sync updated client artifacts & BitSwap SW to embedded sovrad static dir
+  const goStaticDir = path.resolve(rootDir, 'chain/cmd/sovrad/static');
+  if (fs.existsSync(goStaticDir)) {
+    fs.copyFileSync(sovraOutFile, path.join(goStaticDir, 'sovra.bundle.js'));
+    if (fs.existsSync(outCssFile)) {
+      fs.copyFileSync(outCssFile, path.join(goStaticDir, 'sovra.css'));
+    }
+    const swSrc = path.resolve(rootDir, 'public/sovra-sw.js');
+    if (fs.existsSync(swSrc)) {
+      fs.copyFileSync(swSrc, path.join(goStaticDir, 'sovra-sw.js'));
+    }
+    console.log(`[Build] Synced sovra.bundle.js, sovra.css, sovra-sw.js -> ${goStaticDir}`);
   }
 
   return outFile;

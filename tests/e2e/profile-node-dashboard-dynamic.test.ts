@@ -301,6 +301,14 @@ describe('SOVRA Profile & Node Dashboard Dynamicization & Production Suite', () 
     });
 
     it('executes off-chain tip and verifies dynamic balance and voucher updates', async () => {
+      await fetch(`${BASE_URL}/api/wallet/faucet/claim`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${aliceToken}`,
+        },
+        body: JSON.stringify({ did: aliceUser.did }),
+      });
       const initialWallet = await (await fetch(`${BASE_URL}/api/wallet/stats?did=${encodeURIComponent(aliceUser.did)}`)).json();
       const initialBalance = initialWallet.balanceSov;
 

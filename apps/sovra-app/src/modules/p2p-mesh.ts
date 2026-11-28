@@ -52,9 +52,17 @@ export function initP2pMeshModule(): void {
 
   (window as any).registerPeerOnLan = async function(customProfile?: any): Promise<void> {
     try {
-      await fetch('/api/lan/register', {
+      const token = typeof (window as any).getEffectiveSessionToken === 'function'
+        ? (window as any).getEffectiveSessionToken()
+        : (localStorage.getItem('sovra_session_token') || '');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+        headers['x-sovra-session-token'] = token;
+      }
+      await fetch('/api/peers/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(customProfile || {}),
       });
     } catch (_) {}

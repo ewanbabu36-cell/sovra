@@ -17,7 +17,8 @@ import { describe, it, expect } from 'vitest';
 const BASE_URL = process.env.SOVRA_BASE_URL || 'http://localhost:3001';
 
 describe('Signed Encrypted HLS Video Chunks & Anti-Piracy Gatekeeper Suite', () => {
-  const creatorDid = 'did:sovra:creator_hls_test_' + Date.now();
+  let creatorDid = '';
+  let creatorToken = '';
   const creatorAddress = 'sovra12a806ca82d506a025d580d40600abc77a69e10e7';
   const unauthorizedAddress = 'sovra1poor_user_0000000000000000000000000000000000';
   const authorizedAddress = creatorAddress; // creator holds initial supply
@@ -28,10 +29,23 @@ describe('Signed Encrypted HLS Video Chunks & Anti-Piracy Gatekeeper Suite', () 
 
   // 1. Prepare Gated Media Item with CW20 Token Requirement
   it('prepares creator token and configures token-gating on masterclass video', async () => {
+    const regRes = await fetch(`${BASE_URL}/api/user/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ handle: `@creator_hls_${Date.now()}`, name: 'HLS Creator', device: 'Workstation' })
+    });
+    expect(regRes.status).toBe(200);
+    const regData = await regRes.json();
+    creatorToken = regData.sessionToken;
+    creatorDid = regData.user.did;
+
     // Launch token
     const tokenRes = await fetch(`${BASE_URL}/api/studio/token/launch`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${creatorToken}`
+      },
       body: JSON.stringify({
         name: 'HLS Masterclass Pass',
         symbol: 'HLSPASS',
@@ -47,7 +61,10 @@ describe('Signed Encrypted HLS Video Chunks & Anti-Piracy Gatekeeper Suite', () 
     // Configure token gate on media
     const gateRes = await fetch(`${BASE_URL}/api/media/token-gate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${creatorToken}`
+      },
       body: JSON.stringify({
         mediaId,
         contractAddress: tokenContractAddress,

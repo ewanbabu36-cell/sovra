@@ -21,6 +21,8 @@ import { secureKeyStore } from '../services/secure-keystore.js';
 import { multiRelayManager, type RelayEndpoint } from '../services/multi-relay-manager.js';
 import { localDb } from '../services/local-database.js';
 import { getVapidPublicKey, registerWebPushSubscription } from '../services/api.js';
+import { syncEngine } from '../services/sync-engine.js';
+import { verifyAndDownloadUpdate, installVerifiedAndroidUpdate } from '../services/release-updater.js';
 
 export interface AccountSettingsModalProps {
   readonly isOpen: boolean;
@@ -45,7 +47,7 @@ export function AccountSettingsModal({
   const [guardianSaved, setGuardianSaved] = useState(false);
   const [revokedNotice, setRevokedNotice] = useState<string | null>(null);
 
-  // 12-Word Seed Phrase states
+  // 12-Word Seed Phrase & Encrypted Vault states
   const [seedPhrase, setSeedPhrase] = useState<string>('');
   const [isSeedRevealed, setIsSeedRevealed] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
@@ -53,12 +55,23 @@ export function AccountSettingsModal({
   const [restoreWords, setRestoreWords] = useState('');
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [restoreSuccess, setRestoreSuccess] = useState(false);
+  const [vaultPassInput, setVaultPassInput] = useState('');
+  const [backupJsonText, setBackupJsonText] = useState('');
+  const [vaultStatusMsg, setVaultStatusMsg] = useState<string | null>(null);
 
-  // Multi-Relay Swarm states
+  // Multi-Relay Swarm, Tor SOCKS5, Custom STUN, Seed Bundle & M-of-N Update states
   const [relaysList, setRelaysList] = useState<RelayEndpoint[]>(multiRelayManager.getAllRelays());
   const [activeRelay, setActiveRelayState] = useState<RelayEndpoint>(multiRelayManager.getActiveRelay());
   const [newRelayUrl, setNewRelayUrl] = useState('');
+  const [newRelaySpkiPin, setNewRelaySpkiPin] = useState('');
   const [newRelayName, setNewRelayName] = useState('');
+  const [torProxyInput, setTorProxyInput] = useState(() => multiRelayManager.getTorSocks5Proxy());
+  const [customStunInput, setCustomStunInput] = useState('');
+  const [bundleJsonInput, setBundleJsonInput] = useState('');
+  const [trustedSignerInput, setTrustedSignerInput] = useState('');
+  const [netStatusMsg, setNetStatusMsg] = useState<string | null>(null);
+  const [updateStatusMsg, setUpdateStatusMsg] = useState<string | null>(null);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [isPinging, setIsPinging] = useState(false);
 
   // Web Push Notifications states
@@ -84,35 +97,53 @@ export function AccountSettingsModal({
     }
 
     try {
-      if (typeof window === 'undefined' || !('Notification' in window)) {
-        setPushStatusMsg('Notifications not supported in this browser environment');
+      const distributors = syncEngine.listUnifiedPushDistributors();
+      const unifiedPushRegistered =
+        distributors.length > 0 ? syncEngine.registerUnifiedPushDistributor(distributors[0]) : false;
+
+      let registeredViaWebPush = false;
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          const vapidRes = await getVapidPublicKey();
+          if (vapidRes.ok && vapidRes.publicKey && typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
+            try {
+              const swReg = await navigator.serviceWorker.ready;
+              const sub = await swReg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: vapidRes.publicKey,
+              });
+              const regRes = await registerWebPushSubscription(sub.toJSON());
+              registeredViaWebPush = regRes.ok;
+            } catch {}
+          }
+        } else if (!unifiedPushRegistered) {
+          setPushStatusMsg('Notification permission denied by user');
+          setTimeout(() => setPushStatusMsg(null), 3000);
+          return;
+        }
+      }
+
+      const sseStarted = !registeredViaWebPush ? syncEngine.startZeroCloudWakeup() : false;
+
+      if (!registeredViaWebPush && !sseStarted && !unifiedPushRegistered) {
+        setPushStatusMsg('Push/SSE unavailable until connected to a community relay or UnifiedPush distributor');
         setTimeout(() => setPushStatusMsg(null), 3000);
         return;
       }
 
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') {
-        setPushStatusMsg('Notification permission denied by user');
-        setTimeout(() => setPushStatusMsg(null), 3000);
-        return;
-      }
-
-      await getVapidPublicKey();
-      const mockSub = {
-        endpoint: 'https://fcm.googleapis.com/fcm/send/sovra-demo-token',
-        keys: {
-          p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QT9AcDnVwT3JhWuWSSzrT29tPJ0pH9vWgk44tknxlUbGFIBE',
-          auth: 'tBHItJI5svbpez7KI4CCXg',
-        },
-      };
-
-      await registerWebPushSubscription(mockSub);
       setPushEnabled(true);
       try {
         localStorage.setItem('sovra_push_notifications', 'true');
       } catch {}
-      setPushStatusMsg('✓ Zero-Knowledge Web Push active');
-      setTimeout(() => setPushStatusMsg(null), 2500);
+      setPushStatusMsg(
+        unifiedPushRegistered
+          ? '✓ UnifiedPush (Background) + Foreground SSE active'
+          : registeredViaWebPush
+            ? '✓ Zero-Knowledge Web Push active'
+            : '✓ Foreground SSE Wakeup active (background delivery needs UnifiedPush)',
+      );
+      setTimeout(() => setPushStatusMsg(null), 3000);
     } catch (err: any) {
       setPushStatusMsg(`Push setup error: ${err?.message || 'Failed'}`);
       setTimeout(() => setPushStatusMsg(null), 3000);
@@ -183,25 +214,6 @@ export function AccountSettingsModal({
         }
       }
     } catch (_) {}
-
-    if (list.length === 1) {
-      list.push({
-        deviceId: 'dev_mac_02',
-        name: 'MacBook Air M2 (Chrome Browser)',
-        publicKeyHex: '4a5b6c7d8e9f01234a5b6c7d8e9f01234a5b6c7d8e9f01234a5b6c7d8e9f0123',
-        platform: 'web',
-        isCurrent: false,
-        revoked: false,
-      });
-      list.push({
-        deviceId: 'dev_lost_tab',
-        name: 'Galaxy Tab S8 (Lost in Taxi)',
-        publicKeyHex: '9f8e7d6c5b4a32109f8e7d6c5b4a32109f8e7d6c5b4a32109f8e7d6c5b4a3210',
-        platform: 'android',
-        isCurrent: false,
-        revoked: false,
-      });
-    }
 
     return list;
   });
@@ -342,12 +354,119 @@ export function AccountSettingsModal({
   const handleAddCustomRelay = async () => {
     if (!newRelayUrl.trim()) return;
     try {
-      await multiRelayManager.addCustomRelay(newRelayUrl.trim(), newRelayName.trim() || undefined);
+      const cleanUrl = newRelayUrl.trim();
+      if (newRelaySpkiPin.trim()) {
+        multiRelayManager.setRelaySpkiPin(cleanUrl, newRelaySpkiPin.trim());
+      }
+      await multiRelayManager.addCustomRelay(cleanUrl, newRelayName.trim() || undefined);
       setRelaysList(multiRelayManager.getAllRelays());
       setNewRelayUrl('');
+      setNewRelaySpkiPin('');
       setNewRelayName('');
+      setNetStatusMsg('✓ Custom relay & optional SPKI TLS pin saved');
     } catch (e: any) {
-      alert(e.message);
+      setNetStatusMsg(e.message);
+    }
+  };
+
+  const handleSaveTorProxy = () => {
+    try {
+      multiRelayManager.setTorSocks5Proxy(torProxyInput);
+      setNetStatusMsg(torProxyInput.trim() ? `✓ Tor SOCKS5 proxy set to ${torProxyInput.trim()}` : 'Tor SOCKS5 proxy cleared');
+    } catch (e: any) {
+      setNetStatusMsg(e.message || 'Invalid SOCKS5 proxy URI');
+    }
+  };
+
+  const handleAddCustomStun = () => {
+    const clean = customStunInput.trim();
+    if (!clean) return;
+    multiRelayManager.addCustomStunServer(clean.startsWith('stun:') ? clean : `stun:${clean}`);
+    setCustomStunInput('');
+    setRelaysList(multiRelayManager.getAllRelays());
+    setNetStatusMsg('✓ Self-hosted STUN endpoint added');
+  };
+
+  const handleImportSeedBundle = () => {
+    if (!bundleJsonInput.trim()) return;
+    try {
+      const parsed = JSON.parse(bundleJsonInput);
+      const bundleObj = parsed?.bundle ?? parsed;
+      const imported = multiRelayManager.importBootstrapBundle(bundleObj, 'Community Bundle');
+      setRelaysList(multiRelayManager.getAllRelays());
+      setBundleJsonInput('');
+      setNetStatusMsg(`✓ Imported ${imported} zero-domain peer relay(s) + SPKI pins`);
+    } catch (e: any) {
+      setNetStatusMsg(`Invalid bundle JSON: ${e?.message || 'parse error'}`);
+    }
+  };
+
+  const handleCheckSovereignUpdate = async () => {
+    const rawSigners = trustedSignerInput
+      .split(/[\s,;]+/)
+      .map(s => s.trim().toLowerCase())
+      .filter(s => /^[0-9a-f]{64}$/.test(s));
+    if (rawSigners.length < 2) {
+      setUpdateStatusMsg('Enter >=2 trusted 64-hex maintainer public keys (comma/newline separated) to verify M-of-N release.');
+      return;
+    }
+    setIsCheckingUpdate(true);
+    setUpdateStatusMsg('Fetching /api/releases/latest from configured mirrors...');
+    try {
+      const dl = await verifyAndDownloadUpdate({
+        policy: {
+          trustedSignerPubKeysHex: rawSigners,
+          currentVersion: '1.0.0',
+          currentProtocolVersion: 1,
+          minimumThreshold: 2,
+        },
+        minimumThreshold: 2,
+      } as any);
+      const inst = installVerifiedAndroidUpdate(dl);
+      setUpdateStatusMsg(
+        `✓ Verified v${dl.manifest.version} (${dl.validSigners.length} signers, ${dl.validBuilders.length} builders) via ${inst.method}`,
+      );
+    } catch (e: any) {
+      setUpdateStatusMsg(`Update check rejected/failed: ${e?.message || 'error'}`);
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
+
+  const handleSetVaultPassphrase = () => {
+    try {
+      secureKeyStore.setVaultPassphrase(vaultPassInput);
+      setVaultPassInput('');
+      setVaultStatusMsg('✓ Vault locked with scrypt passphrase (zero localStorage seed)');
+    } catch (e: any) {
+      setVaultStatusMsg(e?.message || 'Passphrase error');
+    }
+  };
+
+  const handleExportEncryptedVaultBackup = () => {
+    if (vaultPassInput.length < 8) {
+      setVaultStatusMsg('Enter a >=8 character backup passphrase first');
+      return;
+    }
+    try {
+      const json = secureKeyStore.exportEncryptedBackup(vaultPassInput);
+      setBackupJsonText(json);
+      setVaultStatusMsg('✓ Encrypted scrypt backup generated below (save offline)');
+    } catch (e: any) {
+      setVaultStatusMsg(e?.message || 'Backup export failed');
+    }
+  };
+
+  const handleRestoreEncryptedVaultBackup = () => {
+    if (!backupJsonText.trim() || vaultPassInput.length < 8) {
+      setVaultStatusMsg('Provide encrypted backup JSON and >=8 char passphrase');
+      return;
+    }
+    try {
+      const restored = secureKeyStore.restoreFromEncryptedBackup(backupJsonText, vaultPassInput);
+      setVaultStatusMsg(`✓ Restored ${restored.did}`);
+    } catch (e: any) {
+      setVaultStatusMsg(`Restore failed: ${e?.message || 'invalid passphrase/backup'}`);
     }
   };
 
@@ -1074,8 +1193,55 @@ export function AccountSettingsModal({
                   </button>
                 </div>
 
-                <div style={{ padding: '10px 12px', backgroundColor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: 10, fontSize: 11, color: '#fbbf24', lineHeight: 1.4 }}>
+                <div style={{ padding: '10px 12px', backgroundColor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: 10, fontSize: 11, color: '#fbbf24', lineHeight: 1.4, marginBottom: 14 }}>
                   ⚠️ <b>Anti-Censorship Guarantee:</b> You can restore your identity, posts, and contacts on any phone using these 12 words, even if central servers are blocked.
+                </div>
+
+                {/* Encrypted Scrypt Vault Passphrase & Portable Backup */}
+                <div style={{ backgroundColor: '#1e293b', padding: 14, borderRadius: 12, border: '1px solid #334155' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6, color: '#f8fafc' }}>
+                    🔐 Passphrase Lock &amp; Scrypt Encrypted Backup
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                    Backing mode: {secureKeyStore.getSecurityPosture().storageBacking} | Raw seed in localStorage: {String(secureKeyStore.getSecurityPosture().hasRawSeedInLocalStorage)}
+                  </div>
+                  <input
+                    type="password"
+                    value={vaultPassInput}
+                    onChange={(e) => setVaultPassInput(e.target.value)}
+                    placeholder="Passphrase (min 8 chars)"
+                    style={{ width: '100%', padding: '8px 10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#fff', fontSize: 12, marginBottom: 8 }}
+                  />
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                    <button
+                      onClick={handleSetVaultPassphrase}
+                      style={{ flex: 1, padding: '8px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Lock Vault
+                    </button>
+                    <button
+                      onClick={handleExportEncryptedVaultBackup}
+                      style={{ flex: 1, padding: '8px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Export Backup
+                    </button>
+                    <button
+                      onClick={handleRestoreEncryptedVaultBackup}
+                      style={{ flex: 1, padding: '8px', backgroundColor: '#334155', color: '#fff', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Restore JSON
+                    </button>
+                  </div>
+                  <textarea
+                    value={backupJsonText}
+                    onChange={(e) => setBackupJsonText(e.target.value)}
+                    placeholder="Encrypted backup JSON appears here on Export (or paste here to restore)..."
+                    rows={2}
+                    style={{ width: '100%', padding: 8, backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#fff', fontSize: 10, fontFamily: 'monospace' }}
+                  />
+                  {vaultStatusMsg && (
+                    <div style={{ fontSize: 11, color: '#38bdf8', marginTop: 6 }}>{vaultStatusMsg}</div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -1235,25 +1401,34 @@ export function AccountSettingsModal({
               })}
             </div>
 
-            {/* Zero-Domain Autonomous P2P Bootstrap Seeds (Bitcoin Model) */}
+            {/* Zero-Domain Autonomous P2P & Push Telemetry Status */}
             <div style={{ backgroundColor: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: 12, padding: 14, marginBottom: 18 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>⚡</span> Permanent STUN &amp; DHT Seeds
+                  <span>⚡</span> Zero-Domain Transport &amp; Wakeup Status
                 </div>
-                <span style={{ fontSize: 10, backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
-                  Zero-Domain Autonomous ✓
+                <span style={{ fontSize: 10, backgroundColor: multiRelayManager.getPublicDhtSeeds().length > 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)', color: multiRelayManager.getPublicDhtSeeds().length > 0 ? '#34d399' : '#fbbf24', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
+                  {multiRelayManager.getPublicDhtSeeds().length > 0 ? 'Community Seeds Active ✓' : 'Zero-DNS Mode (Needs Peer/IP/.onion)'}
                 </span>
               </div>
               <p style={{ fontSize: 11, color: '#cbd5e1', margin: '0 0 10px 0', lineHeight: 1.4 }}>
-                Hardcoded in app binary like Bitcoin. Operates with ₹0 domain and ₹0 hosting bills.
+                Public domains and Google STUN/FCM are disabled by default. Configure community relay IPs, .onion peers, custom STUN, or signed seed bundles below.
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0f172a', padding: '6px 10px', borderRadius: 8, fontSize: 11 }}>
+                  <span style={{ color: '#94a3b8' }}>Wakeup Delivery</span>
+                  <span style={{ color: '#38bdf8', fontSize: 10, fontWeight: 700 }}>
+                    {(() => {
+                      const t = syncEngine.getPushDeliveryTelemetry();
+                      return `${t.backgroundAndroidChannel === 'unifiedpush' ? 'UnifiedPush (BG)' : 'No UnifiedPush'} | ${t.foregroundChannel === 'sse' ? 'SSE Foreground ON' : 'SSE Standby'}`;
+                    })()}
+                  </span>
+                </div>
                 {multiRelayManager.getStunServers().map((s) => (
                   <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0f172a', padding: '6px 10px', borderRadius: 8, fontSize: 11 }}>
                     <span style={{ color: '#f8fafc', fontFamily: 'monospace' }}>{s.url}</span>
-                    <span style={{ color: '#10b981', fontSize: 10, fontWeight: 700 }}>● {s.provider} (Free)</span>
+                    <span style={{ color: '#10b981', fontSize: 10, fontWeight: 700 }}>● {s.provider}</span>
                   </div>
                 ))}
                 {multiRelayManager.getPublicDhtSeeds().map((d) => (
@@ -1265,25 +1440,31 @@ export function AccountSettingsModal({
               </div>
             </div>
 
-            {/* Add Custom Relay (Nostr Parity) */}
-            <div style={{ backgroundColor: '#1e293b', padding: 14, borderRadius: 12, border: '1px solid #334155' }}>
+            {netStatusMsg && (
+              <div style={{ fontSize: 11, color: '#38bdf8', marginBottom: 12, padding: '8px 10px', backgroundColor: '#0f172a', borderRadius: 8 }}>
+                {netStatusMsg}
+              </div>
+            )}
+
+            {/* Add Custom Zero-Domain Relay + SPKI TLS Pin */}
+            <div style={{ backgroundColor: '#1e293b', padding: 14, borderRadius: 12, border: '1px solid #334155', marginBottom: 14 }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: '#f8fafc' }}>
-                + Add Custom Node / VPS Relay
+                + Add Peer / Relay IP / .onion Node
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <input
                   type="text"
                   value={newRelayUrl}
                   onChange={(e) => setNewRelayUrl(e.target.value)}
-                  placeholder="https://my-node.example.com or http://192.168.1.10:3001"
-                  style={{
-                    padding: '8px 10px',
-                    backgroundColor: '#0f172a',
-                    border: '1px solid #334155',
-                    borderRadius: 8,
-                    color: '#fff',
-                    fontSize: 12,
-                  }}
+                  placeholder="https://203.0.113.10:3443 or http://...onion:3001"
+                  style={{ padding: '8px 10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#fff', fontSize: 12 }}
+                />
+                <input
+                  type="text"
+                  value={newRelaySpkiPin}
+                  onChange={(e) => setNewRelaySpkiPin(e.target.value)}
+                  placeholder="Optional Self-Signed SPKI SHA-256 Pin (64 hex chars)"
+                  style={{ padding: '8px 10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#fff', fontSize: 11, fontFamily: 'monospace' }}
                 />
                 <div style={{ display: 'flex', gap: 8 }}>
                   <input
@@ -1291,33 +1472,92 @@ export function AccountSettingsModal({
                     value={newRelayName}
                     onChange={(e) => setNewRelayName(e.target.value)}
                     placeholder="Node Name (Optional)"
-                    style={{
-                      flex: 1,
-                      padding: '8px 10px',
-                      backgroundColor: '#0f172a',
-                      border: '1px solid #334155',
-                      borderRadius: 8,
-                      color: '#fff',
-                      fontSize: 12,
-                    }}
+                    style={{ flex: 1, padding: '8px 10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#fff', fontSize: 12 }}
                   />
                   <button
                     onClick={handleAddCustomRelay}
-                    style={{
-                      padding: '8px 14px',
-                      backgroundColor: '#10b981',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 8,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
+                    style={{ padding: '8px 14px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                   >
                     + Add
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* Tor SOCKS5 Proxy & Custom Self-Hosted STUN */}
+            <div style={{ backgroundColor: '#1e293b', padding: 14, borderRadius: 12, border: '1px solid #334155', marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: '#f8fafc' }}>
+                🧅 Tor SOCKS5 &amp; Self-Hosted STUN
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <input
+                  type="text"
+                  value={torProxyInput}
+                  onChange={(e) => setTorProxyInput(e.target.value)}
+                  placeholder="socks5h://127.0.0.1:9050"
+                  style={{ flex: 1, padding: '8px 10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#fff', fontSize: 12, fontFamily: 'monospace' }}
+                />
+                <button
+                  onClick={handleSaveTorProxy}
+                  style={{ padding: '8px 12px', backgroundColor: '#8b5cf6', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Save Tor
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <input
+                  type="text"
+                  value={customStunInput}
+                  onChange={(e) => setCustomStunInput(e.target.value)}
+                  placeholder="stun:192.168.1.10:3478"
+                  style={{ flex: 1, padding: '8px 10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#fff', fontSize: 12, fontFamily: 'monospace' }}
+                />
+                <button
+                  onClick={handleAddCustomStun}
+                  style={{ padding: '8px 12px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  + STUN
+                </button>
+              </div>
+              <textarea
+                value={bundleJsonInput}
+                onChange={(e) => setBundleJsonInput(e.target.value)}
+                placeholder="Paste SignedBootstrapBundle JSON to import volunteer IPs + SPKI pins..."
+                rows={2}
+                style={{ width: '100%', padding: 8, backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#fff', fontSize: 11, fontFamily: 'monospace', marginBottom: 6 }}
+              />
+              <button
+                onClick={handleImportSeedBundle}
+                style={{ width: '100%', padding: '8px', backgroundColor: '#334155', color: '#f8fafc', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Import Signed Bootstrap Bundle
+              </button>
+            </div>
+
+            {/* M-of-N Sovereign Update Verifier & Native APK Installer */}
+            <div style={{ backgroundColor: '#1e293b', padding: 14, borderRadius: 12, border: '1px solid #334155' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6, color: '#f8fafc' }}>
+                📦 Check M-of-N Signed App Update
+              </div>
+              <textarea
+                value={trustedSignerInput}
+                onChange={(e) => setTrustedSignerInput(e.target.value)}
+                placeholder="Trusted Maintainer Ed25519 Public Keys (2+ 64-hex keys, comma separated)"
+                rows={2}
+                style={{ width: '100%', padding: 8, backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#fff', fontSize: 11, fontFamily: 'monospace', marginBottom: 8 }}
+              />
+              <button
+                onClick={handleCheckSovereignUpdate}
+                disabled={isCheckingUpdate}
+                style={{ width: '100%', padding: '10px', backgroundColor: '#059669', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: isCheckingUpdate ? 'default' : 'pointer' }}
+              >
+                {isCheckingUpdate ? 'Verifying M-of-N Signatures & SHA-256...' : 'Verify & Download Sovereign Update'}
+              </button>
+              {updateStatusMsg && (
+                <div style={{ fontSize: 11, color: '#fbbf24', marginTop: 8, lineHeight: 1.4 }}>
+                  {updateStatusMsg}
+                </div>
+              )}
             </div>
           </div>
         )}

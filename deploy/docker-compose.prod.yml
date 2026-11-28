@@ -2,7 +2,7 @@ version: '3.8'
 
 # ============================================================
 #   SOVRA TURNKEY PRODUCTION VPS STACK
-#   Autonomous Sovereign Node + Caddy TLS Reverse Proxy + SQLite WAL
+#   Autonomous Sovereign Node + Caddy Auto-TLS + Coturn TURNS
 # ============================================================
 
 services:
@@ -19,7 +19,12 @@ services:
       - SOVRA_P2P_PORT=4001
       - SOVRA_HTTP_PORT=3001
       - SOVRA_HTTPS_PORT=3443
-      - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY:-sovra-production-admin-secret-key-32chars!}
+      - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY:?Set ADMIN_SECRET_KEY in environment or Vault}
+      - SOVRA_INTERNAL_SERVICE_SECRET=${SOVRA_INTERNAL_SERVICE_SECRET:?Set SOVRA_INTERNAL_SERVICE_SECRET}
+      - SOVRA_TURN_SECRET=${SOVRA_TURN_SECRET:?Set SOVRA_TURN_SECRET in environment or Vault}
+      - DATABASE_URL=${DATABASE_URL:-}
+      - REDIS_URL=${REDIS_URL:-}
+      - SOVRA_TURN_URL=${SOVRA_TURN_URL:-turns:turn-us-east.sovra.network:5349?transport=tcp}
       - SOVRA_TURN_SERVERS=${SOVRA_TURN_SERVERS:-stun:stun.l.google.com:19302}
     volumes:
       - sovra-data-wal:/app/.sovra-storage-prod
@@ -58,6 +63,7 @@ services:
       - "443:443"
     environment:
       - SOVRA_DOMAIN=${SOVRA_DOMAIN:-localhost}
+      - SOVRA_ACME_EMAIL=${SOVRA_ACME_EMAIL:-ops@sovra.network}
     volumes:
       - ../docker/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-tls-data:/data
@@ -65,6 +71,35 @@ services:
     depends_on:
       sovra-node:
         condition: service_healthy
+    networks:
+      - sovra-mesh-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  coturn-relay:
+    image: coturn/coturn:4.6.2-alpine
+    container_name: sovra-coturn-relay
+    restart: always
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "5349:5349/udp"
+      - "5349:5349/tcp"
+      - "49152-49200:49152-49200/udp"
+    environment:
+      - DETECT_EXTERNAL_IP=yes
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ${SOVRA_COTURN_CERT_DIR:-./coturn/certs}:/etc/coturn/certs:ro
+    command:
+      - "-c"
+      - "/etc/coturn/turnserver.conf"
+      - "--realm=${SOVRA_DOMAIN:-sovra.network}"
+      - "--server-name=turn.${SOVRA_DOMAIN:-sovra.network}"
+      - "--static-auth-secret=${SOVRA_TURN_SECRET:?Set SOVRA_TURN_SECRET in environment or Vault}"
     networks:
       - sovra-mesh-net
     logging:

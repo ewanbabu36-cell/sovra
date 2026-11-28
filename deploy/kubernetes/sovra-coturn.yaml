@@ -15,12 +15,17 @@ data:
     fingerprint
     lt-cred-mech
     realm=sovra.network
+    server-name=turn.sovra.network
     use-auth-secret
     stale-nonce=600
+    cert=/etc/coturn/certs/tls.crt
+    pkey=/etc/coturn/certs/tls.key
+    no-tlsv1
+    no-tlsv1_1
     bps-capacity=0
     max-bps=3000000
-    total-quota=200
-    user-quota=10
+    total-quota=500
+    user-quota=15
     no-loopback-peers
     no-multicast-peers
     denied-peer-ip=10.0.0.0-10.255.255.255
@@ -28,18 +33,9 @@ data:
     denied-peer-ip=192.168.0.0-192.168.255.255
     denied-peer-ip=127.0.0.0-127.255.255.255
     cipher-list="ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384"
-    verbose
     no-cli
     log-file=stdout
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: sovra-coturn-secret
-  namespace: sovra-system
-type: Opaque
-stringData:
-  static-auth-secret: "sovra-prod-turn-secret-change-before-apply"
+# NOTE: Provide the `sovra-coturn-secret` Secret (key: static-auth-secret) via ExternalSecrets, Vault, or `kubectl create secret` prior to applying.
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -63,7 +59,9 @@ spec:
         - name: coturn
           image: coturn/coturn:4.6.2-alpine
           imagePullPolicy: IfNotPresent
-          command: ["turnserver", "-c", "/etc/coturn/turnserver.conf"]
+          command: ["sh", "-c"]
+          args:
+            - "exec turnserver -c /etc/coturn/turnserver.conf --static-auth-secret=\"$STATIC_AUTH_SECRET\""
           env:
             - name: TURN_PORT
               value: "3478"
@@ -91,6 +89,9 @@ spec:
             - name: config-volume
               mountPath: /etc/coturn/turnserver.conf
               subPath: turnserver.conf
+            - name: coturn-tls-certs
+              mountPath: /etc/coturn/certs
+              readOnly: true
           resources:
             requests:
               cpu: "250m"
@@ -102,6 +103,10 @@ spec:
         - name: config-volume
           configMap:
             name: sovra-coturn-config
+        - name: coturn-tls-certs
+          secret:
+            secretName: sovra-coturn-tls
+            optional: true
 ---
 apiVersion: v1
 kind: Service

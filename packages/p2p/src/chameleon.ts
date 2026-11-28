@@ -107,4 +107,23 @@ export class TransportChameleonEngine {
   ): boolean {
     return consecutiveDegradedCount >= threshold;
   }
+
+  /**
+   * Maps a path-health evaluation onto transports actually implemented by the active runtime
+   * so routers never pretend an unavailable QUIC socket is active.
+   */
+  public static selectOperationalTransport(
+    evaluation: PathHealthEvaluation,
+    supportedTransports: readonly string[],
+  ): 'quic' | 'ws+noise_xx+yamux' | 'tcp+noise_xx+yamux' {
+    if (evaluation.shouldFallbackToWebSocket && supportedTransports.includes('ws+noise_xx+yamux')) {
+      return 'ws+noise_xx+yamux';
+    }
+    if (!evaluation.shouldFallbackToWebSocket && supportedTransports.includes('quic')) {
+      return 'quic';
+    }
+    return supportedTransports.includes('tcp+noise_xx+yamux')
+      ? 'tcp+noise_xx+yamux'
+      : 'ws+noise_xx+yamux';
+  }
 }

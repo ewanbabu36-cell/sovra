@@ -573,6 +573,7 @@ export class LengthPrefixedFrameCodec {
 export class TcpTransport {
   private server: net.Server | null = null;
   private isListening = false;
+  private activeSockets = new Set<net.Socket>();
 
   public async listen(
     port: number,
@@ -581,6 +582,10 @@ export class TcpTransport {
   ): Promise<number> {
     return new Promise((resolve, reject) => {
       const srv = net.createServer(socket => {
+        this.activeSockets.add(socket);
+        socket.once('close', () => {
+          this.activeSockets.delete(socket);
+        });
         onConnection(socket);
       });
 
@@ -601,6 +606,10 @@ export class TcpTransport {
   public async dial(port: number, host = '127.0.0.1', timeoutMs = 1500): Promise<net.Socket> {
     return new Promise((resolve, reject) => {
       const socket = net.createConnection({ port, host });
+      this.activeSockets.add(socket);
+      socket.once('close', () => {
+        this.activeSockets.delete(socket);
+      });
       socket.setTimeout(timeoutMs);
       socket.on('connect', () => {
         socket.setTimeout(0);
@@ -618,12 +627,26 @@ export class TcpTransport {
 
   public close(): Promise<void> {
     return new Promise(resolve => {
+      for (const sock of this.activeSockets) {
+        try {
+          sock.destroy();
+        } catch {}
+      }
+      this.activeSockets.clear();
+
       if (this.server && this.isListening) {
-        this.server.close(() => {
+        const srv = this.server as net.Server & { closeAllConnections?: () => void };
+        if (typeof srv.closeAllConnections === 'function') {
+          srv.closeAllConnections();
+        }
+        srv.close(() => {
           this.isListening = false;
+          this.server = null;
           resolve();
         });
       } else {
+        this.server = null;
+        this.isListening = false;
         resolve();
       }
     });

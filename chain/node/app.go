@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -74,6 +75,16 @@ func NewSovraApp(s store.KVStore, genesisTime int64) *SovraApp {
 	ik := issuancekeeper.NewKeeper(s, genesisTime)
 	wk := wasmkeeper.NewKeeper(wasmtypes.DefaultWasmConfig())
 
+	wk.SetBurnHandler(func(kv store.KVStore, contractAddr string, amount math.Int) error {
+		burnHandler := func(burner string, amt math.Int) error {
+			if err := bk.SendCoinsFromAccountToModule(kv, burner, issuancetypes.ModuleName, amt); err != nil {
+				return err
+			}
+			return bk.BurnCoins(kv, issuancetypes.ModuleName, amt)
+		}
+		return ik.ExecuteBurn(kv, contractAddr, amount, burnHandler)
+	})
+
 	app := &SovraApp{
 		store:          s,
 		bankKeeper:     bk,
@@ -129,6 +140,55 @@ func (app *SovraApp) InitChain(gen GenesisState) error {
 	app.height = 0
 	app.appHash = app.computeStateRoot()
 
+	// Persist EconomicParams, Genesis Vesting Schedules, SecurityCouncil sunset, and initial block time
+	ep := DefaultEconomicParams()
+	if gen.EconomicParams != nil {
+		ep = *gen.EconomicParams
+	}
+	app.setEconomicParams(app.store, ep)
+	app.setBlockTime(app.store, gen.GenesisTime)
+
+	for _, va := range gen.VestingAccounts {
+		origAmt, ok := math.NewIntFromString(va.OriginalAmount)
+		if !ok || !origAmt.IsPositive() {
+			return fmt.Errorf("invalid vesting original_amount for %s", va.Address)
+		}
+		bal := app.bankKeeper.GetBalance(app.store, va.Address)
+		if bal.LT(origAmt) {
+			return fmt.Errorf("vesting account %s balance %s < vesting amount %s", va.Address, bal, origAmt)
+		}
+		cliffSec := va.CliffSeconds
+		if cliffSec < 0 {
+			cliffSec = issuancetypes.DefaultGenesisCliffSeconds
+		}
+		vestSec := va.VestingDurationSeconds
+		if vestSec <= 0 {
+			vestSec = issuancetypes.DefaultGenesisVestingSeconds
+		}
+		sched := VestingSchedule{
+			Address:        va.Address,
+			OriginalAmount: origAmt.String(),
+			StartTime:      gen.GenesisTime,
+			CliffTime:      gen.GenesisTime + cliffSec,
+			EndTime:        gen.GenesisTime + cliffSec + vestSec,
+			Label:          va.Label,
+		}
+		sbz, _ := json.Marshal(sched)
+		app.store.Set(vestingKey(va.Address), sbz)
+	}
+
+	if gen.SecurityCouncil != nil {
+		scBz, _ := json.Marshal(gen.SecurityCouncil)
+		app.store.Set(KeySecurityCouncil, scBz)
+	} else if ep.SecurityCouncilSunsetHeight > 0 || ep.SecurityCouncilSunsetTime > 0 {
+		sc := SecurityCouncilGenesis{
+			SunsetHeight:    ep.SecurityCouncilSunsetHeight,
+			SunsetTimestamp: ep.SecurityCouncilSunsetTime,
+		}
+		scBz, _ := json.Marshal(sc)
+		app.store.Set(KeySecurityCouncil, scBz)
+	}
+
 	// Persist initial genesis state markers to store
 	heightBz := make([]byte, 8)
 	binary.BigEndian.PutUint64(heightBz, 0)
@@ -159,6 +219,7 @@ func (app *SovraApp) BeginBlock(height int64, blockTimeUnix int64) error {
 	defer app.mu.Unlock()
 
 	app.height = height
+	app.setBlockTime(app.store, blockTimeUnix)
 
 	// Mint callback wiring to bank keeper
 	mintHandler := func(pool issuancetypes.PoolID, dest string, amount math.Int) error {
@@ -170,7 +231,17 @@ func (app *SovraApp) BeginBlock(height int64, blockTimeUnix int64) error {
 	}
 
 	// Run issuance BeginBlocker (triggers new epoch allocations on day boundaries)
-	return app.issuanceKeeper.BeginBlocker(app.store, blockTimeUnix, mintHandler)
+	if err := app.issuanceKeeper.BeginBlocker(app.store, blockTimeUnix, mintHandler); err != nil {
+		return err
+	}
+
+	// Distribute available fee_collector yield to veSOV stakers & patron creators
+	if err := app.distributeFeeRewards(app.store); err != nil {
+		return err
+	}
+
+	// Release only matured 14-21 day unbonding entries
+	return app.processMaturedUnbondings(app.store, blockTimeUnix)
 }
 
 // DeliverTx executes a committed transaction inside a state cache sandbox
@@ -192,10 +263,10 @@ func (app *SovraApp) DeliverTx(tx SignedTransaction) error {
 		}
 	}
 
-	// Deduct fee and credit to fee_collector
+	// Apply EIP-1559 Fee Sink: FeeBurnBps% permanently burned via ExecuteBurn, remainder -> fee_collector
 	if fee.IsPositive() {
-		if err := app.bankKeeper.SendCoinsFromAccountToModule(cacheStore, tx.Sender, issuancetypes.FeeCollectorName, fee); err != nil {
-			return fmt.Errorf("fee deduction failed: %w", err)
+		if _, _, err := app.applyProtocolFee(cacheStore, tx.Sender, fee); err != nil {
+			return err
 		}
 	}
 
@@ -210,10 +281,11 @@ func (app *SovraApp) DeliverTx(tx SignedTransaction) error {
 		}
 	}
 
+	now := app.getBlockTime(cacheStore)
 	env := wasmtypes.Env{
 		Block: wasmtypes.BlockInfo{
 			Height:  app.height,
-			Time:    time.Now().Unix(),
+			Time:    now,
 			ChainID: app.chainID,
 		},
 	}
@@ -267,11 +339,41 @@ func (app *SovraApp) DeliverTx(tx SignedTransaction) error {
 		if targetVal == "" {
 			targetVal = tx.Recipient
 		}
-		if err := app.bankKeeper.SendCoinsFromAccountToModule(cacheStore, tx.Sender, "bonded_tokens_pool", amt); err != nil {
+		tierName, lockSecs, multBps, err := ResolveLockTier(tx.LockDays)
+		if err != nil {
+			return err
+		}
+		if err := app.bankKeeper.SendCoinsFromAccountToModule(cacheStore, tx.Sender, issuancetypes.BondedTokensPoolName, amt); err != nil {
 			return fmt.Errorf("delegation transfer failed: %w", err)
 		}
 		curDel := app.GetDelegation(cacheStore, tx.Sender, targetVal)
-		app.SetDelegation(cacheStore, tx.Sender, targetVal, curDel.Add(amt))
+		newTotal := curDel.Add(amt)
+		app.SetDelegation(cacheStore, tx.Sender, targetVal, newTotal)
+
+		rec := DelegationRecord{
+			Delegator:     tx.Sender,
+			Validator:     targetVal,
+			Amount:        newTotal.String(),
+			LockTier:      tierName,
+			LockSeconds:   lockSecs,
+			LockedAt:      now,
+			UnlockAt:      now + lockSecs,
+			MultiplierBps: multBps,
+		}
+		if existingBz := cacheStore.Get(delegationRecKey(tx.Sender, targetVal)); len(existingBz) > 0 {
+			var existing DelegationRecord
+			if json.Unmarshal(existingBz, &existing) == nil {
+				if existing.UnlockAt > rec.UnlockAt {
+					rec.UnlockAt = existing.UnlockAt
+				}
+				if existing.MultiplierBps > rec.MultiplierBps {
+					rec.MultiplierBps = existing.MultiplierBps
+					rec.LockTier = existing.LockTier
+				}
+			}
+		}
+		rBz, _ := json.Marshal(rec)
+		cacheStore.Set(delegationRecKey(tx.Sender, targetVal), rBz)
 
 	case TxTypeUndelegate:
 		amt, _ := math.NewIntFromString(tx.Amount)
@@ -283,9 +385,223 @@ func (app *SovraApp) DeliverTx(tx SignedTransaction) error {
 		if curDel.LT(amt) {
 			return fmt.Errorf("insufficient delegated balance to undelegate")
 		}
-		app.SetDelegation(cacheStore, tx.Sender, targetVal, curDel.Sub(amt))
-		if err := app.bankKeeper.SendCoinsFromModuleToAccount(cacheStore, "bonded_tokens_pool", tx.Sender, amt); err != nil {
-			return fmt.Errorf("undelegation refund failed: %w", err)
+		if existingBz := cacheStore.Get(delegationRecKey(tx.Sender, targetVal)); len(existingBz) > 0 {
+			var existing DelegationRecord
+			if json.Unmarshal(existingBz, &existing) == nil && existing.UnlockAt > now {
+				return fmt.Errorf("delegation locked until %d (current time %d)", existing.UnlockAt, now)
+			}
+		}
+		remainingDel := curDel.Sub(amt)
+		app.SetDelegation(cacheStore, tx.Sender, targetVal, remainingDel)
+		if existingBz := cacheStore.Get(delegationRecKey(tx.Sender, targetVal)); len(existingBz) > 0 {
+			var existing DelegationRecord
+			if json.Unmarshal(existingBz, &existing) == nil {
+				if remainingDel.IsZero() {
+					cacheStore.Delete(delegationRecKey(tx.Sender, targetVal))
+				} else {
+					existing.Amount = remainingDel.String()
+					rBz, _ := json.Marshal(existing)
+					cacheStore.Set(delegationRecKey(tx.Sender, targetVal), rBz)
+				}
+			}
+		}
+
+		// Move bonded funds to UnbondingTokensPool with 14-21 day cooldown queue
+		if err := app.bankKeeper.SendCoinsFromModuleToModule(cacheStore, issuancetypes.BondedTokensPoolName, issuancetypes.UnbondingTokensPoolName, amt); err != nil {
+			return fmt.Errorf("unbonding pool escrow failed: %w", err)
+		}
+		params := app.getEconomicParams(cacheStore)
+		app.enqueueUnbonding(cacheStore, tx.Sender, targetVal, "delegation", amt, now, now+params.UnbondingPeriodSeconds)
+
+	case TxTypeBondSeeder:
+		amt, _ := math.NewIntFromString(tx.Amount)
+		if err := app.bankKeeper.SendCoinsFromAccountToModule(cacheStore, tx.Sender, issuancetypes.SeederCollateralPoolName, amt); err != nil {
+			return fmt.Errorf("seeder collateral transfer failed: %w", err)
+		}
+		rec := SeederBondRecord{
+			Address:           tx.Sender,
+			BondedUsov:        "0",
+			StorageCapacityGb: tx.StorageGb,
+			SlashedUsov:       "0",
+			EarnedRewardsUsov: "0",
+			BondedAt:          now,
+		}
+		if bz := cacheStore.Get(seederBondKey(tx.Sender)); len(bz) > 0 {
+			_ = json.Unmarshal(bz, &rec)
+		}
+		prev, _ := math.NewIntFromString(rec.BondedUsov)
+		rec.BondedUsov = prev.Add(amt).String()
+		if tx.StorageGb > rec.StorageCapacityGb {
+			rec.StorageCapacityGb = tx.StorageGb
+		}
+		if rec.StorageCapacityGb == 0 {
+			rec.StorageCapacityGb = 10
+		}
+		rBz, _ := json.Marshal(rec)
+		cacheStore.Set(seederBondKey(tx.Sender), rBz)
+		app.addPoolTotal(cacheStore, "seeder_collateral", amt)
+
+	case TxTypeUnbondSeeder:
+		amt, _ := math.NewIntFromString(tx.Amount)
+		bz := cacheStore.Get(seederBondKey(tx.Sender))
+		if len(bz) == 0 {
+			return fmt.Errorf("no active seeder collateral bond found")
+		}
+		var rec SeederBondRecord
+		if err := json.Unmarshal(bz, &rec); err != nil {
+			return err
+		}
+		bonded, _ := math.NewIntFromString(rec.BondedUsov)
+		if bonded.LT(amt) {
+			return fmt.Errorf("insufficient bonded seeder collateral: have %s, want %s", bonded, amt)
+		}
+		rec.BondedUsov = bonded.Sub(amt).String()
+		rBz, _ := json.Marshal(rec)
+		cacheStore.Set(seederBondKey(tx.Sender), rBz)
+		if err := app.bankKeeper.SendCoinsFromModuleToModule(cacheStore, issuancetypes.SeederCollateralPoolName, issuancetypes.UnbondingTokensPoolName, amt); err != nil {
+			return err
+		}
+		app.subPoolTotal(cacheStore, "seeder_collateral", amt)
+		params := app.getEconomicParams(cacheStore)
+		app.enqueueUnbonding(cacheStore, tx.Sender, tx.Sender, "seeder", amt, now, now+params.UnbondingPeriodSeconds)
+
+	case TxTypePatronStake:
+		amt, _ := math.NewIntFromString(tx.Amount)
+		creator := tx.Creator
+		if creator == "" {
+			creator = tx.Recipient
+		}
+		_, lockSecs, multBps, err := ResolveLockTier(tx.LockDays)
+		if err != nil {
+			return err
+		}
+		if err := app.bankKeeper.SendCoinsFromAccountToModule(cacheStore, tx.Sender, issuancetypes.PatronStakingPoolName, amt); err != nil {
+			return fmt.Errorf("patron stake transfer failed: %w", err)
+		}
+		rec := PatronStakeRecord{
+			Fan:           tx.Sender,
+			Creator:       creator,
+			AmountUsov:    "0",
+			LockDays:      tx.LockDays,
+			UnlockAt:      now + lockSecs,
+			MultiplierBps: multBps,
+			StakedAt:      now,
+		}
+		if bz := cacheStore.Get(patronStakeKey(tx.Sender, creator)); len(bz) > 0 {
+			var existing PatronStakeRecord
+			if json.Unmarshal(bz, &existing) == nil {
+				prev, _ := math.NewIntFromString(existing.AmountUsov)
+				rec.AmountUsov = prev.String()
+				if existing.UnlockAt > rec.UnlockAt {
+					rec.UnlockAt = existing.UnlockAt
+				}
+				if existing.MultiplierBps > rec.MultiplierBps {
+					rec.MultiplierBps = existing.MultiplierBps
+				}
+			}
+		}
+		prev, _ := math.NewIntFromString(rec.AmountUsov)
+		rec.AmountUsov = prev.Add(amt).String()
+		rBz, _ := json.Marshal(rec)
+		cacheStore.Set(patronStakeKey(tx.Sender, creator), rBz)
+		app.addPoolTotal(cacheStore, "patron", amt)
+
+	case TxTypePatronUnstake:
+		amt, _ := math.NewIntFromString(tx.Amount)
+		creator := tx.Creator
+		if creator == "" {
+			creator = tx.Recipient
+		}
+		bz := cacheStore.Get(patronStakeKey(tx.Sender, creator))
+		if len(bz) == 0 {
+			return fmt.Errorf("no active patron stake found for fan %s -> creator %s", tx.Sender, creator)
+		}
+		var rec PatronStakeRecord
+		if err := json.Unmarshal(bz, &rec); err != nil {
+			return err
+		}
+		if rec.UnlockAt > now {
+			return fmt.Errorf("patron stake locked until %d (current time %d)", rec.UnlockAt, now)
+		}
+		cur, _ := math.NewIntFromString(rec.AmountUsov)
+		if cur.LT(amt) {
+			return fmt.Errorf("insufficient patron stake: have %s, want %s", cur, amt)
+		}
+		rem := cur.Sub(amt)
+		if rem.IsZero() {
+			cacheStore.Delete(patronStakeKey(tx.Sender, creator))
+		} else {
+			rec.AmountUsov = rem.String()
+			rBz, _ := json.Marshal(rec)
+			cacheStore.Set(patronStakeKey(tx.Sender, creator), rBz)
+		}
+		if err := app.bankKeeper.SendCoinsFromModuleToModule(cacheStore, issuancetypes.PatronStakingPoolName, issuancetypes.UnbondingTokensPoolName, amt); err != nil {
+			return err
+		}
+		app.subPoolTotal(cacheStore, "patron", amt)
+		params := app.getEconomicParams(cacheStore)
+		app.enqueueUnbonding(cacheStore, tx.Sender, creator, "patron", amt, now, now+params.UnbondingPeriodSeconds)
+
+	case TxTypeClaimRewards:
+		_ = app.distributeFeeRewards(cacheStore)
+		claimable := app.getClaimableReward(cacheStore, tx.Sender)
+		if !claimable.IsPositive() {
+			return fmt.Errorf("no claimable staking rewards available for %s", tx.Sender)
+		}
+		if err := app.bankKeeper.SendCoinsFromModuleToAccount(cacheStore, issuancetypes.RewardYieldPoolName, tx.Sender, claimable); err != nil {
+			return fmt.Errorf("reward payout failed: %w", err)
+		}
+		app.setClaimableReward(cacheStore, tx.Sender, math.ZeroInt())
+		app.subPoolTotal(cacheStore, "reward_pool", claimable)
+		lockedReward := claimable.Mul(math.NewInt(issuancetypes.ValidatorRewardVestingShareBps)).Quo(math.NewInt(10000))
+		if lockedReward.IsPositive() {
+			app.addRollingRewardVesting(cacheStore, tx.Sender, lockedReward, now, issuancetypes.ValidatorRewardVestingSeconds, "Validator/Staking Yield Linear Vest (14d)")
+		}
+
+	case TxTypeRegisterHandle:
+		amt, _ := math.NewIntFromString(tx.Amount)
+		cleanHandle := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(tx.Handle), "@"))
+		if existingBz := cacheStore.Get(handleRegistryKey(cleanHandle)); len(existingBz) > 0 {
+			var existing HandleRecord
+			if json.Unmarshal(existingBz, &existing) == nil && existing.Owner != tx.Sender && existing.ExpiresAt > now {
+				return fmt.Errorf("handle @%s is already leased by %s until %d", cleanHandle, existing.Owner, existing.ExpiresAt)
+			}
+		}
+		burnedAmt, _, err := app.burnPercentOfSpend(cacheStore, tx.Sender, issuancetypes.CommunityPoolName, true, amt, issuancetypes.HandleBurnShareBps)
+		if err != nil {
+			return fmt.Errorf("handle registration sink failed: %w", err)
+		}
+		hRec := HandleRecord{
+			Handle:      cleanHandle,
+			Owner:       tx.Sender,
+			ExpiresAt:   now + issuancetypes.HandleRegistrationDurationSec,
+			FeePaidUsov: amt.String(),
+			BurnedUsov:  burnedAmt.String(),
+		}
+		hBz, _ := json.Marshal(hRec)
+		cacheStore.Set(handleRegistryKey(cleanHandle), hBz)
+
+	case TxTypePayStorageRent:
+		amt, _ := math.NewIntFromString(tx.Amount)
+		target := issuancetypes.SeederEscrowPoolName
+		targetIsMod := true
+		if tx.Recipient != "" {
+			// Verify target seeder has active collateral bond before direct payout
+			sbz := cacheStore.Get(seederBondKey(tx.Recipient))
+			if len(sbz) == 0 {
+				return fmt.Errorf("storage rent target %s must be a collateral-bonded seeder", tx.Recipient)
+			}
+			target = tx.Recipient
+			targetIsMod = false
+		}
+		if _, _, err := app.burnPercentOfSpend(cacheStore, tx.Sender, target, targetIsMod, amt, issuancetypes.StorageRentBurnShareBps); err != nil {
+			return fmt.Errorf("storage rent burn split failed: %w", err)
+		}
+
+	case TxTypeBoostBurn:
+		amt, _ := math.NewIntFromString(tx.Amount)
+		if _, _, err := app.burnPercentOfSpend(cacheStore, tx.Sender, issuancetypes.FeeCollectorName, true, amt, issuancetypes.BoostBurnShareBps); err != nil {
+			return fmt.Errorf("boost burn failed: %w", err)
 		}
 
 	default:
@@ -329,6 +645,11 @@ func (app *SovraApp) validateTx(s store.KVStore, tx SignedTransaction, isDeliver
 		}
 		fee = f
 	}
+	params := app.getEconomicParams(s)
+	if fee.LT(math.NewInt(params.MinTxFeeUsov)) {
+		return fmt.Errorf("transaction fee %s uSOV below protocol minimum %d uSOV", fee, params.MinTxFeeUsov)
+	}
+	now := app.getBlockTime(s)
 
 	// 1. Transaction Type specific validation
 	switch tx.Type {
@@ -403,6 +724,9 @@ func (app *SovraApp) validateTx(s store.KVStore, tx SignedTransaction, isDeliver
 		if !ok || !a.IsPositive() {
 			return fmt.Errorf("invalid delegation amount: %s", tx.Amount)
 		}
+		if _, _, _, err := ResolveLockTier(tx.LockDays); err != nil {
+			return err
+		}
 		val := tx.Validator
 		if val == "" {
 			val = tx.Recipient
@@ -428,6 +752,149 @@ func (app *SovraApp) validateTx(s store.KVStore, tx SignedTransaction, isDeliver
 		if curDel.LT(a) {
 			return fmt.Errorf("insufficient delegated balance: have %s, requested %s", curDel, a)
 		}
+		if existingBz := s.Get(delegationRecKey(tx.Sender, val)); len(existingBz) > 0 {
+			var existing DelegationRecord
+			if json.Unmarshal(existingBz, &existing) == nil && existing.UnlockAt > now {
+				return fmt.Errorf("delegation locked until %d (current time %d)", existing.UnlockAt, now)
+			}
+		}
+
+	case TxTypeBondSeeder:
+		a, ok := math.NewIntFromString(tx.Amount)
+		if !ok || !a.IsPositive() {
+			return fmt.Errorf("invalid seeder bond amount: %s", tx.Amount)
+		}
+		existingBonded := math.ZeroInt()
+		if bz := s.Get(seederBondKey(tx.Sender)); len(bz) > 0 {
+			var existing SeederBondRecord
+			if json.Unmarshal(bz, &existing) == nil {
+				existingBonded, _ = math.NewIntFromString(existing.BondedUsov)
+			}
+		}
+		totalAfter := existingBonded.Add(a)
+		required := math.NewInt(issuancetypes.MinSeederBondUsov)
+		if tx.StorageGb > 0 {
+			capReq := math.NewInt(int64(tx.StorageGb)).Mul(math.NewInt(issuancetypes.MinSeederBondPerGbUsov))
+			if capReq.GT(required) {
+				required = capReq
+			}
+		}
+		if totalAfter.LT(required) {
+			return fmt.Errorf("seeder bond %s uSOV below minimum collateral requirement %s uSOV", totalAfter, required)
+		}
+		amt = a
+
+	case TxTypeUnbondSeeder:
+		a, ok := math.NewIntFromString(tx.Amount)
+		if !ok || !a.IsPositive() {
+			return fmt.Errorf("invalid seeder unbond amount: %s", tx.Amount)
+		}
+		bz := s.Get(seederBondKey(tx.Sender))
+		if len(bz) == 0 {
+			return fmt.Errorf("no active seeder bond found")
+		}
+		var rec SeederBondRecord
+		if err := json.Unmarshal(bz, &rec); err != nil {
+			return err
+		}
+		bonded, _ := math.NewIntFromString(rec.BondedUsov)
+		if bonded.LT(a) {
+			return fmt.Errorf("insufficient seeder bond: have %s, want %s", bonded, a)
+		}
+
+	case TxTypePatronStake:
+		a, ok := math.NewIntFromString(tx.Amount)
+		if !ok || !a.IsPositive() {
+			return fmt.Errorf("invalid patron stake amount: %s", tx.Amount)
+		}
+		creator := tx.Creator
+		if creator == "" {
+			creator = tx.Recipient
+		}
+		if creator == "" {
+			return fmt.Errorf("creator address required for patron_stake")
+		}
+		if _, _, _, err := ResolveLockTier(tx.LockDays); err != nil {
+			return err
+		}
+		amt = a
+
+	case TxTypePatronUnstake:
+		a, ok := math.NewIntFromString(tx.Amount)
+		if !ok || !a.IsPositive() {
+			return fmt.Errorf("invalid patron unstake amount: %s", tx.Amount)
+		}
+		creator := tx.Creator
+		if creator == "" {
+			creator = tx.Recipient
+		}
+		if creator == "" {
+			return fmt.Errorf("creator address required for patron_unstake")
+		}
+		bz := s.Get(patronStakeKey(tx.Sender, creator))
+		if len(bz) == 0 {
+			return fmt.Errorf("no active patron stake found")
+		}
+		var rec PatronStakeRecord
+		if err := json.Unmarshal(bz, &rec); err != nil {
+			return err
+		}
+		if rec.UnlockAt > now {
+			return fmt.Errorf("patron stake locked until %d (current time %d)", rec.UnlockAt, now)
+		}
+		cur, _ := math.NewIntFromString(rec.AmountUsov)
+		if cur.LT(a) {
+			return fmt.Errorf("insufficient patron stake: have %s, requested %s", cur, a)
+		}
+
+	case TxTypeClaimRewards:
+		// No extra principal amount required beyond minimum gas fee
+
+	case TxTypeRegisterHandle:
+		a, ok := math.NewIntFromString(tx.Amount)
+		if !ok || a.LT(math.NewInt(issuancetypes.HandleRegistrationMinFeeUsov)) {
+			return fmt.Errorf("handle registration requires >= %d uSOV", issuancetypes.HandleRegistrationMinFeeUsov)
+		}
+		cleanHandle := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(tx.Handle), "@"))
+		if !validHandleRegex.MatchString(cleanHandle) {
+			return fmt.Errorf("invalid handle %q: must match 3-32 lowercase alphanumeric/underscore", tx.Handle)
+		}
+		if existingBz := s.Get(handleRegistryKey(cleanHandle)); len(existingBz) > 0 {
+			var existing HandleRecord
+			if json.Unmarshal(existingBz, &existing) == nil && existing.Owner != tx.Sender && existing.ExpiresAt > now {
+				return fmt.Errorf("handle @%s already registered until %d", cleanHandle, existing.ExpiresAt)
+			}
+		}
+		amt = a
+
+	case TxTypePayStorageRent:
+		a, ok := math.NewIntFromString(tx.Amount)
+		if !ok || !a.IsPositive() {
+			return fmt.Errorf("invalid storage rent amount")
+		}
+		gb := tx.StorageGb
+		if gb == 0 {
+			gb = 1
+		}
+		months := tx.DurationMonths
+		if months == 0 {
+			months = 1
+		}
+		minRent := math.NewInt(int64(gb * months)).Mul(math.NewInt(issuancetypes.StorageRentMinUsovPerGbMonth))
+		if a.LT(minRent) {
+			return fmt.Errorf("storage rent %s uSOV below minimum %s uSOV for %dGB x %dm", a, minRent, gb, months)
+		}
+		if tx.Recipient != "" && len(s.Get(seederBondKey(tx.Recipient))) == 0 {
+			return fmt.Errorf("storage rent recipient %s must be a bonded seeder", tx.Recipient)
+		}
+		amt = a
+
+	case TxTypeBoostBurn:
+		a, ok := math.NewIntFromString(tx.Amount)
+		if !ok || !a.IsPositive() {
+			return fmt.Errorf("invalid boost burn amount")
+		}
+		amt = a
 
 	default:
 		return fmt.Errorf("unsupported transaction type: %s", tx.Type)
@@ -459,11 +926,11 @@ func (app *SovraApp) validateTx(s store.KVStore, tx SignedTransaction, isDeliver
 		return fmt.Errorf("account sequence mismatch: expected %d, got %d", expectedNonce, tx.Nonce)
 	}
 
-	// 4. Verify balance covers amount (or attached funds) + fee
+	// 4. Verify spendable balance (excluding locked cliff/linear vesting tokens) covers amount (or attached funds) + fee
 	totalRequired := amt.Add(fee)
-	senderBal := app.bankKeeper.GetBalance(s, tx.Sender)
-	if senderBal.LT(totalRequired) {
-		return fmt.Errorf("insufficient funds: balance %s < required %s", senderBal, totalRequired)
+	spendableBal := app.getSpendableBalance(s, tx.Sender, now)
+	if spendableBal.LT(totalRequired) {
+		return fmt.Errorf("insufficient spendable funds (after vesting lock): spendable %s < required %s", spendableBal, totalRequired)
 	}
 
 	// Only in DeliverTx do we mutate the nonce
@@ -597,6 +1064,23 @@ func (app *SovraApp) SaveBlock(height int64, data []byte) {
 	app.mu.Lock()
 	defer app.mu.Unlock()
 	app.store.Set(BlockKey(height), data)
+}
+
+// HealIncompleteBlock detects if KeyPrefixHeight advanced ahead of persisted BlockKey(height)
+// (e.g. ungraceful termination between Commit and SaveBlock) and rolls height back by 1.
+func (app *SovraApp) HealIncompleteBlock() (int64, bool) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	if app.height > 1 && len(app.store.Get(BlockKey(app.height))) == 0 && len(app.store.Get(BlockKey(app.height-1))) > 0 {
+		app.height = app.height - 1
+		heightBz := make([]byte, 8)
+		binary.BigEndian.PutUint64(heightBz, uint64(app.height))
+		app.store.Set(KeyPrefixHeight, heightBz)
+		app.appHash = app.computeStateRoot()
+		app.store.Set(KeyPrefixAppHash, app.appHash)
+		return app.height, true
+	}
+	return app.height, false
 }
 
 // GetBlock retrieves serialized block data for a given height

@@ -17,4 +17,9 @@ export * from './transition.js';
 export * from './vector-clock.js';
 export * from './crdt-projection.js';
 export * from './distributed-state.js';
+export * from './sovra-evt.js';
+export * from './node-db.js';
+export * from './sovra-sync.js';
+export * from './sovra-apps.js';
+export * from './sovra-commerce.js';
 

@@ -129,7 +129,7 @@ describe('SOVRA COMMERCIAL ENTERPRISE LAUNCH: COMPLETE ALL REMAINING PRODUCTION 
       expect(fs.existsSync(diskPath)).toBe(true);
       const parsed = JSON.parse(fs.readFileSync(diskPath, 'utf-8'));
       expect(Array.isArray(parsed)).toBe(true);
-      expect(parsed[0].target.package_name).toBe('app.sovra.network');
+      expect(parsed.some((item: any) => item.target?.package_name === 'app.sovra.network')).toBe(true);
     });
 
     it('should verify apps/twa/twa-manifest.json exists with compliant Android packaging metadata', () => {

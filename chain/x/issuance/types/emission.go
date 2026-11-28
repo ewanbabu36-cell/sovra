@@ -4,65 +4,52 @@ import (
 	"cosmossdk.io/math"
 )
 
-// CanonicalAnnualSeederSchedule returns the pre-calculated 25-year Seeder budget in uSOV.
-// It is derived strictly from the recurrence:
-// S[1] = 726653680570
-// S[y] = (S[y-1]*189 + 100) // 200 for y in [2..24]
-// S[25] = 10_000_000_000_000 - sum(S[1..24]) = 186935111695
-var CanonicalAnnualSeederSchedule = [25]int64{
-	726653680570, // Y01
-	686687728139, // Y02
-	648919903091, // Y03
-	613229308421, // Y04
-	579501696458, // Y05
-	547629103153, // Y06
-	517509502480, // Y07
-	489046479844, // Y08
-	462148923453, // Y09
-	436730732663, // Y10
-	412710542367, // Y11
-	390011462537, // Y12
-	368560832097, // Y13
-	348289986332, // Y14
-	329134037084, // Y15
-	311031665044, // Y16
-	293924923467, // Y17
-	277759052676, // Y18
-	262482304779, // Y19
-	248045778016, // Y20
-	234403260225, // Y21
-	221511080913, // Y22
-	209327971463, // Y23
-	197814933033, // Y24
-	186935111695, // Y25 (Exact Residual)
-}
-
-// GenerateCanonicalSeederSchedule dynamically computes the canonical recurrence.
-// It matches CanonicalAnnualSeederSchedule identically down to 1 uSOV.
-func GenerateCanonicalSeederSchedule() [25]int64 {
-	var sched [25]int64
-	sched[0] = 726653680570
-
-	var sumPrior int64 = sched[0]
-	for y := 1; y < 24; y++ {
-		// Pure integer recurrence with nearest half-up rounding:
-		sched[y] = (sched[y-1]*189 + 100) / 200
-		sumPrior += sched[y]
+// HalvingEraForEpoch returns the 0-indexed 4-year halving era for a 1-indexed daily epoch.
+// Returns MaxHalvingEras when epoch is out of active policy bounds.
+func HalvingEraForEpoch(epoch uint64) int {
+	if epoch < 1 || epoch > TotalPolicyEpochs {
+		return MaxHalvingEras
 	}
-	// Year 25 residual to hit exactly 10,000,000,000,000 uSOV (10M SOV)
-	sched[24] = 10_000_000_000_000 - sumPrior
-	return sched
+	return int((epoch - 1) / uint64(HalvingIntervalEpochs))
 }
 
-// GetAnnualPoolAllocations returns (E_y, V_y, C_y, S_y) for year y in [1..25].
-func GetAnnualPoolAllocations(year int) (totalE, valV, commC, seedS math.Int) {
-	if year < 1 || year > 25 {
+// ComputeHalvingBaseDaily returns the daily Community base subsidy (1x unit) in uSOV for era k >= 0.
+// Mirrors Bitcoin Core's integer bit-shift halving (base >> k), halving every 1,460 daily epochs (4 years)
+// down to 1 uSOV in Era 31 and reaching 0 uSOV in Era 32 (Year 129+).
+func ComputeHalvingBaseDaily(era int) int64 {
+	if era < 0 || era >= MaxHalvingEras {
+		return 0
+	}
+	return Era0CommunityBaseDaily >> uint(era)
+}
+
+// GetHalvingEraAllocations returns cumulative 4-year (totalE, valV, commC, seedS) budgets for era in [0..31].
+func GetHalvingEraAllocations(era int) (totalE, valV, commC, seedS math.Int) {
+	cDay := ComputeHalvingBaseDaily(era)
+	if cDay <= 0 {
 		return math.ZeroInt(), math.ZeroInt(), math.ZeroInt(), math.ZeroInt()
 	}
-	s := math.NewInt(CanonicalAnnualSeederSchedule[year-1])
-	v := s.MulRaw(2)
-	c := s.MulRaw(4)
-	e := s.MulRaw(7) // e = v + c + s
+	c := math.NewInt(cDay).MulRaw(int64(HalvingIntervalEpochs))
+	v := c.MulRaw(2)
+	s := c.MulRaw(4)
+	e := c.MulRaw(7)
+	return e, v, c, s
+}
+
+// GetAnnualPoolAllocations returns (E_y, V_y, C_y, S_y) for year y in [1..128] (32 four-year halving eras).
+func GetAnnualPoolAllocations(year int) (totalE, valV, commC, seedS math.Int) {
+	if year < 1 || year > MaxHalvingEras*4 {
+		return math.ZeroInt(), math.ZeroInt(), math.ZeroInt(), math.ZeroInt()
+	}
+	era := (year - 1) / 4
+	cDay := ComputeHalvingBaseDaily(era)
+	if cDay <= 0 {
+		return math.ZeroInt(), math.ZeroInt(), math.ZeroInt(), math.ZeroInt()
+	}
+	c := math.NewInt(cDay).MulRaw(365)
+	v := c.MulRaw(2)
+	s := c.MulRaw(4)
+	e := c.MulRaw(7) // e = v + c + s (ratio 2:1:4)
 	return e, v, c, s
 }
 
@@ -84,31 +71,19 @@ func ResolveEpoch(blockTimeUnix int64, genesisTimeUnix int64) (uint64, ProtocolP
 	return epoch, PhaseActive
 }
 
-// ComputeEpochAllowance calculates the daily allocation for epoch e in [1..9125].
-// It guarantees that the 2:4:1 ratio (V:C:S) holds exactly on EVERY single daily epoch.
+// ComputeEpochAllowance calculates the daily allocation (valV, commC, seedS) for epoch e in [1..46720].
+// Uses Bitcoin-inspired 4-year bit-shift halving (50% cut every 1,460 epochs) and preserves the exact
+// 2:1:4 (Validator : Community : Seeder) integer ratio on every active daily epoch.
 func ComputeEpochAllowance(epoch uint64) (valV, commC, seedS math.Int) {
-	if epoch < 1 || epoch > TotalPolicyEpochs {
+	era := HalvingEraForEpoch(epoch)
+	cBase := ComputeHalvingBaseDaily(era)
+	if cBase <= 0 {
 		return math.ZeroInt(), math.ZeroInt(), math.ZeroInt()
 	}
 
-	// 1-indexed year in [1..25] and day in [1..365]
-	yearIdx := int((epoch-1)/365) + 1
-	dayIdx := int((epoch-1)%365) + 1
-
-	annualS := math.NewInt(CanonicalAnnualSeederSchedule[yearIdx-1])
-	sBase := annualS.QuoRaw(365)
-
-	var sDay math.Int
-	if dayIdx < 365 {
-		sDay = sBase
-	} else {
-		// Day 365 reconciliation: absorbs remaining Seeder dust for that year
-		sDay = annualS.Sub(sBase.MulRaw(364))
-	}
-
-	// Strict integer multiples guarantee exact 2:4:1 ratio on every single epoch
-	vDay := sDay.MulRaw(2)
-	cDay := sDay.MulRaw(4)
+	cDay := math.NewInt(cBase)
+	vDay := cDay.MulRaw(2)
+	sDay := cDay.MulRaw(4)
 
 	return vDay, cDay, sDay
 }

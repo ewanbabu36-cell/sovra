@@ -63,7 +63,7 @@ export function ReferralModal({
   if (!isOpen) return null;
 
   const referralCode = statsData?.referralCode || 'SOV-GENESIS';
-  const referralLink = statsData?.referralLink || `https://sovra.app/join?ref=${referralCode}`;
+  const referralLink = statsData?.referralLink || `sovra://join?ref=${referralCode}`;
   const shareMessage = statsData?.shareMessage ||
     `🚀 Join me on Sovra - the private WhatsApp & YouTube alternative where you own your identity! Use my referral code *${referralCode}* to get 25 FREE SOV coins in your sovereign wallet: ${referralLink}`;
 

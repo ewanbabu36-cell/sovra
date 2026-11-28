@@ -15,3 +15,5 @@ export * from './key-rotation-revocation.js';
 export * from './succession.js';
 export * from './document-registry.js';
 export * from './transparency-dashboard.js';
+export * from './community-governance.js';
+export * as extConsensus from './ext-consensus.js';

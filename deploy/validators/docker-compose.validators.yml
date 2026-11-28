@@ -1,0 +1,119 @@
+# ==============================================================================
+# SOVRA CHAIN MULTI-VALIDATOR CONSENSUS CLUSTER (COMETBFT BFT + PROMETHEUS)
+# Supports per-validator isolated volumes, KMS signer addresses, and healthchecks.
+# ==============================================================================
+
+volumes:
+  sovra-val0-home:
+  sovra-val1-home:
+  sovra-val2-home:
+  sovra-val3-home:
+
+services:
+  validator-0:
+    image: golang:1.23-alpine
+    container_name: sovra-val-0
+    restart: unless-stopped
+    working_dir: /app/chain
+    volumes:
+      - ../../chain:/app/chain:ro
+      - sovra-val0-home:/var/lib/sovra-val0
+    environment:
+      - SOVRA_OPERATOR_ID=${VAL0_OPERATOR_ID:-org-alpha-us-east}
+      - SOVRA_KMS_SIGNER_ADDR=${VAL0_KMS_SIGNER_ADDR:-}
+    command: ["sh", "-c", "mkdir -p /var/lib/sovra-val0 && cp -rn /app/chain/mytestnet/node0/. /var/lib/sovra-val0/ 2>/dev/null || true; go run ./cmd/sovrad start --home /var/lib/sovra-val0"]
+    ports:
+      - "26656:26656"
+      - "26657:26657"
+      - "26660:26660"
+    networks:
+      sovra-l1-mesh:
+        aliases:
+          - validator-0
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:26657/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  validator-1:
+    image: golang:1.23-alpine
+    container_name: sovra-val-1
+    restart: unless-stopped
+    working_dir: /app/chain
+    volumes:
+      - ../../chain:/app/chain:ro
+      - sovra-val1-home:/var/lib/sovra-val1
+    environment:
+      - SOVRA_OPERATOR_ID=${VAL1_OPERATOR_ID:-org-beta-eu-central}
+      - SOVRA_KMS_SIGNER_ADDR=${VAL1_KMS_SIGNER_ADDR:-}
+    command: ["sh", "-c", "mkdir -p /var/lib/sovra-val1 && cp -rn /app/chain/mytestnet/node1/. /var/lib/sovra-val1/ 2>/dev/null || true; go run ./cmd/sovrad start --home /var/lib/sovra-val1"]
+    ports:
+      - "26666:26666"
+      - "26667:26667"
+      - "26670:26660"
+    networks:
+      sovra-l1-mesh:
+        aliases:
+          - validator-1
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:26667/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  validator-2:
+    image: golang:1.23-alpine
+    container_name: sovra-val-2
+    restart: unless-stopped
+    working_dir: /app/chain
+    volumes:
+      - ../../chain:/app/chain:ro
+      - sovra-val2-home:/var/lib/sovra-val2
+    environment:
+      - SOVRA_OPERATOR_ID=${VAL2_OPERATOR_ID:-org-gamma-ap-south}
+      - SOVRA_KMS_SIGNER_ADDR=${VAL2_KMS_SIGNER_ADDR:-}
+    command: ["sh", "-c", "mkdir -p /var/lib/sovra-val2 && cp -rn /app/chain/mytestnet/node2/. /var/lib/sovra-val2/ 2>/dev/null || true; go run ./cmd/sovrad start --home /var/lib/sovra-val2"]
+    ports:
+      - "26676:26676"
+      - "26677:26677"
+      - "26680:26660"
+    networks:
+      sovra-l1-mesh:
+        aliases:
+          - validator-2
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:26677/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  validator-3:
+    image: golang:1.23-alpine
+    container_name: sovra-val-3
+    restart: unless-stopped
+    working_dir: /app/chain
+    volumes:
+      - ../../chain:/app/chain:ro
+      - sovra-val3-home:/var/lib/sovra-val3
+    environment:
+      - SOVRA_OPERATOR_ID=${VAL3_OPERATOR_ID:-org-delta-ap-northeast}
+      - SOVRA_KMS_SIGNER_ADDR=${VAL3_KMS_SIGNER_ADDR:-}
+    command: ["sh", "-c", "mkdir -p /var/lib/sovra-val3 && cp -rn /app/chain/mytestnet/node3/. /var/lib/sovra-val3/ 2>/dev/null || true; go run ./cmd/sovrad start --home /var/lib/sovra-val3"]
+    ports:
+      - "26686:26686"
+      - "26687:26687"
+      - "26690:26660"
+    networks:
+      sovra-l1-mesh:
+        aliases:
+          - validator-3
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:26687/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  sovra-l1-mesh:
+    driver: bridge

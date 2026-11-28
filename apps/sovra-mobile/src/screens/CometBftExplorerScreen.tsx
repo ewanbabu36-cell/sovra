@@ -21,62 +21,54 @@ export interface CometBftExplorerScreenProps {
 }
 
 export function CometBftExplorerScreen({ onClose }: CometBftExplorerScreenProps): React.JSX.Element {
-  const [blockHeight, setBlockHeight] = useState<number>(142857);
-  const [activeValidators, setActiveValidators] = useState<number>(24);
-  const [blockTimeSeconds] = useState<number>(1.2);
-  const [recentBlocks, setRecentBlocks] = useState<BlockSummary[]>([
-    {
-      height: 142857,
-      hash: '0x8f4c9102b489a12c',
-      timeAgo: '1s ago',
-      txCount: 4,
-      proposer: 'node_validator_alpha',
-    },
-    {
-      height: 142856,
-      hash: '0x17b384ef29810ac2',
-      timeAgo: '2s ago',
-      txCount: 12,
-      proposer: 'node_validator_beta',
-    },
-    {
-      height: 142855,
-      hash: '0xaa4291883cde0981',
-      timeAgo: '4s ago',
-      txCount: 8,
-      proposer: 'node_validator_gamma',
-    },
-    {
-      height: 142854,
-      hash: '0x991047192cae5812',
-      timeAgo: '5s ago',
-      txCount: 3,
-      proposer: 'node_validator_alpha',
-    },
-  ]);
+  const [blockHeight, setBlockHeight] = useState<number>(0);
+  const [activeValidators, setActiveValidators] = useState<number>(0);
+  const [blockTimeSeconds, setBlockTimeSeconds] = useState<number>(1.0);
+  const [economy, setEconomy] = useState<any | null>(null);
+  const [recentBlocks, setRecentBlocks] = useState<BlockSummary[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadLiveChainState = async () => {
+    try {
+      const [sumRes, econRes] = await Promise.all([
+        fetch(`${getApiBaseUrl()}/api/explorer/summary`),
+        fetch(`${getApiBaseUrl()}/api/economy/overview`),
+      ]);
+      if (sumRes.ok) {
+        const data = await sumRes.json();
+        if (data?.ok) {
+          setBlockHeight(Number(data.height || 0));
+          setActiveValidators(Number(data.consensus?.onlineValidators ?? data.consensus?.totalValidators ?? 0));
+          if (data.blockTimeSeconds) setBlockTimeSeconds(Number(data.blockTimeSeconds));
+          if (Array.isArray(data.recentBlocks)) {
+            setRecentBlocks(
+              data.recentBlocks.map((b: any) => ({
+                height: Number(b.height || 0),
+                hash: String(b.blockHash || b.hash || '').slice(0, 18),
+                timeAgo: b.timestamp ? `${Math.max(0, Math.round((Date.now() - Number(b.timestamp)) / 1000))}s ago` : 'recent',
+                txCount: Number(b.txCount || 0),
+                proposer: String(b.proposer || 'validator-0'),
+              })),
+            );
+          }
+        }
+      }
+      if (econRes.ok) {
+        const eData = await econRes.json();
+        if (eData?.ok && eData.economy) {
+          setEconomy(eData.economy);
+        }
+      }
+    } catch {}
+  };
 
   useEffect(() => {
     let mounted = true;
-    const fetchStatus = async () => {
-      try {
-        const res = await fetch(`${getApiBaseUrl()}/api/explorer/status`);
-        const data = await res.json();
-        if (!mounted) return;
-        if (data && data.ok) {
-          if (data.latestBlockHeight) setBlockHeight(data.latestBlockHeight);
-          if (data.activeValidatorsCount) setActiveValidators(data.activeValidatorsCount);
-        }
-      } catch {
-        // Fallback simulation
-      }
+    const poll = async () => {
+      if (mounted) await loadLiveChainState();
     };
-
-    fetchStatus();
-    const interval = setInterval(() => {
-      setBlockHeight((h) => h + 1);
-    }, 1200);
-
+    poll();
+    const interval = setInterval(poll, 5000);
     return () => {
       mounted = false;
       clearInterval(interval);
@@ -85,14 +77,8 @@ export function CometBftExplorerScreen({ onClose }: CometBftExplorerScreenProps)
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
-    try {
-      const res = await fetch(`${getApiBaseUrl()}/api/explorer/blocks?limit=5`);
-      const data = await res.json();
-      if (data && data.ok && Array.isArray(data.blocks)) {
-        setRecentBlocks(data.blocks);
-      }
-    } catch {}
-    setTimeout(() => setIsRefreshing(false), 500);
+    await loadLiveChainState();
+    setTimeout(() => setIsRefreshing(false), 300);
   };
 
   return (
@@ -209,6 +195,63 @@ export function CometBftExplorerScreen({ onClose }: CometBftExplorerScreenProps)
               {activeValidators} Active
             </div>
           </div>
+        </div>
+
+        {/* Live Sovereign Supply, Burn, Locked & Circulating Dashboard */}
+        <div
+          style={{
+            backgroundColor: 'rgba(16, 185, 129, 0.06)',
+            border: '1px solid rgba(16, 185, 129, 0.25)',
+            borderRadius: 14,
+            padding: '12px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase' }}>
+              🔥 Live Supply, Burn & Lockup Dashboard
+            </span>
+            <span style={{ fontSize: '0.68rem', color: economy?.isNetDeflationaryToday ? '#f59e0b' : '#94a3b8', fontWeight: 700 }}>
+              {economy?.isNetDeflationaryToday ? 'NET DEFLATIONARY 🔥' : '100M Hard Cap'}
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: '0.72rem' }}>
+            <div>
+              <div style={{ color: '#94a3b8' }}>Total Burned (SOV)</div>
+              <div style={{ fontWeight: 800, color: '#f87171' }}>
+                {economy ? Number(economy.totalBurnedSov || 0).toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—'}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: '#94a3b8' }}>Total Locked (Staked+Vest+DePIN+POL)</div>
+              <div style={{ fontWeight: 800, color: '#a5b4fc' }}>
+                {economy ? Number(economy.totalLockedSov || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: '#94a3b8' }}>Liquid Circulating Supply</div>
+              <div style={{ fontWeight: 800, color: '#38bdf8' }}>
+                {economy ? Number(economy.liquidCirculatingSov || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: '#94a3b8' }}>Fee Burn / Unbond Delay</div>
+              <div style={{ fontWeight: 800, color: '#e2e8f0' }}>
+                {economy ? `${economy.feeBurnPercent}% Burn · ${economy.unbondingPeriodDays}d Cooldown` : '50% Burn · 14d Cooldown'}
+              </div>
+            </div>
+          </div>
+          {economy && (
+            <div style={{ fontSize: '0.66rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+              <span>veSOV: {Number(economy.bondedStakeSov || 0).toFixed(1)} SOV</span>
+              <span>DePIN Bond: {Number(economy.seederCollateralSov || 0).toFixed(1)} SOV</span>
+              <span>Patron: {Number(economy.patronStakedSov || 0).toFixed(1)} SOV</span>
+              <span>Vesting: {Number(economy.vestingLockedSov || 0).toFixed(1)} SOV</span>
+              <span>POL LP: {Number(economy.polLockedSov || 0).toFixed(1)} SOV</span>
+            </div>
+          )}
         </div>
 
         {/* Live Block Stream Table */}

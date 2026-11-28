@@ -120,12 +120,12 @@ func TestFullSovraAppLifecycle(t *testing.T) {
 		t.Fatalf("replay attack succeeded: expected nonce mismatch error")
 	}
 
-	// 5. Authenticated Burn: Alice burns 1,000,000 uSOV (1 SOV)
+	// 5. Authenticated Burn: Alice burns 1,000,000 uSOV (1 SOV) + 1,000 uSOV fee (500 burned + 500 fee from sendTx = 1,001,000 total burned)
 	burnTx := node.SignedTransaction{
 		Type:   node.TxTypeBurn,
 		Amount: "1000000",
 		Nonce:  1, // Nonce incremented
-		Fee:    "0",
+		Fee:    "1000",
 	}
 	signTransaction(alice, &burnTx)
 
@@ -136,9 +136,9 @@ func TestFullSovraAppLifecycle(t *testing.T) {
 		t.Fatalf("DeliverTx burn failed: %v", err)
 	}
 
-	// Assert supply accounting
-	if !app.QueryLifetimeBurned().Equal(math.NewInt(1_000_000)) {
-		t.Fatalf("LifetimeBurned %s != 1,000,000", app.QueryLifetimeBurned())
+	// Assert supply accounting (500 uSOV burned from sendTx fee + 1,000,000 burnTx amount + 500 uSOV from burnTx fee)
+	if !app.QueryLifetimeBurned().Equal(math.NewInt(1_001_000)) {
+		t.Fatalf("LifetimeBurned %s != 1,001,000", app.QueryLifetimeBurned())
 	}
 
 	// Commit block 1
@@ -201,7 +201,7 @@ func TestSovraAppPersistentRestart(t *testing.T) {
 		Recipient: bob.Address,
 		Amount:    "1000000",
 		Nonce:     0,
-		Fee:       "0",
+		Fee:       "1000",
 	}
 	signTransaction(alice, &sendTx)
 	if err := app1.DeliverTx(sendTx); err != nil {
@@ -234,7 +234,7 @@ func TestSovraAppPersistentRestart(t *testing.T) {
 	}
 
 	// Verify account balances persisted
-	expectedAlice := math.NewInt(20_000_000_000_000).SubRaw(1_000_000)
+	expectedAlice := math.NewInt(20_000_000_000_000).SubRaw(1_000_000 + 1_000)
 	expectedBob := math.NewInt(10_000_000_000_000).AddRaw(1_000_000)
 	if !app2.QueryBalance(alice.Address).Equal(expectedAlice) {
 		t.Fatalf("alice balance not restored: expected %s, got %s", expectedAlice, app2.QueryBalance(alice.Address))
@@ -457,6 +457,41 @@ func TestSlashingAndGenesisExport(t *testing.T) {
 	}
 	if app.IsValidatorJailed(bob.Address, now+5+601) {
 		t.Fatalf("Bob should not be jailed after successful unjail")
+	}
+}
+
+func TestHealIncompleteBlock(t *testing.T) {
+	memStore := store.NewMemoryStore()
+	genesisTime := int64(1_700_000_000)
+	app := node.NewSovraApp(memStore, genesisTime)
+
+	alice := generateTestKeyPair(t, "alice")
+	gen := node.GenesisState{
+		ChainID:     "sovra-heal-test",
+		GenesisTime: genesisTime,
+		Accounts:    map[string]string{alice.Address: "30000000000000"},
+	}
+	if err := app.InitChain(gen); err != nil {
+		t.Fatalf("InitChain failed: %v", err)
+	}
+
+	// Block 1 committed with SaveBlock present
+	_ = app.BeginBlock(1, genesisTime+1)
+	_ = app.Commit()
+	app.SaveBlock(1, []byte(`{"height":1}`))
+
+	// Block 2 simulated torn write: Commit advanced height to 2 without SaveBlock(2)
+	_ = app.BeginBlock(2, genesisTime+2)
+	_ = app.Commit()
+
+	if _, healed := app.HealIncompleteBlock(); !healed {
+		t.Fatalf("expected HealIncompleteBlock to detect torn height 2 without block")
+	}
+	if app.GetHeight() != 1 {
+		t.Fatalf("expected height rolled back to 1, got %d", app.GetHeight())
+	}
+	if _, healedAgain := app.HealIncompleteBlock(); healedAgain {
+		t.Fatalf("expected second HealIncompleteBlock call to be no-op")
 	}
 }
 

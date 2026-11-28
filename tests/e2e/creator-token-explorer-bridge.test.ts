@@ -70,6 +70,14 @@ describe('CosmWasm CW20 Creator Tokens & Explorer Bridge Suite', () => {
 
   describe('Creator Studio Token Launchpad Integration', () => {
     it('deploys and instantiates a new CW20 creator token via POST /api/studio/token/launch', async () => {
+      const regRes = await fetch(`${BASE_URL}/api/user/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: `@creator_exp_${Date.now()}`, name: 'Explorer Creator', device: 'Workstation' }),
+      });
+      expect(regRes.status).toBe(200);
+      const regData = await regRes.json();
+
       const payload = {
         name: tokenName,
         symbol: tokenSymbol,
@@ -80,7 +88,10 @@ describe('CosmWasm CW20 Creator Tokens & Explorer Bridge Suite', () => {
 
       const res = await fetch(`${BASE_URL}/api/studio/token/launch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${regData.sessionToken}`,
+        },
         body: JSON.stringify(payload),
       });
 

@@ -106,8 +106,8 @@ describe('Geo-Spatial Geohash & Trustless P2P Escrow Marketplace', () => {
       expect(item.status).toBe('active');
       expect(item.priceSov).toBe(75.0);
 
-      const buyerBefore = sovraDb.findUserByDid(buyerDid)!.balanceSov;
-      const sellerBefore = sovraDb.findUserByDid(sellerDid)!.balanceSov;
+      const buyerBefore = Number(sovraDb.findUserByDid(buyerDid)?.balanceSov ?? 0);
+      const sellerBefore = Number(sovraDb.findUserByDid(sellerDid)?.balanceSov ?? 0);
 
       // 2. Buyer creates escrow
       const { escrow, deliverySecret } = sovraDb.createMarketplaceEscrow(buyerDid, item.id);

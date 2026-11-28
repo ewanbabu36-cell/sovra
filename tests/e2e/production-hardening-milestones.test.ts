@@ -118,6 +118,30 @@ describe('🚀 Sovra Production-Grade Hardening E2E Test Suite', () => {
     });
 
     it('supports keyset cursor pagination on /api/reels/list', async () => {
+      const initialRes = await fetch(`${BASE_URL}/api/reels/list?limit=5`);
+      const initialData = await initialRes.json();
+      if ((initialData.reels?.length || 0) < 5) {
+        const regRes = await fetch(`${BASE_URL}/api/user/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ handle: '@reel_seeder_' + Date.now(), name: 'Reel Seeder' }),
+        });
+        const regData = await regRes.json();
+        const needed = 5 - (initialData.reels?.length || 0);
+        for (let i = 0; i < needed; i++) {
+          await fetch(`${BASE_URL}/api/reels/create`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${regData.sessionToken}`,
+            },
+            body: JSON.stringify({
+              caption: `Cursor Pagination Reel #${i + 1}`,
+              audioTrack: 'Sovereign Pulse',
+            }),
+          });
+        }
+      }
       const res = await fetch(`${BASE_URL}/api/reels/list?limit=5`);
       expect(res.status).toBe(200);
       const data = await res.json();

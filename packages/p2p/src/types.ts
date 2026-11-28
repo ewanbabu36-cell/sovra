@@ -11,7 +11,7 @@ export type PeerConnectionStatus =
   | 'closing'
   | 'failed';
 
-export type ConnectionType = 'direct' | 'relayed' | 'unreachable';
+export type ConnectionType = 'direct' | 'relayed' | 'tor-onion' | 'unreachable';
 
 export type NatStatus = 'direct' | 'cone_nat' | 'symmetric_nat' | 'relayed' | 'unreachable';
 
@@ -125,6 +125,7 @@ export interface DHTRecord {
   readonly authorPeerId: string;
   readonly sequenceNumber: bigint;
   readonly timestamp: number;
+  readonly expiresAt?: number | undefined;
   readonly signature?: string;
 }
 

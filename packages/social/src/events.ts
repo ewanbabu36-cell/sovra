@@ -194,3 +194,51 @@ export function createSignedFriendRequestEvent(
   );
 }
 
+export function createSignedCommentEvent(
+  authorPubkey: string,
+  authorPrivateKey: Uint8Array,
+  targetEventId: string,
+  commentText: string,
+  media?: readonly ContentReference[],
+  createdAt = Math.floor(Date.now() / 1000),
+): SovraEvent {
+  const tags: EventTag[] = [
+    ['e', targetEventId, '', 'reply'],
+    ['type', 'comment'],
+  ];
+  return createSignedSovraEvent(
+    {
+      pubkey: authorPubkey,
+      createdAt,
+      kind: EventKind.ShortPost,
+      tags,
+      content: commentText,
+      media,
+    },
+    authorPrivateKey,
+  );
+}
+
+export function createSignedProfileUpdateEvent(
+  authorPubkey: string,
+  authorPrivateKey: Uint8Array,
+  profile: {
+    displayName?: string;
+    handle?: string;
+    bio?: string;
+    avatarCid?: string;
+  },
+  createdAt = Math.floor(Date.now() / 1000),
+): SovraEvent {
+  return createSignedSovraEvent(
+    {
+      pubkey: authorPubkey,
+      createdAt,
+      kind: EventKind.Metadata,
+      tags: [['type', 'profile_metadata']],
+      content: JSON.stringify(profile),
+    },
+    authorPrivateKey,
+  );
+}
+

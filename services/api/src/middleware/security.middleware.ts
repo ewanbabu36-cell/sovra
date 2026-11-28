@@ -76,7 +76,17 @@ export class SecurityMiddleware {
         return false;
       }
       const normalized = `${parsed.protocol}//${parsed.host}`;
-      return this.config.allowedOrigins.includes(normalized);
+      if (this.config.allowedOrigins.includes(normalized)) {
+        return true;
+      }
+      // In explicit zero-domain P2P node deployments, permit literal IPv4, IPv6, or .onion origins (never wildcards)
+      if (process.env.SOVRA_ZERO_DOMAIN_CORS === 'true') {
+        const host = parsed.hostname.toLowerCase();
+        if (host.endsWith('.onion') || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.startsWith('[')) {
+          return true;
+        }
+      }
+      return false;
     } catch {
       return false;
     }
@@ -166,10 +176,11 @@ export class SecurityMiddleware {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 
     // 5. Content Security Policy
-    res.setHeader(
-      'Content-Security-Policy',
-      "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data: https:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' ws: wss: https:;"
-    );
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cspValue = isProduction
+      ? "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' ws: wss: https:; object-src 'none'; frame-ancestors 'self';"
+      : "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data: https:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' ws: wss: https:;";
+    res.setHeader('Content-Security-Policy', cspValue);
 
     // 6. Permissions Policy
     res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
@@ -192,6 +203,20 @@ export class SecurityMiddleware {
       return result.allowed;
     } catch {
       // In case of storage outage: fail-closed for safety
+      return false;
+    }
+  }
+
+  public async checkRateLimitAsync(req: IncomingMessage): Promise<boolean> {
+    const ip = req.socket?.remoteAddress || '127.0.0.1';
+    try {
+      const result = await this.sharedStore.consumeRateLimitAsync(
+        ip,
+        this.config.rateLimitMaxRequests,
+        this.config.rateLimitWindowMs
+      );
+      return result.allowed;
+    } catch {
       return false;
     }
   }

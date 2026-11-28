@@ -21,11 +21,17 @@
       {
         "appID": "TEAMID1234.app.sovra.network",
         "paths": [
+          "/spaces/*",
+          "/profile/*",
+          "/channel/*",
           "/feed/*",
           "/p/*",
           "/u/*",
           "/call/*",
-          "/chat/*"
+          "/chat/*",
+          "/watch/*",
+          "/post/*",
+          "/join/*"
         ]
       }
     ]

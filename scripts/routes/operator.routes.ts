@@ -14,6 +14,14 @@ import type { AuthenticatedPrincipal } from '../../packages/identity/dist/index.
 import type { PeerIdentityBinding, SovraP2PNode } from '../../packages/p2p/dist/index.js';
 import type { StorageNodeDaemon } from '../../nodes/storage-node/dist/index.js';
 
+let cachedCloudflareUrl = '';
+let lastCloudflareCheckTime = 0;
+const CLOUDFLARE_CACHE_TTL_MS = 10000;
+
+let cachedStorageStatsPayload: string | null = null;
+let lastStorageStatsCheckTime = 0;
+const STORAGE_STATS_CACHE_TTL_MS = 2000;
+
 export interface OperatorRouteContext {
   req: http.IncomingMessage;
   res: http.ServerResponse;
@@ -173,12 +181,21 @@ export async function handleOperatorRoutes(ctx: OperatorRouteContext): Promise<b
       }
     }
     const currentLanIp = getLanIpAddress();
-    let cloudflareUrl = '';
-    try {
-      if (fs.existsSync(path.resolve('scripts', 'cloudflare-url.txt'))) {
-        cloudflareUrl = fs.readFileSync(path.resolve('scripts', 'cloudflare-url.txt'), 'utf8').trim();
+    const now = Date.now();
+    if (now - lastCloudflareCheckTime > CLOUDFLARE_CACHE_TTL_MS) {
+      lastCloudflareCheckTime = now;
+      try {
+        const cfPath = path.resolve('scripts', 'cloudflare-url.txt');
+        if (fs.existsSync(cfPath)) {
+          cachedCloudflareUrl = fs.readFileSync(cfPath, 'utf8').trim();
+        } else {
+          cachedCloudflareUrl = '';
+        }
+      } catch (_) {
+        cachedCloudflareUrl = '';
       }
-    } catch (_) {}
+    }
+    const cloudflareUrl = cachedCloudflareUrl;
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(
@@ -365,14 +382,21 @@ export async function handleOperatorRoutes(ctx: OperatorRouteContext): Promise<b
 
   // 10. GET /api/node/storage-stats
   if (url.pathname === '/api/node/storage-stats' && req.method === 'GET') {
-    const diskBytes = getDirectorySize(STORAGE_DIR);
-    const diskMb = Number((diskBytes / (1024 * 1024)).toFixed(2));
-    const stats = storageDaemon ? storageDaemon.getStats() : { totalBlocks: 0, pinnedCount: 0 };
+    const now = Date.now();
     res.writeHead(200, {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache, no-store, must-revalidate',
     });
-    res.end(JSON.stringify({
+
+    if (cachedStorageStatsPayload && (now - lastStorageStatsCheckTime < STORAGE_STATS_CACHE_TTL_MS)) {
+      res.end(cachedStorageStatsPayload);
+      return true;
+    }
+
+    const diskBytes = getDirectorySize(STORAGE_DIR);
+    const diskMb = Number((diskBytes / (1024 * 1024)).toFixed(2));
+    const stats = storageDaemon ? storageDaemon.getStats() : { totalBlocks: 0, pinnedCount: 0 };
+    cachedStorageStatsPayload = JSON.stringify({
       ok: true,
       diskStorageBytes: diskBytes,
       diskBytes,
@@ -386,7 +410,9 @@ export async function handleOperatorRoutes(ctx: OperatorRouteContext): Promise<b
       uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
       uptimeSec: Math.floor((Date.now() - startTime) / 1000),
       connectedPeersCount: node ? node.getConnectedPeers().length : 0,
-    }));
+    });
+    lastStorageStatsCheckTime = now;
+    res.end(cachedStorageStatsPayload);
     return true;
   }
 

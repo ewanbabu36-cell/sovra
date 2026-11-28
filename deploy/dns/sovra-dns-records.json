@@ -1,0 +1,87 @@
+{
+  "domain": "sovra.network",
+  "generatedAt": "2026-11-25T00:00:00Z",
+  "ttl": 300,
+  "records": [
+    {
+      "type": "A",
+      "name": "@",
+      "value": "<PRIMARY_NODE_PUBLIC_IPV4>",
+      "proxied": false,
+      "purpose": "Root web PWA, HTTPS API & Android TWA/.well-known/assetlinks.json"
+    },
+    {
+      "type": "A",
+      "name": "app",
+      "value": "<PRIMARY_NODE_PUBLIC_IPV4>",
+      "proxied": false,
+      "purpose": "Primary application web portal (app.sovra.network)"
+    },
+    {
+      "type": "A",
+      "name": "seed-us-east",
+      "value": "<US_EAST_VPS_IPV4>",
+      "proxied": false,
+      "purpose": "US-East Bootstrap Seed Node (TCP 4001 Noise_XX P2P + 8080 Health)"
+    },
+    {
+      "type": "A",
+      "name": "seed-eu-central",
+      "value": "<EU_CENTRAL_VPS_IPV4>",
+      "proxied": false,
+      "purpose": "EU-Central Frankfurt Bootstrap Seed Node (TCP 4001/4002 Noise_XX + HTTP Health)"
+    },
+    {
+      "type": "A",
+      "name": "seed-ap-east",
+      "value": "<AP_EAST_VPS_IPV4>",
+      "proxied": false,
+      "purpose": "AP-East Singapore Bootstrap Seed Node (TCP 4001/4003 Noise_XX + HTTP Health)"
+    },
+    {
+      "type": "A",
+      "name": "seed1",
+      "value": "<PRIMARY_SEED_ANYCAST_IPV4>",
+      "proxied": false,
+      "purpose": "Global Anycast/Primary P2P Seed (seed1.sovra.network)"
+    },
+    {
+      "type": "A",
+      "name": "turn-us-east",
+      "value": "<TURN_US_EAST_IPV4>",
+      "proxied": false,
+      "purpose": "Coturn STUN/TURN & TURNS TLS Relay (US-East) - Must NOT use HTTP proxy"
+    },
+    {
+      "type": "A",
+      "name": "turn-eu-central",
+      "value": "<TURN_EU_CENTRAL_IPV4>",
+      "proxied": false,
+      "purpose": "Coturn STUN/TURN & TURNS TLS Relay (Frankfurt) - Must NOT use HTTP proxy"
+    },
+    {
+      "type": "A",
+      "name": "turn-ap-south",
+      "value": "<TURN_AP_SOUTH_IPV4>",
+      "proxied": false,
+      "purpose": "Coturn STUN/TURN & TURNS TLS Relay (AP-South) - Must NOT use HTTP proxy"
+    },
+    {
+      "type": "SRV",
+      "name": "_turns._tcp",
+      "priority": 10,
+      "weight": 10,
+      "port": 5349,
+      "target": "turn-us-east.sovra.network",
+      "purpose": "RFC 5928 TURNS encrypted relay service discovery"
+    },
+    {
+      "type": "CAA",
+      "name": "@",
+      "flags": 0,
+      "tag": "issue",
+      "value": "letsencrypt.org",
+      "purpose": "Authorize Let's Encrypt ACME certificates for Caddy & Coturn"
+    }
+  ]
+}

@@ -698,7 +698,7 @@ export async function handleCallSignalingRoutes(ctx: CallRouteContext): Promise<
           senderName: callerUser?.displayName || callerUser?.handle || 'Peer',
           text: bubbleText,
           status: 'delivered',
-          isE2EE: true,
+          isE2EE: false,
           caption: wasConnected ? 'Call completed' : (isDeclined ? 'Declined call' : 'Missed call'),
         });
       } catch (bubbleErr) {

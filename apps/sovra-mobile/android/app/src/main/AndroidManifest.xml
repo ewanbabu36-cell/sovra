@@ -1,5 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="network.sovra.mobile">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Standard Network Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -34,6 +33,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Hardware Feature Declarations -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
@@ -45,6 +45,7 @@
         android:icon="@drawable/ic_launcher"
         android:roundIcon="@drawable/ic_launcher_round"
         android:allowBackup="false"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
         <activity
@@ -61,12 +62,43 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Custom URI Deep Link Scheme (sovra://feed, sovra://watch, sovra://chats, sovra://peer-pex/v1) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="sovra" />
+            </intent-filter>
         </activity>
+
+        <!-- Zero-Google UnifiedPush Receiver (ntfy / Sunup / NextPush compatible) -->
+        <receiver
+            android:name=".push.SovraUnifiedPushReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.unifiedpush.android.connector.MESSAGE" />
+                <action android:name="org.unifiedpush.android.connector.NEW_ENDPOINT" />
+                <action android:name="org.unifiedpush.android.connector.REGISTRATION_FAILED" />
+                <action android:name="org.unifiedpush.android.connector.UNREGISTERED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Continuous Offline BLE Mesh Foreground Service (Connected Device) -->
         <service
             android:name=".ble.SovraBleForegroundService"
             android:foregroundServiceType="connectedDevice"
             android:exported="false" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

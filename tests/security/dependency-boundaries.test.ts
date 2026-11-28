@@ -103,4 +103,64 @@ describe('Architectural Dependency Boundaries Enforcement', () => {
       expect(fs.existsSync(path.join(dir, 'src/index.ts'))).toBe(true);
     }
   });
+
+  it('IA-01 Sec 1-2: isolates SOVRA-EXT-CONSENSUS (Go L1 chain & wallet) from mandatory core packages, nodes, and client apps', () => {
+    const coreDirs = [
+      'packages/crypto',
+      'packages/identity',
+      'packages/protocol',
+      'packages/social',
+      'packages/storage',
+      'packages/messaging',
+      'packages/p2p',
+      'packages/shared',
+      'packages/moderation',
+      'nodes/full-node',
+      'nodes/storage-node',
+      'nodes/relay-node',
+      'nodes/community-node',
+      'nodes/index-node',
+      'apps/sovra-app',
+      'apps/sovra-mobile',
+    ];
+    const forbiddenRuntimeImports = [
+      /chain-supervisor/,
+      /wallet\.routes/,
+      /['"`][^'"`]*\/chain\/[^'"`]*['"`]/,
+      /(?:https?|wss?|tcp):\/\/[^'"`\s]*:26657\b|['"`][^'"`\s]*:26657\b/,
+    ];
+
+    const collectTsFiles = (dir: string): string[] => {
+      if (!fs.existsSync(dir)) return [];
+      const out: string[] = [];
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) out.push(...collectTsFiles(full));
+        else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) out.push(full);
+      }
+      return out;
+    };
+
+    for (const relDir of coreDirs) {
+      const files = collectTsFiles(path.join(rootDir, relDir, 'src'));
+      for (const f of files) {
+        const src = fs.readFileSync(f, 'utf8');
+        for (const pat of forbiddenRuntimeImports) {
+          expect(src, `${f} must not couple core logic to optional SOVRA-EXT-CONSENSUS (${pat})`).not.toMatch(pat);
+        }
+      }
+    }
+  });
+
+  it('Stage 5 P1 Hardening: eliminates hardcoded client identity/relays and release signing credentials', () => {
+    const appClientSrc = fs.readFileSync(path.join(rootDir, 'apps/sovra-app/src/client.ts'), 'utf8');
+    expect(appClientSrc).not.toContain('did:sovra:user:local');
+    expect(appClientSrc).not.toContain("'/ip4/127.0.0.1/tcp/4001/p2p-circuit'");
+
+    const gradleSrc = fs.readFileSync(path.join(rootDir, 'apps/sovra-mobile/android/app/build.gradle'), 'utf8');
+    expect(gradleSrc).not.toContain('sovraSecure2026!');
+    expect(gradleSrc).toContain('minifyEnabled = true');
+    expect(gradleSrc).toContain('abortOnError = true');
+    expect(gradleSrc).toContain('checkReleaseBuilds = true');
+  });
 });

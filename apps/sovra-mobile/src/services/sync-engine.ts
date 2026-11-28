@@ -11,7 +11,8 @@
 
 import { localDb, type QueuedOperation } from './local-database.js';
 import { mobileMesh } from './mobile-mesh-coordinator.js';
-import { API_BASE_URL, getActiveSessionToken } from './api.js';
+import { getActiveSessionToken } from './api.js';
+import { multiRelayManager } from './multi-relay-manager.js';
 
 export interface SyncEngineStatus {
   isSyncing: boolean;
@@ -27,16 +28,215 @@ export class MobileSyncEngine {
   private statusListeners: Array<(status: SyncEngineStatus) => void> = [];
   private lastSyncTimestamp = 0;
   private lastSyncResult: SyncEngineStatus['lastSyncResult'] = 'IDLE';
+  private wakeupEventSource: any = null;
+  private wakeupUnsubRelay: (() => void) | null = null;
+  private wakeupRelayUrl = '';
+  private lastWakeupEventId = 0;
+  private seenWakeupHints = new Set<string>();
+  private unifiedPushListenersAttached = false;
+  private unifiedPushEndpoint = '';
 
   private constructor() {
     // Start background sync loop
     this.startPeriodicSync();
 
     if (typeof window !== 'undefined') {
+      try {
+        const savedCursor = Number(localStorage.getItem('sovra_sse_last_event_id_v1') || '0');
+        if (Number.isFinite(savedCursor) && savedCursor > 0) this.lastWakeupEventId = savedCursor;
+      } catch {}
       window.addEventListener('online', () => {
         this.triggerSync();
       });
+      this.attachUnifiedPushListeners();
+      this.startZeroCloudWakeup();
     }
+  }
+
+  private getUnifiedPushBridge(): {
+    listDistributors?: () => string;
+    registerDistributor?: (distributorPackage: string, instanceToken: string) => boolean;
+    unregisterDistributor?: (distributorPackage: string, instanceToken: string) => boolean;
+    getLastEndpointJson?: () => string;
+  } | null {
+    if (typeof window === 'undefined') return null;
+    return (window as any).SovraUnifiedPushNative ?? null;
+  }
+
+  public listUnifiedPushDistributors(): string[] {
+    try {
+      const raw = this.getUnifiedPushBridge()?.listDistributors?.();
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string' && x.length > 0) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  public async syncUnifiedPushEndpoint(endpoint: string, token = 'sovra-default', didOverride?: string): Promise<boolean> {
+    if (!endpoint || (!endpoint.startsWith('http://') && !endpoint.startsWith('https://'))) return false;
+    this.unifiedPushEndpoint = endpoint;
+    const targetDid = didOverride || this.getLocalDidFromStorage() || 'did:key:z6MksLocalUser';
+    try {
+      const base = multiRelayManager.getActiveBaseUrl().replace(/\/+$/, '');
+      if (!base) return false;
+      const res = await fetch(`${base}/api/push/register-native`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userDid: targetDid,
+          token,
+          endpointUrl: endpoint,
+          provider: 'unifiedpush',
+          platform: 'android',
+        }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  public registerUnifiedPushDistributor(distributorPackage?: string, didOverride?: string): boolean {
+    const bridge = this.getUnifiedPushBridge();
+    if (!bridge) return false;
+    this.attachUnifiedPushListeners(didOverride);
+    const chosen = distributorPackage || this.listUnifiedPushDistributors()[0];
+    if (!chosen) return false;
+    const initiated = Boolean(bridge.registerDistributor?.(chosen, 'sovra-default'));
+    try {
+      const cached = JSON.parse(bridge.getLastEndpointJson?.() || '{}') as { endpoint?: string; token?: string };
+      if (cached?.endpoint) {
+        this.syncUnifiedPushEndpoint(cached.endpoint, cached.token || 'sovra-default', didOverride).catch(() => {});
+      }
+    } catch {}
+    return initiated;
+  }
+
+  public attachUnifiedPushListeners(didOverride?: string): void {
+    if (typeof window === 'undefined' || this.unifiedPushListenersAttached) return;
+    this.unifiedPushListenersAttached = true;
+    window.addEventListener('sovraUnifiedPushEndpoint', (ev: any) => {
+      const endpoint = String(ev?.detail?.endpoint || '');
+      const token = String(ev?.detail?.token || 'sovra-default');
+      if (endpoint) {
+        this.syncUnifiedPushEndpoint(endpoint, token, didOverride).catch(() => {});
+      }
+    });
+    window.addEventListener('sovraUnifiedPushMessage', () => {
+      this.triggerSync().catch(() => {});
+    });
+  }
+
+  public getPushDeliveryTelemetry(): {
+    foregroundChannel: 'sse' | 'inactive';
+    foregroundRelayUrl: string;
+    lastWakeupEventId: number;
+    backgroundAndroidChannel: 'unifiedpush' | 'none';
+    unifiedPushBridgeAvailable: boolean;
+    installedUnifiedPushDistributors: string[];
+    unifiedPushEndpoint: string;
+    backgroundIosChannel: 'unsupported';
+  } {
+    const distributors = this.listUnifiedPushDistributors();
+    return {
+      foregroundChannel: this.wakeupEventSource ? 'sse' : 'inactive',
+      foregroundRelayUrl: this.wakeupRelayUrl,
+      lastWakeupEventId: this.lastWakeupEventId,
+      backgroundAndroidChannel: this.unifiedPushEndpoint ? 'unifiedpush' : 'none',
+      unifiedPushBridgeAvailable: Boolean(this.getUnifiedPushBridge()),
+      installedUnifiedPushDistributors: distributors,
+      unifiedPushEndpoint: this.unifiedPushEndpoint,
+      backgroundIosChannel: 'unsupported',
+    };
+  }
+
+  public startZeroCloudWakeup(didOverride?: string): boolean {
+    this.attachUnifiedPushListeners(didOverride);
+    try {
+      const bridge = this.getUnifiedPushBridge();
+      const cached = bridge?.getLastEndpointJson ? JSON.parse(bridge.getLastEndpointJson()) : null;
+      if (cached?.endpoint) {
+        this.unifiedPushEndpoint = String(cached.endpoint);
+      }
+    } catch {}
+    if (typeof EventSource === 'undefined') return false;
+    const isTestEnv = typeof process !== 'undefined' && Boolean((process as any).env?.VITEST);
+    if (isTestEnv && !didOverride) return false;
+
+    const targetDid = didOverride || this.getLocalDidFromStorage() || 'did:key:z6MksLocalUser';
+    const connectToRelay = (baseUrl: string) => {
+      const cleanBase = baseUrl.replace(/\/+$/, '');
+      if (this.wakeupEventSource && this.wakeupRelayUrl === cleanBase) return;
+      this.stopWakeupSocketOnly();
+      try {
+        const es = new EventSource(
+          `${cleanBase}/api/push/stream?did=${encodeURIComponent(targetDid)}&lastEventId=${this.lastWakeupEventId}`,
+        );
+        this.wakeupEventSource = es;
+        this.wakeupRelayUrl = cleanBase;
+        es.addEventListener('wakeup', (ev: any) => {
+          try {
+            const parsed = JSON.parse(ev.data || '{}');
+            if (typeof parsed.id === 'number' && parsed.id > this.lastWakeupEventId) {
+              this.lastWakeupEventId = parsed.id;
+              try {
+                if (typeof localStorage !== 'undefined') {
+                  localStorage.setItem('sovra_sse_last_event_id_v1', String(this.lastWakeupEventId));
+                }
+              } catch {}
+            }
+            const hint = String(parsed.opaqueWakeupHint || ev.lastEventId || '');
+            if (hint && this.seenWakeupHints.has(hint)) return;
+            if (hint) {
+              this.seenWakeupHints.add(hint);
+              if (this.seenWakeupHints.size > 512) this.seenWakeupHints.clear();
+            }
+            this.triggerSync().catch(() => {});
+          } catch {}
+        });
+      } catch {}
+    };
+
+    connectToRelay(multiRelayManager.getActiveBaseUrl());
+    if (!this.wakeupUnsubRelay) {
+      this.wakeupUnsubRelay = multiRelayManager.subscribe((_relays, active) => {
+        if (active?.url && active.url !== this.wakeupRelayUrl) {
+          connectToRelay(active.url);
+        }
+      });
+    }
+    return Boolean(this.wakeupEventSource);
+  }
+
+  private stopWakeupSocketOnly(): void {
+    if (this.wakeupEventSource) {
+      try { this.wakeupEventSource.close(); } catch {}
+      this.wakeupEventSource = null;
+      this.wakeupRelayUrl = '';
+    }
+  }
+
+  public stopZeroCloudWakeup(): void {
+    this.stopWakeupSocketOnly();
+    if (this.wakeupUnsubRelay) {
+      this.wakeupUnsubRelay();
+      this.wakeupUnsubRelay = null;
+    }
+  }
+
+  private getLocalDidFromStorage(): string {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('sovra_secure_key_vault_v1');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.did) return String(parsed.did);
+        }
+      }
+    } catch {}
+    return '';
   }
 
   public static getInstance(): MobileSyncEngine {
@@ -94,39 +294,45 @@ export class MobileSyncEngine {
         }
       }
 
-      // Step 2: For any remaining un-reconciled operations, process individually
-      for (const op of remainingOps) {
-        await localDb.markOperationAttempting(op.operationId);
+      // Step 2: Process remaining un-reconciled ops in bounded concurrent batches (CONCURRENCY = 4)
+      const SYNC_CONCURRENCY = 4;
+      for (let i = 0; i < remainingOps.length; i += SYNC_CONCURRENCY) {
+        const batch = remainingOps.slice(i, i + SYNC_CONCURRENCY);
+        await Promise.allSettled(
+          batch.map(async (op) => {
+            await localDb.markOperationAttempting(op.operationId);
 
-        let success = false;
-        let errorMsg = '';
+            let success = false;
+            let errorMsg = '';
 
-        // Priority 1: Try Internet HTTP API if online
-        if (isOnline) {
-          try {
-            success = await this.executeOpOverHttp(op);
-          } catch (httpErr: any) {
-            errorMsg = httpErr?.message || 'HTTP sync error';
-          }
-        }
+            // Priority 1: Concurrent multi-relay HTTP failover race (1.5s hedged timeout)
+            if (isOnline) {
+              try {
+                success = await this.executeOpOverHttp(op);
+              } catch (httpErr: any) {
+                errorMsg = httpErr?.message || 'HTTP sync error';
+              }
+            }
 
-        // Priority 2: If Internet failed or offline, try BLE Mesh
-        if (!success && hasBlePeers) {
-          try {
-            success = await this.executeOpOverMesh(op);
-          } catch (meshErr: any) {
-            errorMsg = meshErr?.message || 'Mesh routing error';
-          }
-        }
+            // Priority 2: Immediate BLE / Wi-Fi Direct Mesh fallback
+            if (!success && hasBlePeers) {
+              try {
+                success = await this.executeOpOverMesh(op);
+              } catch (meshErr: any) {
+                errorMsg = meshErr?.message || 'Mesh routing error';
+              }
+            }
 
-        if (success) {
-          await localDb.markOperationSuccess(op.operationId);
-        } else {
-          await localDb.markOperationRetryable(
-            op.operationId,
-            errorMsg || 'No available transport (Internet or Mesh peers)',
-          );
-        }
+            if (success) {
+              await localDb.markOperationSuccess(op.operationId);
+            } else {
+              await localDb.markOperationRetryable(
+                op.operationId,
+                errorMsg || 'No available transport (Internet or Mesh peers)',
+              );
+            }
+          }),
+        );
       }
 
       this.lastSyncTimestamp = Date.now();
@@ -152,7 +358,7 @@ export class MobileSyncEngine {
     };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(`${API_BASE_URL}/api/sync/reconcile`, {
+    const res = await multiRelayManager.fetchWithFallback('/api/sync/reconcile', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -225,6 +431,18 @@ export class MobileSyncEngine {
     };
   }
 
+  private async postOpWithFailover(
+    path: string,
+    payload: unknown,
+    headers: Record<string, string>,
+  ): Promise<Response> {
+    return multiRelayManager.fetchWithFallback(path, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+  }
+
   private async executeOpOverHttp(op: QueuedOperation): Promise<boolean> {
     const token =
       getActiveSessionToken() ||
@@ -237,11 +455,7 @@ export class MobileSyncEngine {
 
     switch (op.type) {
       case 'CREATE_POST': {
-        const res = await fetch(`${API_BASE_URL}/api/feed/create`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(op.payload),
-        });
+        const res = await this.postOpWithFailover('/api/feed/create', op.payload, headers);
         if (res.ok) {
           const data = await res.json();
           if (data.ok && data.post) {
@@ -256,11 +470,7 @@ export class MobileSyncEngine {
       }
 
       case 'SEND_CHAT': {
-        const res = await fetch(`${API_BASE_URL}/api/chat/messages`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(op.payload),
-        });
+        const res = await this.postOpWithFailover('/api/chat/messages', op.payload, headers);
         if (res.ok) {
           const data = await res.json();
           if (data.ok && data.message) {
@@ -272,29 +482,17 @@ export class MobileSyncEngine {
       }
 
       case 'LIKE_POST': {
-        const res = await fetch(`${API_BASE_URL}/api/feed/like`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(op.payload),
-        });
+        const res = await this.postOpWithFailover('/api/feed/like', op.payload, headers);
         return res.ok;
       }
 
       case 'ADD_COMMENT': {
-        const res = await fetch(`${API_BASE_URL}/api/feed/comment`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(op.payload),
-        });
+        const res = await this.postOpWithFailover('/api/feed/comment', op.payload, headers);
         return res.ok;
       }
 
       case 'UPDATE_PROFILE': {
-        const res = await fetch(`${API_BASE_URL}/api/profile/update`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(op.payload),
-        });
+        const res = await this.postOpWithFailover('/api/profile/update', op.payload, headers);
         return res.ok;
       }
 
@@ -321,6 +519,29 @@ export class MobileSyncEngine {
           op.payload.text,
           op.payload.senderName || 'Local User',
         );
+        return res.success;
+      }
+
+      case 'LIKE_POST': {
+        const res = await mobileMesh.broadcastReaction(
+          op.payload.postId || op.payload.targetEventId,
+          op.payload.emoji || '❤️',
+          Boolean(op.payload.isRetraction),
+        );
+        return res.success;
+      }
+
+      case 'ADD_COMMENT': {
+        const res = await mobileMesh.broadcastComment(
+          op.payload.postId,
+          op.payload.text || op.payload.comment || '',
+          op.payload.authorName || 'Local User',
+        );
+        return res.success;
+      }
+
+      case 'UPDATE_PROFILE': {
+        const res = await mobileMesh.broadcastProfileUpdate(op.payload || {});
         return res.success;
       }
 

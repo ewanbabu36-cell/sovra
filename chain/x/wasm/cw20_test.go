@@ -253,15 +253,16 @@ func TestCW20CreatorTokenLifecycle(t *testing.T) {
 		t.Fatalf("Bob balance altered on failed tx: %s", bobBal["balance"])
 	}
 
-	// 6. Strict Verification: L1 native bank total supply invariants remain strictly preserved
+	// 6. Strict Verification: L1 native bank total supply invariants remain strictly preserved (accounting for EIP-1559 50% fee burn)
 	finalNativeSupply := app.QueryTotalSupply()
-	if !finalNativeSupply.Equal(initialNativeSupply) {
-		t.Fatalf("L1 Total native supply changed! Initial: %s, Final: %s", initialNativeSupply, finalNativeSupply)
+	minted := app.QueryLifetimeMinted()
+	burned := app.QueryLifetimeBurned()
+	expectedFinal := initialNativeSupply.Sub(burned)
+	if !finalNativeSupply.Equal(expectedFinal) {
+		t.Fatalf("L1 Total native supply changed unexpectedly! Initial - Burned: %s, Final: %s (burned=%s)", expectedFinal, finalNativeSupply, burned)
 	}
 
 	// Verify master supply invariant holds
-	minted := app.QueryLifetimeMinted()
-	burned := app.QueryLifetimeBurned()
 	if !finalNativeSupply.Equal(minted.Sub(burned)) {
 		t.Fatalf("Master supply invariant violated: supply %s != minted %s - burned %s", finalNativeSupply, minted, burned)
 	}

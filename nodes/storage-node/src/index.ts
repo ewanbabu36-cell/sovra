@@ -25,7 +25,7 @@ import {
 } from './types.js';
 import { ContinuousPinningManager } from './pinning.js';
 import { StorageQuotaManager } from './quota.js';
-import { ReplicaVerificationEngine, ProofOfRetrievabilityEngine, PoRProof } from './verifier.js';
+import { ReplicaVerificationEngine, ProofOfRetrievabilityEngine, PoRProof, PoRChallenge, SignedPoRProof } from './verifier.js';
 import { ContentComplianceManager, JurisdictionRulebookPolicy } from './compliance.js';
 
 export * from './types.js';
@@ -36,6 +36,7 @@ export * from './db.js';
 export * from './compliance.js';
 
 export const BITSWAP_PROTOCOL_ID = '/sovra/bitswap/1.2.0';
+export const POR_PROTOCOL_ID = '/sovra/storage/por/1.0.0';
 
 export class StorageNodeDaemon {
   public blockstore!: TieredBlockstore;
@@ -49,10 +50,16 @@ export class StorageNodeDaemon {
 
   private readonly activeStreams = new Map<string, MuxedStream>();
   private readonly streamCodecs = new Map<string, LengthPrefixedFrameCodec>();
+  private readonly consumedPorChallengeIds = new Set<string>();
+  private readonly seenInboundPorChallengeIds = new Set<string>();
   private sweeperTimer: NodeJS.Timeout | null = null;
   private _isRunning = false;
 
-  constructor(private readonly config: StorageNodeConfig) {}
+  constructor(private readonly config: StorageNodeConfig) {
+    if (!config || typeof config !== 'object' || typeof config.storagePath !== 'string' || config.storagePath.trim().length === 0) {
+      throw new StorageError('StorageNodeDaemon requires StorageNodeConfig with a non-empty storagePath', 'ERR_INVALID_CONFIG');
+    }
+  }
 
   public getConfig(): StorageNodeConfig {
     return this.config;
@@ -132,6 +139,39 @@ export class StorageNodeDaemon {
           // Register protocol handler for incoming BitSwap streams
           p2p.registerProtocolHandler(BITSWAP_PROTOCOL_ID, (peerId: string, stream: MuxedStream) => {
             this.setupStreamHandler(peerId, stream);
+          });
+
+          // Register remote Proof-of-Retrievability (PoR) challenge responder over Noise_XX
+          p2p.reqResp.registerHandler(POR_PROTOCOL_ID, async (_fromPeerId, reqBytes) => {
+            try {
+              const req = JSON.parse(new TextDecoder().decode(reqBytes)) as { challenge?: PoRChallenge };
+              if (!req?.challenge?.cid || !req.challenge.challengeId) {
+                return new TextEncoder().encode(JSON.stringify({ ok: false, error: 'Missing challenge' }));
+              }
+              if (this.seenInboundPorChallengeIds.has(req.challenge.challengeId)) {
+                return new TextEncoder().encode(JSON.stringify({ ok: false, error: 'Replayed PoR challengeId rejected' }));
+              }
+              if (this.seenInboundPorChallengeIds.size >= 4096) {
+                this.seenInboundPorChallengeIds.clear();
+              }
+              this.seenInboundPorChallengeIds.add(req.challenge.challengeId);
+              const parsedCid = CID.parse(req.challenge.cid);
+              const blockData = await this.blockstore.get(parsedCid);
+              if (!blockData) {
+                return new TextEncoder().encode(JSON.stringify({ ok: false, error: 'CID not held locally' }));
+              }
+              const proof = ProofOfRetrievabilityEngine.createSignedProof(
+                req.challenge,
+                blockData,
+                p2p.identity.peerId,
+                msgBytes => p2p.config.deviceKey.sign(msgBytes),
+              );
+              return new TextEncoder().encode(JSON.stringify({ ok: true, proof }));
+            } catch (errPor) {
+              return new TextEncoder().encode(
+                JSON.stringify({ ok: false, error: errPor instanceof Error ? errPor.message : 'PoR failure' }),
+              );
+            }
           });
         }
       }
@@ -332,6 +372,70 @@ export class StorageNodeDaemon {
     }
   }
 
+  /**
+   * Sends a live Ed25519 challenge-response PoR audit over Noise_XX to a remote storage peer.
+   */
+  public async challengePeerRetrievability(
+    targetPeerId: string,
+    cid: CID,
+    expectedBlockData?: Uint8Array,
+    maxResponseTimeMs = 2000,
+  ): Promise<Result<SignedPoRProof>> {
+    const p2p = this.config.p2pNode;
+    if (!p2p) {
+      return err(new StorageError('Cannot challenge remote peer without P2PNode'));
+    }
+    try {
+      const challenge = ProofOfRetrievabilityEngine.generateChallenge(cid.toString());
+      if (this.consumedPorChallengeIds.has(challenge.challengeId)) {
+        return err(new StorageError('Duplicate PoR challenge ID detected'));
+      }
+      if (this.consumedPorChallengeIds.size >= 4096) {
+        this.consumedPorChallengeIds.clear();
+      }
+      this.consumedPorChallengeIds.add(challenge.challengeId);
+
+      const res = await p2p.reqResp.sendRequest(
+        targetPeerId,
+        POR_PROTOCOL_ID,
+        new TextEncoder().encode(JSON.stringify({ challenge })),
+        { timeoutMs: maxResponseTimeMs },
+      );
+      if (!res.ok) {
+        return err(new StorageError(`Remote PoR RPC failed: ${res.error.message}`));
+      }
+      const wallElapsedMs = Date.now() - challenge.issuedAt;
+      if (wallElapsedMs > maxResponseTimeMs) {
+        return err(new StorageError(`Remote PoR exceeded challenger wall-clock timeout (${wallElapsedMs}ms > ${maxResponseTimeMs}ms)`));
+      }
+      const parsed = JSON.parse(new TextDecoder().decode(res.value)) as {
+        ok?: boolean;
+        proof?: SignedPoRProof;
+        error?: string;
+      };
+      if (!parsed.ok || !parsed.proof) {
+        return err(new StorageError(parsed.error || 'Peer declined or failed PoR challenge'));
+      }
+      const valid = ProofOfRetrievabilityEngine.verifySignedProof(
+        challenge,
+        parsed.proof,
+        targetPeerId,
+        expectedBlockData,
+        maxResponseTimeMs,
+      );
+      if (!valid) {
+        return err(new StorageError(`Remote peer ${targetPeerId} returned forged or corrupted PoR proof`));
+      }
+      return ok(parsed.proof);
+    } catch (e) {
+      return err(
+        new StorageError(
+          `Remote PoR verification error: ${e instanceof Error ? e.message : String(e)}`,
+        ),
+      );
+    }
+  }
+
   public getQuotaUsage(): StorageQuotaUsage {
     return this.quotaManager.getUsage();
   }
@@ -440,7 +544,13 @@ export class StorageNodeDaemon {
         if (!frame) break;
 
         try {
-          await this.bitswapEngine.handleInboundMessage(peerId, frame);
+          const decoded = (await import('@sovra/storage')).decodeBitSwapMessage(frame);
+          await this.bitswapEngine.handleInboundMessage(peerId, decoded);
+          if (this.config.p2pNode && decoded.blocks && decoded.blocks.length > 0) {
+            for (const blk of decoded.blocks) {
+              this.config.p2pNode.dht.provide(blk.cid).catch(() => {});
+            }
+          }
         } catch {}
       }
     });

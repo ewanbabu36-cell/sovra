@@ -133,4 +133,65 @@ describe('ColdPeerFallbackEngine & DePIN Storage Tiering', () => {
     const exists = await blockstore.has(cid);
     expect(exists).toBe(true);
   });
+
+  it('races parallel hedged miners so slow peers do not stall fast recovery and awards speed bonus', async () => {
+    const rawData = new TextEncoder().encode('Hedged parallel block delivery payload');
+    const cid = CID.create('raw', rawData);
+    const cidStr = cid.toString();
+
+    const fallbackEngine = new ColdPeerFallbackEngine({
+      rewardRate_uSOVPer64KB: 2.0,
+      fastResponseThresholdMs: 200,
+      speedBonusMultiplier: 1.5,
+      hedgeConcurrency: 3,
+      customFetcher: async (url: string) => {
+        if (url.includes('slow-miner')) {
+          await new Promise(resolve => setTimeout(resolve, 600));
+          return null;
+        }
+        return rawData;
+      },
+    });
+
+    fallbackEngine.registerMiner({
+      peerId: 'peer_slow_1',
+      did: 'did:sovra:slow1',
+      endpoint: 'http://198.51.100.10:4001/slow-miner/{cid}',
+      reputationScore: 90,
+      totalBytesServed: 0,
+      rewardBalance_uSOV: 0,
+      lastActive: Date.now(),
+    });
+    fallbackEngine.registerMiner({
+      peerId: 'peer_slow_2',
+      did: 'did:sovra:slow2',
+      endpoint: 'http://198.51.100.11:4001/slow-miner/{cid}',
+      reputationScore: 85,
+      totalBytesServed: 0,
+      rewardBalance_uSOV: 0,
+      lastActive: Date.now(),
+    });
+    fallbackEngine.registerMiner({
+      peerId: 'peer_fast_direct',
+      did: 'did:sovra:fast1',
+      endpoint: 'http://127.0.0.1:4001/fast-miner/{cid}',
+      reputationScore: 80,
+      totalBytesServed: 0,
+      rewardBalance_uSOV: 0,
+      lastActive: Date.now(),
+    });
+
+    const t0 = Date.now();
+    const recovered = await fallbackEngine.resolveColdBlock(cidStr);
+    const elapsedMs = Date.now() - t0;
+
+    expect(recovered).not.toBeNull();
+    expect(elapsedMs).toBeLessThan(350);
+
+    const fastMiner = fallbackEngine.getMiner('peer_fast_direct');
+    expect(fastMiner).toBeDefined();
+    expect(fastMiner!.latencyMs).toBeDefined();
+    expect(fastMiner!.rewardBalance_uSOV).toBe(3.0); // 1 * 2.0 * 1.5 speed bonus
+    expect(fallbackEngine.rankMinersBySpeed()[0]!.peerId).toBe('peer_fast_direct');
+  });
 });

@@ -601,6 +601,7 @@ export async function sendChatMessage(params: {
   let isE2EE = false;
   let ciphertextHex: string | undefined;
   let ivHex: string | undefined;
+  let tagHex: string | undefined;
   let sequenceNumber: number | undefined;
 
   // Perform Double Ratchet ChaCha20-Poly1305 wire encryption for direct peer messages
@@ -611,6 +612,7 @@ export async function sendChatMessage(params: {
       isE2EE = true;
       ciphertextHex = enc.ciphertextHex;
       ivHex = enc.nonceHex;
+      tagHex = ciphertextHex && ciphertextHex.length >= 32 ? ciphertextHex.slice(-32) : undefined;
       sequenceNumber = enc.sequenceNumber;
     } catch (e) {
       console.warn('[API] E2EE client encryption error, sending plaintext fallback:', e);
@@ -632,6 +634,7 @@ export async function sendChatMessage(params: {
       isE2EE,
       ciphertextHex,
       ivHex,
+      tagHex,
       sequenceNumber,
       ...(params.attachment ? { attachment: params.attachment } : {}),
     }),
@@ -880,7 +883,7 @@ export async function fetchMeshTelemetry(): Promise<MobileMeshTelemetry> {
       ok: false,
       localPeerId: '12D3KooWOfflineNode',
       localDid: activeUserDid,
-      localNoiseXxKey: '0x0000000000000000000000000000000000000000000000000000000000000000',
+      localNoiseXxKey: 'unavailable',
       interfaces: {
         ble5: { active: false, mtu: 512, phy: '2M_LE_CODED', txPowerDbm: -59 },
         wifiDirectNan: { active: false, band: '5GHz', clusterRole: 'STANDALONE' },
@@ -1622,15 +1625,14 @@ export async function getVapidPublicKey(): Promise<{ ok: boolean; publicKey?: st
     });
     if (res.ok) {
       const data = await res.json();
-      return { ok: true, publicKey: data.publicKey };
+      if (data?.publicKey) {
+        return { ok: true, publicKey: data.publicKey };
+      }
     }
+    return { ok: false, error: `VAPID key request returned HTTP ${res.status}` };
   } catch (err: any) {
-    console.warn('[API] getVapidPublicKey network warning:', err);
+    return { ok: false, error: err?.message || 'VAPID key endpoint unreachable' };
   }
-  return {
-    ok: true,
-    publicKey: 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDZKrxZElO7jPOYNtTQTLvPW290S533EQE2r6Y6_q508',
-  };
 }
 
 export async function registerWebPushSubscription(subscription: any): Promise<{ ok: boolean; error?: string }> {
@@ -1639,17 +1641,40 @@ export async function registerWebPushSubscription(subscription: any): Promise<{ 
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
-        userDid: activeUserDid,
+        deviceId: `dev_${activeUserDid.slice(-12)}`,
+        deviceDid: activeUserDid,
+        pushToken: subscription?.endpoint || '',
+        blindChannelId: subscription?.blindChannelId || '',
         subscription,
       }),
     });
     if (res.ok) {
       return { ok: true };
     }
+    return { ok: false, error: `Push registration returned HTTP ${res.status}` };
   } catch (err: any) {
-    console.warn('[API] registerWebPushSubscription network warning:', err);
+    return { ok: false, error: err?.message || 'Push registration failed' };
   }
-  return { ok: true };
+}
+
+export function subscribeZeroCloudWakeupStream(
+  onWakeup: (event: { blindChannelId: string; opaqueWakeupHint: string; priority: string; timestamp: number }) => void,
+): (() => void) | null {
+  if (typeof EventSource === 'undefined') return null;
+  try {
+    const base = getApiBaseUrl();
+    const url = `${base}/api/push/stream?did=${encodeURIComponent(activeUserDid)}`;
+    const es = new EventSource(url);
+    es.addEventListener('wakeup', (ev: any) => {
+      try {
+        const parsed = JSON.parse(ev.data);
+        onWakeup(parsed);
+      } catch {}
+    });
+    return () => es.close();
+  } catch {
+    return null;
+  }
 }
 
 // ==========================================
@@ -2430,7 +2455,8 @@ export async function fetchValidators(): Promise<SovereignValidator[]> {
 export async function delegateTokensToValidator(params: {
   validatorAddress: string;
   amount: string;
-}): Promise<{ ok: boolean; txHash?: string; error?: string }> {
+  lockDays?: 0 | 90 | 365 | 730;
+}): Promise<{ ok: boolean; txHash?: string; multiplier?: number; effectiveVeSov?: number; error?: string }> {
   const num = Number(params.amount);
   if (!params.amount || isNaN(num) || num <= 0) {
     return { ok: false, error: 'Invalid delegation amount' };
@@ -2444,19 +2470,110 @@ export async function delegateTokensToValidator(params: {
         delegatorDid: activeUserDid,
         validatorAddress: params.validatorAddress,
         amount: params.amount,
+        lockDays: params.lockDays ?? 0,
       }),
     });
-    if (res.ok) {
-      const data = await res.json();
-      return { ok: true, txHash: data.txHash || '0x' + Math.random().toString(16).substring(2) };
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error || `HTTP ${res.status}` };
     }
+    return { ok: true, txHash: data.txHash, multiplier: data.multiplier, effectiveVeSov: data.effectiveVeSov };
   } catch (err: any) {
-    console.warn('[API] delegateTokensToValidator offline fallback:', err);
+    return { ok: false, error: err?.message || 'Delegation server unreachable' };
   }
+}
 
-  // Durable P2P fallback
-  const fallbackTx = '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-  return { ok: true, txHash: fallbackTx };
+export async function fetchEconomyOverview(): Promise<{ ok: boolean; economy?: any; l1ChainTelemetry?: any; error?: string }> {
+  try {
+    const res = await apiFetch('/api/economy/overview', { method: 'GET', headers: getHeaders() });
+    return await res.json();
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Economy overview unavailable' };
+  }
+}
+
+export async function fetchStakingPositions(): Promise<{ ok: boolean; delegations: any[]; unbondings: any[]; claimableSov: number }> {
+  try {
+    const res = await apiFetch(`/api/blockchain/staking/positions?did=${encodeURIComponent(activeUserDid)}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      return {
+        ok: true,
+        delegations: Array.isArray(d.delegations) ? d.delegations : [],
+        unbondings: Array.isArray(d.unbondings) ? d.unbondings : [],
+        claimableSov: Number(d.claimableSov || 0),
+      };
+    }
+  } catch {}
+  return { ok: false, delegations: [], unbondings: [], claimableSov: 0 };
+}
+
+export async function undelegateTokens(params: { validatorAddress: string; amount: string }): Promise<{ ok: boolean; unbonding?: any; error?: string }> {
+  try {
+    const res = await apiFetch('/api/blockchain/staking/undelegate', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ validatorAddress: params.validatorAddress, amount: params.amount }),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Undelegate failed' };
+  }
+}
+
+export async function claimStakingRewards(): Promise<{ ok: boolean; claimedSov?: number; newBalanceSov?: number; error?: string }> {
+  try {
+    const res = await apiFetch('/api/blockchain/staking/claim', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ delegatorDid: activeUserDid }),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Claim rewards failed' };
+  }
+}
+
+export async function bondSeederCollateral(params: { amountSov: number; storageCapacityGb: number }): Promise<{ ok: boolean; bondedSov?: number; error?: string }> {
+  try {
+    const res = await apiFetch('/api/economy/seeder/bond', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(params),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Seeder bond failed' };
+  }
+}
+
+export async function stakePatronPool(params: { creatorDid: string; amountSov: number; lockDays?: number }): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await apiFetch('/api/economy/patron/stake', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(params),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Patron stake failed' };
+  }
+}
+
+export async function registerPaidHandle(handle: string, feeSov = 10): Promise<{ ok: boolean; burnedSov?: number; error?: string }> {
+  try {
+    const res = await apiFetch('/api/economy/sinks/handle', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ handle, feeSov }),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Handle registration failed' };
+  }
 }
 
 // ==========================================

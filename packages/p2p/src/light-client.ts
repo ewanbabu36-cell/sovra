@@ -293,9 +293,8 @@ export class SovraLightClient {
   }
 
   /**
-   * Pure UDP QUIC Connection Migration:
-   * Migrates session across Wi-Fi and 5G cellular endpoints in <= 30ms
-   * using authenticated cryptographic token and QUIC Connection ID without full re-handshake.
+   * Session endpoint migration across Wi-Fi and 5G cellular handoffs using a signed/time-bounded
+   * migration token (applies to whichever active socket/relay transport is bound in the runtime).
    */
   public migrateConnection(
     token: SessionMigrationToken,

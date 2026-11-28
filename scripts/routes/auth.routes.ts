@@ -122,11 +122,14 @@ export async function handleAuthRoutes(ctx: AuthRouteContext): Promise<boolean> 
     try {
       const parsed = JSON.parse(body);
       const regIp = clientIp ? clientIp.replace(/^::ffff:/, '') : '127.0.0.1';
+      const socketIp = String((req.socket as any)?.remoteAddress || '127.0.0.1').replace(/^::ffff:/, '');
       const isLoopback = regIp === '127.0.0.1' || regIp === '::1' || regIp === 'localhost';
+      const isSocketLoopback = socketIp === '127.0.0.1' || socketIp === '::1' || socketIp === 'localhost';
       // Zero-Trust Hardening: Public headers cannot bypass registration throttles in production
       const isTestEnv = (process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST)) && (
         req.headers['x-sovra-test-bypass'] === 'true' ||
         req.headers['x-sovra-test-fixture'] === 'true' ||
+        isSocketLoopback ||
         isLoopback
       );
 

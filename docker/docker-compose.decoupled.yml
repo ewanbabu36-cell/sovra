@@ -1,137 +1,220 @@
-# =============================================================================
-# SOVRA PRODUCTION DOCKER COMPOSE - DECOUPLED HORIZONTAL ARCHITECTURE
-# Segregates:
-#   1. Ingress Load Balancer (NGINX)
-#   2. Horizontally Scaled API Pods (api-node-1, api-node-2)
-#   3. Independent CometBFT Validator Daemons (validator-0, validator-1)
-#   4. Asynchronous Background Media & Moderation Worker
-# =============================================================================
-
-version: '3.8'
+# ==============================================================================
+# SOVRA DECOUPLED ENTERPRISE ARCHITECTURE (POSTGRESQL + REDIS + MULTI-SERVICE)
+# Stateless API Replicas, Distributed Workers, L1 Validators & Autonomous Relayer
+# Zero shared SQLite volumes; zero hardcoded secret fallbacks.
+# ==============================================================================
 
 networks:
-  sovra-ingress-net:
+  sovra-mesh:
     driver: bridge
-  sovra-cluster-mesh:
-    driver: bridge
-    internal: true # No direct internet ingress for consensus nodes
 
 volumes:
-  sovra-storage-shared:
-  validator-0-data:
-  validator-1-data:
+  sovra-pg-data:
+  sovra-redis-data:
+  sovra-val0-data:
+  sovra-val1-data:
 
 services:
-  # ---------------------------------------------------------------------------
-  # 1. INGRESS & LOAD BALANCER
-  # ---------------------------------------------------------------------------
-  nginx:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.nginx
-    container_name: sovra-load-balancer
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
+  # 1. Primary ACID Persistence: Clustered / Persistent PostgreSQL 16
+  postgres:
+    image: postgres:16-alpine
+    container_name: sovra-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=sovra
+      - POSTGRES_DB=sovra
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD before starting decoupled stack}
+    volumes:
+      - sovra-pg-data:/var/lib/postgresql/data
     networks:
-      - sovra-ingress-net
-    depends_on:
-      - api-node-1
-      - api-node-2
+      - sovra-mesh
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health/lb"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
+      test: ["CMD-SHELL", "pg_isready -U sovra -d sovra"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  # ---------------------------------------------------------------------------
-  # 2. HORIZONTALLY SCALED DECOUPLED API PODS
-  # ---------------------------------------------------------------------------
-  api-node-1:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.api
-    container_name: sovra-api-1
-    restart: always
-    environment:
-      - NODE_ENV=production
-      - PORT=3001
-      - HOST=0.0.0.0
-      - SOVRA_L1_RPC_URLS=http://validator-0:26657,http://validator-1:26667
-      - SOVRA_INTERNAL_SERVICE_SECRET=sovra_cluster_secret_production_2026_prod
+  # 2. Cluster Nonce Replay, Distributed Rate Limiting & Cache Pub/Sub
+  redis:
+    image: redis:7-alpine
+    container_name: sovra-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD before starting decoupled stack}"]
     volumes:
-      - sovra-storage-shared:/app/.sovra-storage-dev
+      - sovra-redis-data:/data
     networks:
-      - sovra-ingress-net
-      - sovra-cluster-mesh
-    depends_on:
-      - validator-0
+      - sovra-mesh
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"${REDIS_PASSWORD:?Set REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  api-node-2:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.api
-    container_name: sovra-api-2
-    restart: always
-    environment:
-      - NODE_ENV=production
-      - PORT=3002
-      - HOST=0.0.0.0
-      - SOVRA_L1_RPC_URLS=http://validator-0:26657,http://validator-1:26667
-      - SOVRA_INTERNAL_SERVICE_SECRET=sovra_cluster_secret_production_2026_prod
-    volumes:
-      - sovra-storage-shared:/app/.sovra-storage-dev
-    networks:
-      - sovra-ingress-net
-      - sovra-cluster-mesh
-    depends_on:
-      - validator-0
-
-  # ---------------------------------------------------------------------------
-  # 3. INDEPENDENT COMETBFT VALIDATORS (ZERO DIRECT PUBLIC INGRESS)
-  # ---------------------------------------------------------------------------
+  # 3. Sovereign Chain L1 Validator Cluster Nodes
   validator-0:
     build:
       context: ..
       dockerfile: docker/Dockerfile.validator
     container_name: sovra-validator-0
-    restart: always
+    ports:
+      - "26656:26656"
+      - "26657:26657"
+      - "26660:26660"
+    environment:
+      - NODE_MONIKER=validator-0
+      - CHAIN_ID=sovra-mainnet-1
+      - VALIDATOR_INDEX=0
+      - SOVRA_KMS_SIGNER_ADDR=${SOVRA_KMS_SIGNER_ADDR:-}
     volumes:
-      - validator-0-data:/var/lib/sovra
-      - ../chain/mytestnet/node0:/var/lib/sovra/config:ro
+      - sovra-val0-data:/root/.sovrad
     networks:
-      - sovra-cluster-mesh
-    # Port 26656 (P2P), Port 26657 (RPC internal to mesh)
+      - sovra-mesh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:26657/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
-  validator-1:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.validator
-    container_name: sovra-validator-1
-    restart: always
-    volumes:
-      - validator-1-data:/var/lib/sovra
-      - ../chain/mytestnet/node1:/var/lib/sovra/config:ro
-    networks:
-      - sovra-cluster-mesh
-
-  # ---------------------------------------------------------------------------
-  # 4. ASYNCHRONOUS BACKGROUND WORKER
-  # ---------------------------------------------------------------------------
-  background-worker:
+  # 4. Horizontal Stateless Core API Service
+  api:
     build:
       context: ..
       dockerfile: docker/Dockerfile.api
-    container_name: sovra-worker
-    restart: always
-    entrypoint: ["node", "services/moderation-worker/dist/index.js"]
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - HOST=0.0.0.0
+      - NODE_ENV=production
+      - SOVRA_L1_RPC_URLS=http://validator-0:26657
+      - DATABASE_URL=postgresql://sovra:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/sovra
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD}@redis:6379
+      - SOVRA_INTERNAL_SERVICE_SECRET=${SOVRA_INTERNAL_SERVICE_SECRET:?Set SOVRA_INTERNAL_SERVICE_SECRET}
+      - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY:?Set ADMIN_SECRET_KEY}
+      - FIAT_PAYOUT_PROVIDER_ENABLED=${FIAT_PAYOUT_PROVIDER_ENABLED:-false}
+      - FIAT_PAYOUT_PROVIDER=${FIAT_PAYOUT_PROVIDER:-razorpayx}
+      - MODERATION_WORKER_URL=http://moderation-worker:3021
+      - SEARCH_WORKER_URL=http://search-worker:3022
+      - TRANSCODER_WORKER_URL=http://transcoder-worker:3023
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      validator-0:
+        condition: service_healthy
+    networks:
+      - sovra-mesh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health/liveness"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 5. Distributed AI Content Moderation Worker
+  moderation-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    command: ["node", "services/moderation-worker/dist/server.js"]
     environment:
       - NODE_ENV=production
-      - SOVRA_INTERNAL_SERVICE_SECRET=sovra_cluster_secret_production_2026_prod
-    volumes:
-      - sovra-storage-shared:/app/.sovra-storage-dev
-    networks:
-      - sovra-cluster-mesh
+      - PORT=3021
+      - HOST=0.0.0.0
+      - SOVRA_INTERNAL_SERVICE_SECRET=${SOVRA_INTERNAL_SERVICE_SECRET:?Set SOVRA_INTERNAL_SERVICE_SECRET}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD}@redis:6379
     depends_on:
-      - validator-0
+      redis:
+        condition: service_healthy
+    networks:
+      - sovra-mesh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3021/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # 6. Full-Text & Vector Search Indexing Worker
+  search-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    command: ["node", "services/search/dist/server.js"]
+    environment:
+      - NODE_ENV=production
+      - PORT=3022
+      - HOST=0.0.0.0
+      - SOVRA_INTERNAL_SERVICE_SECRET=${SOVRA_INTERNAL_SERVICE_SECRET:?Set SOVRA_INTERNAL_SERVICE_SECRET}
+      - DATABASE_URL=postgresql://sovra:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/sovra
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD}@redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sovra-mesh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3022/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # 7. Media HLS ABR Transcoding Worker
+  transcoder-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    command: ["node", "services/transcoder/dist/server.js"]
+    environment:
+      - NODE_ENV=production
+      - PORT=3023
+      - HOST=0.0.0.0
+      - SOVRA_INTERNAL_SERVICE_SECRET=${SOVRA_INTERNAL_SERVICE_SECRET:?Set SOVRA_INTERNAL_SERVICE_SECRET}
+    networks:
+      - sovra-mesh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3023/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # 8. Edge API Gateway & Static CDN Router (NGINX)
+  gateway:
+    image: nginx:alpine
+    container_name: sovra-edge-gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+    networks:
+      - sovra-mesh
+
+  # 9. Decentralized Storage Node Sidecar
+  storage-node:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    command: ["node", "nodes/storage-node/dist/index.js"]
+    environment:
+      - NODE_ENV=production
+      - PORT=3010
+      - SOVRA_INTERNAL_SERVICE_SECRET=${SOVRA_INTERNAL_SERVICE_SECRET:?Set SOVRA_INTERNAL_SERVICE_SECRET}
+      - DATABASE_URL=postgresql://sovra:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/sovra
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD}@redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sovra-mesh

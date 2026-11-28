@@ -13,6 +13,7 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { sovraDb } from '../database-engine.ts';
+import { riskManagementEngine } from '../risk-management-engine.ts';
 import type { AuthenticatedPrincipal } from '../../packages/identity/dist/index.js';
 
 export const REWARD_INVITER_SOV = 50.0;
@@ -225,6 +226,22 @@ export async function handleReferralRoutes(ctx: ReferralRouteContext): Promise<b
       return true;
     }
 
+    // Risk Management Cap: Enforce daily referral subsidy budget & per-inviter daily velocity limit
+    const referralGuard = riskManagementEngine.checkAndRecordReferralPayout(
+      inviter.did,
+      cleanInviteeDid,
+      REWARD_INVITER_SOV + REWARD_INVITEE_SOV,
+    );
+    if (!referralGuard.allowed) {
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: false,
+        error: referralGuard.reason || 'Referral reward budget exceeded',
+        code: referralGuard.code,
+      }));
+      return true;
+    }
+
     const now = Date.now();
     const claimId = `ref_${now}_${crypto.randomBytes(4).toString('hex')}`;
 
@@ -251,8 +268,13 @@ export async function handleReferralRoutes(ctx: ReferralRouteContext): Promise<b
         });
         if (dep.ok) newInviteeBalance = dep.newBalance;
       } else {
-        // Invitee not yet registered in users array; credit upon user registration
-        newInviteeBalance = 500.0 + REWARD_INVITEE_SOV;
+        // Invitee not yet in memory cache: issue exact welcome bonus cleanly without synthetic +500 seed
+        const dep = sovraDb.depositFunds({
+          did: cleanInviteeDid,
+          amount: REWARD_INVITEE_SOV,
+          sourceTx: `referral_welcome_${claimId}`,
+        });
+        newInviteeBalance = dep.ok ? dep.newBalance : REWARD_INVITEE_SOV;
       }
     } catch (err) {
       console.warn('[Referral] Could not credit invitee:', err);

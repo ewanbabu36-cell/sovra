@@ -7,131 +7,140 @@ import (
 	"github.com/sovra/chain/x/issuance/types"
 )
 
-func TestCanonicalRecurrenceAndTotals(t *testing.T) {
-	// 1. Verify dynamic recurrence matches published array identically
-	generated := types.GenerateCanonicalSeederSchedule()
-	for y := 0; y < 25; y++ {
-		if generated[y] != types.CanonicalAnnualSeederSchedule[y] {
-			t.Fatalf("Year %d mismatch: generated %d != published %d", y+1, generated[y], types.CanonicalAnnualSeederSchedule[y])
+func TestBitcoinInspiredHalvingScheduleAndTotals(t *testing.T) {
+	// 1. Verify exact 50% bit-shift halving across all 32 four-year eras (128 years)
+	for era := 0; era < types.MaxHalvingEras-1; era++ {
+		cur := types.ComputeHalvingBaseDaily(era)
+		nxt := types.ComputeHalvingBaseDaily(era + 1)
+		if cur <= 0 {
+			t.Fatalf("Era %d daily base %d is not positive", era, cur)
+		}
+		if nxt != (cur >> 1) {
+			t.Fatalf("Era %d -> %d halving mismatch: %d != %d >> 1", era, era+1, nxt, cur)
 		}
 	}
 
-	// 2. Verify exact lifetime pool totals
-	var sumS, sumV, sumC, sumE math.Int = math.ZeroInt(), math.ZeroInt(), math.ZeroInt(), math.ZeroInt()
+	// Era 31 emits minimum 1 uSOV base atom; Era 32 drops to 0 (Bitcoin terminal convergence)
+	if lastBase := types.ComputeHalvingBaseDaily(31); lastBase != 1 {
+		t.Fatalf("Era 31 final base expected 1 uSOV, got %d", lastBase)
+	}
+	if termBase := types.ComputeHalvingBaseDaily(32); termBase != 0 {
+		t.Fatalf("Era 32 terminal base expected 0 uSOV, got %d", termBase)
+	}
 
-	for y := 1; y <= 25; y++ {
-		e, v, c, s := types.GetAnnualPoolAllocations(y)
+	// 2. Verify lifetime pool totals, Seeder-dominant 2:1:4 weighting, and 20-year front-loading (~96.875%)
+	var sumC, sumV, sumS, sumE math.Int = math.ZeroInt(), math.ZeroInt(), math.ZeroInt(), math.ZeroInt()
+	var first4YearsE, first20YearsE math.Int = math.ZeroInt(), math.ZeroInt()
 
-		// Strict per-year integer identities
-		if !v.Equal(s.MulRaw(2)) {
-			t.Fatalf("Year %d: V (%s) != 2*S (%s)", y, v, s.MulRaw(2))
+	for era := 0; era < types.MaxHalvingEras; era++ {
+		e, v, c, s := types.GetHalvingEraAllocations(era)
+
+		// Exact 2:1:4 ratio (Validator : Community : Seeder)
+		if !v.Equal(c.MulRaw(2)) {
+			t.Fatalf("Era %d: V (%s) != 2*C (%s)", era, v, c.MulRaw(2))
 		}
-		if !c.Equal(s.MulRaw(4)) {
-			t.Fatalf("Year %d: C (%s) != 4*S (%s)", y, c, s.MulRaw(4))
+		if !s.Equal(c.MulRaw(4)) {
+			t.Fatalf("Era %d: S (%s) != 4*C (%s)", era, s, c.MulRaw(4))
 		}
-		if !e.Equal(s.MulRaw(7)) {
-			t.Fatalf("Year %d: E (%s) != 7*S (%s)", y, e, s.MulRaw(7))
-		}
-		if !e.Equal(v.Add(c).Add(s)) {
-			t.Fatalf("Year %d: E (%s) != V+C+S", y, e)
+		if !e.Equal(c.MulRaw(7)) || !e.Equal(v.Add(c).Add(s)) {
+			t.Fatalf("Era %d: E (%s) != 7*C / V+C+S", era, e)
 		}
 
-		sumS = sumS.Add(s)
-		sumV = sumV.Add(v)
+		if era == 0 {
+			first4YearsE = e
+		}
+		if era < 5 {
+			first20YearsE = first20YearsE.Add(e)
+		}
+
 		sumC = sumC.Add(c)
+		sumV = sumV.Add(v)
+		sumS = sumS.Add(s)
 		sumE = sumE.Add(e)
 	}
 
-	expectedS := math.NewInt(10_000_000_000_000)
-	expectedV := math.NewInt(20_000_000_000_000)
-	expectedC := math.NewInt(40_000_000_000_000)
-	expectedE := math.NewInt(70_000_000_000_000)
-
-	if !sumS.Equal(expectedS) {
-		t.Fatalf("Seeder sum %s != %s", sumS, expectedS)
+	// Era 0 (Years 1-4) ~50% of 70M minable supply; Eras 0..4 (Years 1-20) ~96.875%
+	if first4YearsE.LT(math.NewInt(34_999_000_000_000)) || first4YearsE.GT(math.NewInt(35_000_000_000_000)) {
+		t.Fatalf("First 4 years emission %s outside expected ~35M SOV (50%%)", first4YearsE)
 	}
-	if !sumV.Equal(expectedV) {
-		t.Fatalf("Validator sum %s != %s", sumV, expectedV)
-	}
-	if !sumC.Equal(expectedC) {
-		t.Fatalf("Community sum %s != %s", sumC, expectedC)
-	}
-	if !sumE.Equal(expectedE) {
-		t.Fatalf("Total emission sum %s != %s", sumE, expectedE)
+	if first20YearsE.LT(math.NewInt(67_812_000_000_000)) || first20YearsE.GT(math.NewInt(67_813_000_000_000)) {
+		t.Fatalf("First 20 years emission %s outside expected ~67.8125M SOV (96.875%%)", first20YearsE)
 	}
 
-	// 3. Year 25 residual properties
-	s24 := types.CanonicalAnnualSeederSchedule[23]
-	s25 := types.CanonicalAnnualSeederSchedule[24]
-
-	if s25 <= 0 {
-		t.Fatalf("Year 25 residual %d is not strictly positive", s25)
+	// Bitcoin integer-shift convergence strictly <= PoolCaps (never over-mints 100M hard cap)
+	// with sub-millitoken dust < 0.0002 SOV across 128 years
+	if sumC.GT(types.CommunityCap) || sumC.LT(types.CommunityCap.SubRaw(100_000)) {
+		t.Fatalf("Cumulative Community %s out of expected [Cap-100k, Cap]", sumC)
 	}
-	if s25 >= s24 {
-		t.Fatalf("Year 25 residual %d is not less than Year 24 (%d)", s25, s24)
+	if sumV.GT(types.ValidatorCap) || !sumV.Equal(sumC.MulRaw(2)) {
+		t.Fatalf("Cumulative Validator %s inconsistent with 2*C / Cap", sumV)
 	}
-	if s25 != 186935111695 {
-		t.Fatalf("Year 25 residual %d != 186935111695", s25)
+	if sumS.GT(types.SeederCap) || !sumS.Equal(sumC.MulRaw(4)) {
+		t.Fatalf("Cumulative Seeder %s inconsistent with 4*C / Cap", sumS)
+	}
+	expectedMinableCap := types.CommunityCap.Add(types.ValidatorCap).Add(types.SeederCap)
+	if !expectedMinableCap.Equal(math.NewInt(70_000_000_000_000)) {
+		t.Fatalf("Minable pool caps sum %s != 70M SOV", expectedMinableCap)
+	}
+	if sumE.GT(expectedMinableCap) || types.GenesisCap.Add(sumE).GT(types.GlobalLifetimeCap) {
+		t.Fatalf("Lifetime emission %s breaches 100M SOV hard cap", sumE)
 	}
 }
 
-func TestDailyEpochAllocation241Ratio(t *testing.T) {
-	// Verify that the 2:4:1 ratio holds on EVERY single daily epoch (1 to 9125)
-	var cumulativeS, cumulativeV, cumulativeC math.Int = math.ZeroInt(), math.ZeroInt(), math.ZeroInt()
-
-	for y := 1; y <= 25; y++ {
-		_, annualV, annualC, annualS := types.GetAnnualPoolAllocations(y)
-
-		var yearS, yearV, yearC math.Int = math.ZeroInt(), math.ZeroInt(), math.ZeroInt()
-
-		for d := 1; d <= 365; d++ {
-			epoch := uint64((y-1)*365 + d)
-			vDay, cDay, sDay := types.ComputeEpochAllowance(epoch)
-
-			// Ratio 2:4:1 must hold exactly on this specific daily epoch
-			if !vDay.Equal(sDay.MulRaw(2)) {
-				t.Fatalf("Epoch %d (Y%d D%d): V (%s) != 2*S (%s)", epoch, y, d, vDay, sDay.MulRaw(2))
-			}
-			if !cDay.Equal(sDay.MulRaw(4)) {
-				t.Fatalf("Epoch %d (Y%d D%d): C (%s) != 4*S (%s)", epoch, y, d, cDay, sDay.MulRaw(4))
-			}
-
-			yearS = yearS.Add(sDay)
-			yearV = yearV.Add(vDay)
-			yearC = yearC.Add(cDay)
+func TestDailyEpochAllocationAndHalvingBoundaries(t *testing.T) {
+	// Verify era transition boundaries and 2:1:4 ratio across sampled daily epochs (1..46720)
+	checkEpoch := func(epoch uint64, expectedEra int) (math.Int, math.Int, math.Int) {
+		if gotEra := types.HalvingEraForEpoch(epoch); gotEra != expectedEra {
+			t.Fatalf("Epoch %d: expected era %d, got %d", epoch, expectedEra, gotEra)
 		}
-
-		// Sum of all 365 daily allocations in year y must match annual pool budget exactly
-		if !yearS.Equal(annualS) {
-			t.Fatalf("Year %d daily Seeder sum %s != annual %s", y, yearS, annualS)
+		vDay, cDay, sDay := types.ComputeEpochAllowance(epoch)
+		if !vDay.IsPositive() || !vDay.Equal(cDay.MulRaw(2)) || !sDay.Equal(cDay.MulRaw(4)) {
+			t.Fatalf("Epoch %d: broken 2:1:4 ratio (V=%s C=%s S=%s)", epoch, vDay, cDay, sDay)
 		}
-		if !yearV.Equal(annualV) {
-			t.Fatalf("Year %d daily Validator sum %s != annual %s", y, yearV, annualV)
-		}
-		if !yearC.Equal(annualC) {
-			t.Fatalf("Year %d daily Community sum %s != annual %s", y, yearC, annualC)
-		}
-
-		cumulativeS = cumulativeS.Add(yearS)
-		cumulativeV = cumulativeV.Add(yearV)
-		cumulativeC = cumulativeC.Add(yearC)
+		return vDay, cDay, sDay
 	}
 
-	if !cumulativeS.Equal(types.SeederCap) {
-		t.Fatalf("Cumulative Seeder %s != %s", cumulativeS, types.SeederCap)
+	_, c1, s1 := checkEpoch(1, 0)
+	_, c1460, _ := checkEpoch(1460, 0)
+	_, c1461, s1461 := checkEpoch(1461, 1)
+	if !c1.Equal(c1460) {
+		t.Fatalf("Daily allocation drifted inside Era 0")
 	}
-	if !cumulativeV.Equal(types.ValidatorCap) {
-		t.Fatalf("Cumulative Validator %s != %s", cumulativeV, types.ValidatorCap)
+	if !c1461.Equal(c1.QuoRaw(2)) || !s1461.Equal(s1.QuoRaw(2)) {
+		t.Fatalf("First halving boundary (1460->1461) did not halve cleanly")
 	}
-	if !cumulativeC.Equal(types.CommunityCap) {
-		t.Fatalf("Cumulative Community %s != %s", cumulativeC, types.CommunityCap)
+
+	checkEpoch(7300, 4)  // End of Year 20
+	checkEpoch(7301, 5)  // Start of Era 5 (Year 21)
+	vLast, cLast, sLast := checkEpoch(46720, 31)
+	if !cLast.Equal(math.NewInt(1)) || !vLast.Equal(math.NewInt(2)) || !sLast.Equal(math.NewInt(4)) {
+		t.Fatalf("Era 31 final day expected V=2 C=1 S=4 uSOV, got V=%s C=%s S=%s", vLast, cLast, sLast)
+	}
+
+	// Out of bounds / terminal epoch returns zero
+	vZero, cZero, sZero := types.ComputeEpochAllowance(46721)
+	if !vZero.IsZero() || !cZero.IsZero() || !sZero.IsZero() {
+		t.Fatalf("Terminal epoch 46721 expected zero allocations")
+	}
+
+	// Verify 128 annual lookups reconcile to exact 32-era cumulative sum
+	var yearTotalE math.Int = math.ZeroInt()
+	for y := 1; y <= 128; y++ {
+		e, v, c, s := types.GetAnnualPoolAllocations(y)
+		if !v.Equal(c.MulRaw(2)) || !s.Equal(c.MulRaw(4)) || !e.Equal(v.Add(c).Add(s)) {
+			t.Fatalf("Year %d annual 2:1:4 invariant broken", y)
+		}
+		yearTotalE = yearTotalE.Add(e)
+	}
+	if yearTotalE.GT(math.NewInt(70_000_000_000_000)) {
+		t.Fatalf("128-year annual sum %s exceeds 70M SOV", yearTotalE)
 	}
 }
 
 func TestResolveEpochSignedArithmetic(t *testing.T) {
 	var genesisTime int64 = 1_700_000_000
 
-	// 1. Pre-genesis timestamp (e.g. genesis - 100 seconds)
+	// 1. Pre-genesis timestamp
 	epoch, phase := types.ResolveEpoch(genesisTime-100, genesisTime)
 	if phase != types.PhasePreGenesis || epoch != 0 {
 		t.Fatalf("Pre-genesis failed: got epoch %d, phase %v", epoch, phase)
@@ -143,32 +152,26 @@ func TestResolveEpochSignedArithmetic(t *testing.T) {
 		t.Fatalf("Genesis second failed: got epoch %d, phase %v", epoch, phase)
 	}
 
-	// 3. Last second of Epoch 1 (t = genesis + 86399)
-	epoch, phase = types.ResolveEpoch(genesisTime+86399, genesisTime)
-	if phase != types.PhaseActive || epoch != 1 {
-		t.Fatalf("Last second of Epoch 1 failed: got epoch %d, phase %v", epoch, phase)
+	// 3. First halving boundary (Epoch 1461 starts at day 1460 * 86400)
+	epoch, phase = types.ResolveEpoch(genesisTime+1460*86400, genesisTime)
+	if phase != types.PhaseActive || epoch != 1461 {
+		t.Fatalf("Halving Era 1 start failed: got epoch %d, phase %v", epoch, phase)
 	}
 
-	// 4. First second of Epoch 2 (t = genesis + 86400)
-	epoch, phase = types.ResolveEpoch(genesisTime+86400, genesisTime)
-	if phase != types.PhaseActive || epoch != 2 {
-		t.Fatalf("Epoch 2 start failed: got epoch %d, phase %v", epoch, phase)
-	}
-
-	// 5. Last second of active policy (Epoch 9125: t = genesis + 788,400,000 - 1)
-	terminalSec := genesisTime + 788_400_000
+	// 4. Last second of 128-year policy (Epoch 46720: t = genesis + 46720 * 86400 - 1)
+	terminalSec := genesisTime + int64(types.TotalPolicyEpochs)*int64(types.EpochDurationSeconds)
 	epoch, phase = types.ResolveEpoch(terminalSec-1, genesisTime)
-	if phase != types.PhaseActive || epoch != 9125 {
+	if phase != types.PhaseActive || epoch != 46720 {
 		t.Fatalf("Final active second failed: got epoch %d, phase %v", epoch, phase)
 	}
 
-	// 6. Exact terminal timestamp (t = genesis + 788,400,000)
+	// 5. Exact terminal timestamp (Epoch 46721)
 	epoch, phase = types.ResolveEpoch(terminalSec, genesisTime)
-	if phase != types.PhaseTerminal || epoch != 9126 {
+	if phase != types.PhaseTerminal || epoch != 46721 {
 		t.Fatalf("Terminal boundary failed: got epoch %d, phase %v", epoch, phase)
 	}
 
-	// 7. Far future terminal timestamp (100 years later)
+	// 6. Far future terminal timestamp
 	epoch, phase = types.ResolveEpoch(terminalSec+365*86400*100, genesisTime)
 	if phase != types.PhaseTerminal {
 		t.Fatalf("Far future failed: got phase %v", phase)

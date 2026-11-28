@@ -123,18 +123,34 @@ describe('Pillar 6: Decentralized Perceptual Hashing & Multi-Sig Oracle Complian
     expect(BlindErasureShardingEngine.isPlausiblyDeniable(2, 2)).toBe(false);
   });
 
-  it('generates and verifies cryptographic Proof of Retrievability (PoR) challenges within 150ms SLA', async () => {
+  it('generates and verifies cryptographic Proof of Retrievability (PoR) challenges within 150ms SLA and fails closed on invalid/forged CIDs', async () => {
     const { ProofOfRetrievabilityEngine } = await import('../src/index.js');
+    const { CID } = await import('@sovra/storage');
     const blockData = new Uint8Array(256 * 1024); // 256KB block
     blockData.fill(7);
+    const validCid = CID.create('raw', blockData).toString();
 
-    const challenge = ProofOfRetrievabilityEngine.generateChallenge('bafybeihash123', 0);
+    const challenge = ProofOfRetrievabilityEngine.generateChallenge(validCid, 0);
     expect(challenge.challengeId).toBeDefined();
 
     const proof = ProofOfRetrievabilityEngine.verifyProof(challenge, blockData, 150);
     expect(proof.isValid).toBe(true);
     expect(proof.proofResponseTimeMs).toBeLessThanOrEqual(150);
     expect(proof.blockSampleHashHex).toBeDefined();
+
+    // Negative fail-closed tests: synthetic non-CID string, corrupted block data, empty data, and wrong CID must fail
+    const badCidChallenge = ProofOfRetrievabilityEngine.generateChallenge('bafybeihash123', 0);
+    expect(ProofOfRetrievabilityEngine.verifyProof(badCidChallenge, blockData, 150).isValid).toBe(false);
+
+    const corruptedData = new Uint8Array(blockData);
+    corruptedData[0] ^= 0xff;
+    expect(ProofOfRetrievabilityEngine.verifyProof(challenge, corruptedData, 150).isValid).toBe(false);
+
+    const otherCid = CID.create('raw', corruptedData).toString();
+    expect(
+      ProofOfRetrievabilityEngine.verifyProof(ProofOfRetrievabilityEngine.generateChallenge(otherCid, 0), blockData, 150).isValid,
+    ).toBe(false);
+    expect(ProofOfRetrievabilityEngine.verifyProof(challenge, new Uint8Array(0), 150).isValid).toBe(false);
   });
 });
 

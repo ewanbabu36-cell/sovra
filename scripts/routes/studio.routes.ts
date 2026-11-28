@@ -69,39 +69,13 @@ export function findCopyrightMatch(pHash: string): CopyrightFingerprint | null {
 export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Promise<boolean> {
   const { req, res, url, readBoundedBody } = ctx;
 
-  // 0. GET /api/studio/my-channels - Returns video channels owned by requesting creator
+  // 0. GET /api/studio/my-channels - Returns video channels owned by requesting creator (read-only)
   if (url.pathname === '/api/studio/my-channels' && req.method === 'GET') {
     const principal = ctx.resolvePrincipal(ctx.req);
     const qDid = url.searchParams.get('creatorDid') || url.searchParams.get('did');
     const creatorDid = (principal && principal.did) || (qDid && qDid.trim()) || '';
     const allChannels = sovraDb.getAllChannels();
-    let myChannels = creatorDid ? allChannels.filter(c => c && c.ownerDid === creatorDid) : [];
-
-    // If requesting user is the host/seed user or system creator, provide seed channels
-    if (creatorDid && (creatorDid === 'did:sovra:creator_primary' || creatorDid === 'did:sovra:system' || creatorDid === 'did:sovra:laptop_host' || creatorDid.includes('laptop') || creatorDid.includes('host') || creatorDid === 'did:sovra:primary_user')) {
-      if (myChannels.length === 0) {
-        myChannels = allChannels.filter(c => c && (c.ownerDid === 'did:sovra:system' || c.ownerDid === creatorDid));
-      }
-    }
-
-    // Real-World YouTube Studio Parity: Seamless default creator channel auto-provisioning
-    if (myChannels.length === 0) {
-      const defaultChannel = {
-        id: 'ch-personal-' + (creatorDid ? creatorDid.replace(/[^a-zA-Z0-9]/g, '').slice(-8) : 'primary'),
-        handle: (principal && principal.handle) || '@creator',
-        name: (principal && principal.displayName) || (principal && principal.handle ? principal.handle.replace(/^@/, '') : 'Creator Studio'),
-        category: 'tech',
-        desc: 'Sovereign 4K Video & Live Broadcast Channel',
-        count: 0,
-        avatar: '🎬',
-        bg: '#0284c7',
-        isSubbed: true,
-        ownerDid: creatorDid || 'did:sovra:creator_primary',
-        createdAt: Date.now(),
-      };
-      sovraDb.upsertChannel(defaultChannel);
-      myChannels = [defaultChannel];
-    }
+    const myChannels = creatorDid ? allChannels.filter(c => c && c.ownerDid === creatorDid) : [];
 
     const hasChannel = myChannels.length > 0;
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -192,15 +166,23 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
 
   // POST /api/studio/token/launch - Deploy custom CW20 Creator Token on Layer-1
   if (url.pathname === '/api/studio/token/launch' && req.method === 'POST') {
+    const principal = ctx.enforceAuth(req, res);
+    if (!principal) return true;
+
     const { body, ok } = await readBoundedBody(req, res, 64 * 1024);
     if (!ok) return true;
     try {
       const parsed = JSON.parse(body);
+      if (parsed.creatorDid && String(parsed.creatorDid).trim() !== principal.did) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Cannot launch creator token on behalf of another DID' }));
+        return true;
+      }
       const name = (parsed.name || '').trim();
       const symbol = (parsed.symbol || '').trim().toUpperCase();
       const initialSupply = String(parsed.initialSupply || parsed.initial_supply || '1000000000');
       const decimals = Number(parsed.decimals !== undefined ? parsed.decimals : 6);
-      const creatorDid = parsed.creatorDid || resolveCreatorDid(ctx);
+      const creatorDid = principal.did;
       const channelId = parsed.channelId || '';
 
       if (!name || !symbol) {
@@ -1264,6 +1246,11 @@ export async function handleStudioTranscoderRoutes(ctx: StudioRouteContext): Pro
         return true;
       }
       const updateRes = sovraDb.updateCreatorStudioContent(creatorDid, videoId, parsed);
+      if (!updateRes.ok) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: updateRes.error || 'Content item not found' }));
+        return true;
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, video: updateRes.item }));
     } catch (err: any) {

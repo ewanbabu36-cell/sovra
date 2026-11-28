@@ -84,7 +84,15 @@ describe('🚀 Sovra Enterprise Zero-Mock Production Hardening Suite (Phases 1 -
   // =========================================================================
   describe('Phase 2: Real Messenger & Persistent Call History Endpoints', () => {
     it('GET /api/chat/conversations returns dynamic conversations array', async () => {
-      const res = await fetch(`${BASE_URL}/api/chat/conversations?did=did:sovra:host`);
+      const regRes = await fetch(`${BASE_URL}/api/user/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: '@conv_probe_' + Date.now(), name: 'Conv Probe' })
+      });
+      const regData = await regRes.json();
+      const res = await fetch(`${BASE_URL}/api/chat/conversations`, {
+        headers: { Authorization: `Bearer ${regData.sessionToken}` }
+      });
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.ok).toBe(true);
@@ -138,12 +146,22 @@ describe('🚀 Sovra Enterprise Zero-Mock Production Hardening Suite (Phases 1 -
     });
 
     it('POST /api/wallet/faucet/claim credits 50 SOV and enforces rate limiting', async () => {
-      const uniqueDid = 'did:sovra:faucet_claimer_' + Date.now();
-      
+      const regRes = await fetch(`${BASE_URL}/api/user/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: '@faucet_claimer_' + Date.now(), name: 'Faucet Claimer' })
+      });
+      const regData = await regRes.json();
+      const uniqueDid = regData.user.did;
+      const authHeaders = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${regData.sessionToken}`
+      };
+
       // First claim succeeds
       const res1 = await fetch(`${BASE_URL}/api/wallet/faucet/claim`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({ did: uniqueDid })
       });
       expect(res1.status).toBe(200);
@@ -154,7 +172,7 @@ describe('🚀 Sovra Enterprise Zero-Mock Production Hardening Suite (Phases 1 -
       // Second claim within 24h is rate-limited with 429
       const res2 = await fetch(`${BASE_URL}/api/wallet/faucet/claim`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({ did: uniqueDid })
       });
       expect(res2.status).toBe(429);

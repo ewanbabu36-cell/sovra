@@ -55,7 +55,7 @@ describe('🌍 SOVRA World-Standard Flagship Audit & Verification', () => {
     expect(devServerContent).toContain("'/dist/sovra.css'");
     expect(devServerContent).toContain("'/bundle.js'");
     expect(devServerContent).toContain("'/sovra.css'");
-    expect(devServerContent).toContain("const CACHE_NAME = 'sovra-pwa-v8'");
+    expect(devServerContent).toContain("const CACHE_NAME = 'sovra-pwa-v10'");
   });
 
   it('4. Creator Studio Engine contains all flagship operational methods', () => {

@@ -537,7 +537,16 @@ describe('Sovra 100% Real-World End-to-End Go-Live Verification Suite', { timeou
     const commentData = await commentRes.json();
     expect(commentData.ok).toBe(true);
 
-    // 3. User B sends a creator micro-tip
+    // 3. User B claims starter faucet grant then sends a creator micro-tip
+    await fetch(`${BASE_URL}/api/wallet/faucet/claim`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${userB.sessionToken}`,
+      },
+      body: JSON.stringify({ did: userB.did }),
+    });
+
     const tipRes = await fetch(`${BASE_URL}/api/youtube/tip`, {
       method: 'POST',
       headers: {
@@ -656,7 +665,7 @@ describe('Sovra 100% Real-World End-to-End Go-Live Verification Suite', { timeou
   // SCENARIO 11: ATOMIC DISK PERSISTENCE VERIFICATION
   // =========================================================================
   it('proves that all registered users and mutations are persisted to disk', async () => {
-    const storagePath = path.resolve(process.cwd(), '.sovra-storage-dev/dynamic-social-state.json');
+    const storagePath = path.resolve(process.env.SOVRA_STORAGE_DIR || './.sovra-storage-dev', 'dynamic-social-state.json');
     expect(fs.existsSync(storagePath)).toBe(true);
 
     let diskState: any;

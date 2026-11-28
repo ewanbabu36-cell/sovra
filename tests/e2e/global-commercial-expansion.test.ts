@@ -92,7 +92,10 @@ describe('🚀 SOVRA GLOBAL COMMERCIAL EXPANSION: IOS APP STORE, MPC KEY RECOVER
       expect(res.data.applinks).toBeDefined();
       expect(Array.isArray(res.data.applinks.details)).toBe(true);
 
-      const applinkDetail = res.data.applinks.details[0];
+      const applinkDetail = res.data.applinks.details.find((d: any) =>
+        String(d.appID || '').includes('app.sovra.network')
+      );
+      expect(applinkDetail).toBeDefined();
       expect(applinkDetail.appID).toContain('app.sovra.network');
       expect(applinkDetail.paths).toContain('/spaces/*');
       expect(applinkDetail.paths).toContain('/profile/*');
@@ -149,7 +152,9 @@ describe('🚀 SOVRA GLOBAL COMMERCIAL EXPANSION: IOS APP STORE, MPC KEY RECOVER
       const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       expect(parsed.appId).toBe('app.sovra.network');
       expect(parsed.appName).toBe('Sovra');
-      expect(parsed.server.url).toContain('sovra.network');
+      expect(parsed.webDir).toBe('dist');
+      expect(parsed.server?.url).toBeUndefined();
+      expect(parsed.server?.iosScheme).toBe('sovra');
     });
   });
 

@@ -28,6 +28,8 @@ import {
   getMediaEncryptionKey,
 } from '../../scripts/routes/media.routes.ts';
 import { handleJuryModerationRoutes } from '../../scripts/routes/jury-moderation.routes.ts';
+import { generateEd25519KeyPair, bytesToHex } from '../../packages/crypto/src/index.js';
+import { signBandwidthReceipt } from '../../packages/protocol/src/index.js';
 
 // Helper to create mock HTTP requests and responses
 function createMockReqRes(
@@ -335,19 +337,37 @@ describe('SOVRA PRE-LAUNCH MASTER CONTROL & ARCHITECTURAL AUDIT', () => {
       expect(duplicateClaimAllowed).toBe(false);
     });
 
-    it('2.4 [P2P Bandwidth Seeder Yield Engine]: Claims bandwidth earnings and marks receipts claimed', async () => {
+    it('2.4 [P2P Bandwidth Seeder Yield Engine]: Claims verified co-signed bandwidth earnings, rejects unsigned self-reports, and marks receipts claimed', async () => {
       const seederDid = `did:sovra:seeder_${Date.now()}`;
+      const dlKeys = generateEd25519KeyPair();
+      const downloaderDid = `did:sovra:downloader_${Date.now()}`;
       const dbAny = sovraDb as any;
       if (!dbAny.db.seeder_receipts) dbAny.db.seeder_receipts = [];
+      dbAny.upsertUser?.({
+        did: downloaderDid,
+        handle: `@dl_${Date.now()}`,
+        displayName: 'Downloader Verifier',
+        publicKey: bytesToHex(dlKeys.publicKey),
+      });
 
-      // Add mock bandwidth receipt
+      const receiptId = 'rcpt_audit_' + Date.now();
+      const signedReceipt = signBandwidthReceipt(
+        {
+          receiptId,
+          contentCid: 'bafkreiauditvideo1',
+          seederDid,
+          downloaderDid,
+          bytesServed: 1024 * 1024 * 1024, // 1 GiB -> deterministic 0.05 SOV yield
+          totalMediaBytes: 1024 * 1024 * 1024,
+          timestamp: Date.now(),
+        },
+        dlKeys.privateKey,
+      );
+
       dbAny.db.seeder_receipts.push({
-        id: 'rcpt_audit_' + Date.now(),
-        seederDid: seederDid,
-        bytesRelayed: 100 * 1024 * 1024, // 100 MB
-        amountSov: 5.0,
+        ...signedReceipt,
+        downloaderPublicKeyHex: bytesToHex(dlKeys.publicKey),
         claimed: false,
-        timestamp: Date.now(),
       });
 
       const { req, res, getResponse } = createMockReqRes('POST', '/api/wallet/claim-seeder-yield');
@@ -366,7 +386,7 @@ describe('SOVRA PRE-LAUNCH MASTER CONTROL & ARCHITECTURAL AUDIT', () => {
       expect(response.statusCode).toBe(200);
       const json = response.json();
       expect(json.ok).toBe(true);
-      expect(json.claimedSov).toBe(5.0);
+      expect(json.claimedSov).toBe(0.05);
 
       // Subsequent claim has 0 pending receipts
       const remainingUnclaimed = dbAny.db.seeder_receipts.filter(

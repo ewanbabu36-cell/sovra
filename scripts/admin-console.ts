@@ -1038,6 +1038,12 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         <span class="admin-nav-badge" style="background: #10b981; color: #000;">4-Col Audit</span>
       </button>
 
+      <button class="admin-nav-item" id="navRiskManagementBtn" data-admin-tab="risk-management">
+        <span class="admin-nav-icon">🛡️</span>
+        <span>Risk Management &amp; P&amp;L</span>
+        <span class="admin-nav-badge" id="sidebarRiskBadge" style="background: #f59e0b; color: #000;">RISK AUDIT</span>
+      </button>
+
       <button class="admin-nav-item" onclick="switchAdminTab('panopticon-god-mode')">
         <span class="admin-nav-icon">👁️</span>
         <span>The God Eye (Panopticon)</span>
@@ -3749,16 +3755,16 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
               <div style="background: #0f172a; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
                 <div style="font-size: 0.68rem; color: #94a3b8;">Daily Inflow (Fees)</div>
-                <div id="statDailyInflow" style="font-size: 0.95rem; font-weight: 800; color: #34d399; margin-top: 2px;">+125.00 SOV</div>
+                <div id="statDailyInflow" style="font-size: 0.95rem; font-weight: 800; color: #34d399; margin-top: 2px;">0.00 SOV</div>
               </div>
               <div style="background: #0f172a; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
                 <div style="font-size: 0.68rem; color: #94a3b8;">Daily Burn (Rewards)</div>
-                <div id="statDailyBurn" style="font-size: 0.95rem; font-weight: 800; color: #f87171; margin-top: 2px;">-45.00 SOV</div>
+                <div id="statDailyBurn" style="font-size: 0.95rem; font-weight: 800; color: #f87171; margin-top: 2px;">0.00 SOV</div>
               </div>
             </div>
             <div style="padding: 8px 10px; background: #020617; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; margin-bottom: 10px;">
               <span style="color: #94a3b8;">Calculated Runway:</span>
-              <strong id="statRunwayDays" style="color: #38bdf8; font-family: var(--font-mono);">9,999+ Days (Perpetual)</strong>
+              <strong id="statRunwayDays" style="color: #38bdf8; font-family: var(--font-mono);">Calculating...</strong>
             </div>
             <button class="btn-ops" style="width: 100%; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: #34d399; justify-content: center;" onclick="createChronosSnapshotNow()">Create Chronos Point-in-Time Snapshot</button>
           </div>
@@ -3969,6 +3975,174 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
   </div>
 
   <!-- 💎 1. FINANCIAL WAR ROOM & DOUBLE-ENTRY SOLVENCY ENGINE -->
+  <!-- ==============================================
+       MODULE: RISK MANAGEMENT ENGINE & COMPANY P&L
+       ============================================== -->
+  <section class="ops-section" id="view-risk-management" style="display: none;">
+    <div id="adminTabRiskManagement" class="ops-header-card" style="background: linear-gradient(135deg, rgba(245,158,11,0.16), rgba(239,68,68,0.08)); border: 1px solid rgba(245,158,11,0.35);">
+      <div>
+        <div class="ops-header-title" style="color: #fbbf24;">🛡️ Autonomous Company Risk Management, P&amp;L &amp; Leakage Defense</div>
+        <div class="ops-header-desc">Real-time company profit &amp; loss ledger, unbacked emission/subsidy tracking, active rate/cap guardrails, and 1-click leakage mitigations.</div>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+        <span id="riskOverallGradeBadge" style="font-size: 0.78rem; font-weight: 800; padding: 4px 12px; border-radius: 999px; background: rgba(16,185,129,0.2); color: #34d399; border: 1px solid rgba(16,185,129,0.4);">
+          SCORE: -- / 100 (AUDITING)
+        </span>
+        <button class="btn-ops" id="riskRefreshBtn" data-risk-op="refresh" style="background: rgba(56,189,248,0.18); border-color: rgba(56,189,248,0.45); color: #38bdf8; font-weight: 700;">
+          🔄 Run Deep Risk Audit
+        </button>
+        <button class="btn-ops" id="riskExportBtn" data-risk-op="export" style="background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.45); color: #c084fc; font-weight: 700;">
+          📥 Export Risk JSON Report
+        </button>
+      </div>
+    </div>
+
+    <!-- 1. Executive Company P&L Telemetry Grid -->
+    <div class="ops-grid" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 1.25rem;">
+      <div class="ops-card" style="border-left: 3px solid #10b981;">
+        <div class="ops-card-label">Gross Protocol Revenue</div>
+        <div id="riskGrossRevenue" class="ops-card-val" style="color: #34d399;">0.00 SOV</div>
+        <div id="riskDailyRevRate" class="ops-card-sub">Daily Intake: 0.00 SOV/d</div>
+      </div>
+      <div class="ops-card" style="border-left: 3px solid #f43f5e;">
+        <div class="ops-card-label">Direct Subsidies &amp; Costs</div>
+        <div id="riskDirectCosts" class="ops-card-val" style="color: #fb7185;">0.00 SOV</div>
+        <div id="riskDailyCostRate" class="ops-card-sub">Daily Cost: 0.00 SOV/d</div>
+      </div>
+      <div class="ops-card" style="border-left: 3px solid #38bdf8;">
+        <div class="ops-card-label">Net Operating Profit / Loss</div>
+        <div id="riskNetOperatingProfit" class="ops-card-val" style="color: #38bdf8;">0.00 SOV</div>
+        <div id="riskOperatingMargin" class="ops-card-sub">Operating Margin: 0.0%</div>
+      </div>
+      <div class="ops-card" style="border-left: 3px solid #f59e0b;">
+        <div class="ops-card-label">Risk-Adjusted Net P&amp;L</div>
+        <div id="riskAdjustedPnl" class="ops-card-val" style="color: #fbbf24;">0.00 SOV</div>
+        <div id="riskTotalExposure" class="ops-card-sub">Total Leakage Exposure: 0.00 SOV</div>
+      </div>
+      <div class="ops-card" style="border-left: 3px solid #a855f7;">
+        <div class="ops-card-label">Honest Treasury Runway</div>
+        <div id="riskRunwayLabel" class="ops-card-val" style="color: #c084fc; font-size: 1.25rem;">Computing...</div>
+        <div id="riskBurnRemoved" class="ops-card-sub">Permanent Burn Sink: 0.00 SOV</div>
+      </div>
+      <div class="ops-card" style="border-left: 3px solid #06b6d4;">
+        <div class="ops-card-label">Attacks Prevented &amp; Saved</div>
+        <div id="riskRecoveredSavings" class="ops-card-val" style="color: #22d3ee;">0.00 SOV</div>
+        <div id="riskPreventedCount" class="ops-card-sub">0 Exploits Blocked</div>
+      </div>
+    </div>
+
+    <!-- 2. Revenue Streams vs. Subsidies / Loss Breakdown -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+      <div class="ops-table-card">
+        <div class="ops-table-header">
+          <span class="ops-table-title" style="color: #34d399;">💹 Company Revenue Streams (Real Ledger)</span>
+        </div>
+        <div id="riskRevenueBreakdownBody" style="padding: 1rem; display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem;"></div>
+      </div>
+      <div class="ops-table-card">
+        <div class="ops-table-header">
+          <span class="ops-table-title" style="color: #fb7185;">🩸 Subsidies, Expenses &amp; Risk Losses</span>
+        </div>
+        <div id="riskCostBreakdownBody" style="padding: 1rem; display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem;"></div>
+      </div>
+    </div>
+
+    <!-- 3. One-Click Automated Leakage Mitigation Playbook -->
+    <div class="ops-card" style="margin-bottom: 1.25rem; background: rgba(15,23,42,0.9); border: 1px solid rgba(245,158,11,0.35); padding: 1.25rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+        <div>
+          <span style="font-weight: 800; color: #fbbf24; font-size: 0.98rem;">⚡ One-Click Leakage &amp; Solvency Mitigations</span>
+          <div style="font-size: 0.75rem; color: #94a3b8;">Execute immediate containment actions across DePIN, Referrals, Vouchers, AMM pools &amp; Dual-DB Ledgers.</div>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="btn-ops" data-risk-action="RECLAIM_EXPIRED_VOUCHERS" style="background: rgba(56,189,248,0.18); border-color: rgba(56,189,248,0.45); color: #38bdf8;">♻️ Reclaim Expired Vouchers</button>
+          <button class="btn-ops" data-risk-action="FREEZE_WASH_TRADING_LOOPS" style="background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.45); color: #fbbf24;">🕸️ Freeze Sybil/Wash Loops</button>
+          <button class="btn-ops" data-risk-action="RECONCILE_LEDGER_SYNC" style="background: rgba(16,185,129,0.18); border-color: rgba(16,185,129,0.45); color: #34d399;">⚖️ Reconcile JSON↔SQLite</button>
+          <button class="btn-ops" data-risk-action="RECONCILE_OFFCHAIN_L1" style="background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.45); color: #c084fc;">🔄 Audit Off-Chain L1 Queue</button>
+          <button class="btn-ops" data-risk-action="ENFORCE_STRICT_CAPS" style="background: rgba(239,68,68,0.2); border-color: rgba(239,68,68,0.5); color: #f87171;">🔒 Enforce Fortress Mainnet Caps</button>
+        </div>
+      </div>
+      <div id="riskTopPrioritiesList" style="font-size: 0.78rem; color: #e2e8f0; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px 12px;">
+        Running top priority scan...
+      </div>
+    </div>
+
+    <!-- 4. Deep Codebase Leakage Vectors & "How To Stop Leakage" Matrix -->
+    <div class="ops-table-card" style="margin-bottom: 1.25rem;">
+      <div class="ops-table-header">
+        <span class="ops-table-title">🔍 Deep Leakage Audit Matrix &amp; Prevention Controls ("Leakage Kaise Rokein")</span>
+      </div>
+      <div id="riskLeakageVectorsList" style="padding: 1rem; display: flex; flex-direction: column; gap: 10px;"></div>
+    </div>
+
+    <!-- 5. Active Guardrail Policies & Operational Expense Recorder -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+      <div class="ops-card" style="background: rgba(15,23,42,0.88); border: 1px solid rgba(99,102,241,0.35); padding: 1.25rem;">
+        <div style="font-weight: 800; color: #818cf8; margin-bottom: 10px;">🎛️ Active Hard Caps &amp; Risk Guardrail Policy</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.78rem;">
+          <label>Daily Referral Cap (SOV)<input id="rpDailyRefCap" type="number" style="width:100%;margin-top:4px;background:#1e293b;color:#fff;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px;" /></label>
+          <label>Daily Faucet Cap (SOV)<input id="rpDailyFaucetCap" type="number" style="width:100%;margin-top:4px;background:#1e293b;color:#fff;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px;" /></label>
+          <label>Max Unbacked DePIN (SOV/MB)<input id="rpDepinRateCap" type="number" step="0.001" style="width:100%;margin-top:4px;background:#1e293b;color:#fff;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px;" /></label>
+          <label>Daily Meta-Tx Relayer Cap<input id="rpMetaTxCap" type="number" style="width:100%;margin-top:4px;background:#1e293b;color:#fff;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px;" /></label>
+          <label>Max AMM Single Drain (%)<input id="rpAmmDrainPct" type="number" style="width:100%;margin-top:4px;background:#1e293b;color:#fff;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px;" /></label>
+          <label>Take-Rate Floor (%)<input id="rpTakeRateFloor" type="number" step="0.1" style="width:100%;margin-top:4px;background:#1e293b;color:#fff;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px;" /></label>
+          <label>Daily Fiat Mint Cap (SOV)<input id="rpFiatMintCap" type="number" style="width:100%;margin-top:4px;background:#1e293b;color:#fff;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px;" /></label>
+          <label style="display:flex;align-items:center;gap:6px;padding-top:6px;"><input id="rpRequireSeederBond" type="checkbox" /> Require 100 SOV Seeder Bond</label>
+          <label style="display:flex;align-items:center;gap:6px;padding-top:6px;"><input id="rpStrictDepin" type="checkbox" /> Strict Funded DePIN Only</label>
+          <label style="display:flex;align-items:center;gap:6px;padding-top:6px;"><input id="rpStrictAmm" type="checkbox" /> Hard Block AMM Drain</label>
+        </div>
+        <button class="btn-ops" id="riskSavePolicyBtn" data-risk-op="save-policies" style="margin-top: 12px; background: rgba(99,102,241,0.22); border-color: rgba(99,102,241,0.5); color: #a5b4fc; font-weight: 700;">
+          💾 Save &amp; Enforce Risk Policy
+        </button>
+      </div>
+
+      <div class="ops-card" style="background: rgba(15,23,42,0.88); border: 1px solid rgba(244,63,94,0.35); padding: 1.25rem;">
+        <div style="font-weight: 800; color: #fb7185; margin-bottom: 10px;">📝 Record Company Operational Expense / Cost / Loss</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.78rem;">
+          <label>Category
+            <select id="rlCategory" style="width:100%;margin-top:4px;background:#1e293b;color:#fff;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px;">
+              <option value="OPERATIONAL_INFRA_EXPENSE">Operational / Server Expense</option>
+              <option value="CREATOR_BOUNTY">Creator Bounty / Grant</option>
+              <option value="MITIGATION_RECOVERY">Recovered Leakage / Savings</option>
+              <option value="SOLVENCY_DRIFT">Solvency Adjustment</option>
+            </select>
+          </label>
+          <label>Amount (SOV)<input id="rlAmountSov" type="number" step="0.01" placeholder="50.00" style="width:100%;margin-top:4px;background:#1e293b;color:#fff;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px;" /></label>
+        </div>
+        <label style="display:block;margin-top:10px;font-size:0.78rem;">Description / Audit Justification
+          <input id="rlDescription" type="text" placeholder="e.g. Monthly Bootstrap Node & Storage Relay Hosting" style="width:100%;margin-top:4px;background:#1e293b;color:#fff;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px;" />
+        </label>
+        <button class="btn-ops" id="riskRecordManualBtn" data-risk-op="record-manual" style="margin-top: 12px; background: rgba(244,63,94,0.2); border-color: rgba(244,63,94,0.5); color: #fda4af; font-weight: 700;">
+          ➕ Commit to Risk P&amp;L Ledger
+        </button>
+      </div>
+    </div>
+
+    <!-- 6. Live Risk & Mitigation Ledger Table -->
+    <div class="ops-table-card">
+      <div class="ops-table-header">
+        <span class="ops-table-title">📜 Real-Time Risk, Subsidy &amp; Mitigation Audit Log</span>
+      </div>
+      <div style="overflow-x: auto; max-height: 360px; overflow-y: auto;">
+        <table class="ops-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Category</th>
+              <th>Severity</th>
+              <th>Amount (SOV)</th>
+              <th>Status</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="riskEventLedgerRows">
+            <tr><td colspan="6" style="text-align:center;color:#64748b;padding:1rem;">Loading risk events...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
   <section class="ops-section" id="view-treasury-war-room">
     <div id="adminTabTreasury" class="ops-header-card" style="background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(56,189,248,0.08)); border: 1px solid rgba(16,185,129,0.35);">
       <div>
@@ -4036,7 +4210,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           <span>1. Bridge &amp; Liquidity Gateway</span>
           <span style="color: #38bdf8; font-weight: 700;">0.2% - 0.5% Fee</span>
         </div>
-        <div id="revStream1Val" class="ops-card-val" style="color: #38bdf8; font-size: 1.5rem;">1,450.00 SOV</div>
+        <div id="revStream1Val" class="ops-card-val" style="color: #38bdf8; font-size: 1.5rem;">0.00 SOV</div>
         <div class="ops-card-sub">BTC Lightning, Base L2 (USDC) &amp; Solana off-ramp cashouts</div>
         <div style="margin-top: 8px; font-size: 0.72rem; color: #10b981; font-weight: 700;">● Active Multi-Chain Routing</div>
       </div>
@@ -4045,10 +4219,10 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
       <div class="ops-card" style="border-left: 3px solid #10b981;">
         <div class="ops-card-label">
           <span>2. Native SOV Core Treasury</span>
-          <span style="color: #10b981; font-weight: 700;">20% Reserve</span>
+          <span style="color: #10b981; font-weight: 700;">100M Hard Cap</span>
         </div>
-        <div id="revStream2Val" class="ops-card-val" style="color: #10b981; font-size: 1.5rem;">200,000,000 SOV</div>
-        <div class="ops-card-sub">Core developer salaries, international security audits, 20-yr runway</div>
+        <div id="revStream2Val" class="ops-card-val" style="color: #10b981; font-size: 1.5rem;">Loading...</div>
+        <div class="ops-card-sub">Core developer salaries, international security audits, L1 reserve</div>
         <div style="margin-top: 8px; font-size: 0.72rem; color: #34d399; font-weight: 700;">● Time-Locked Cold Treasury Vault</div>
       </div>
 
@@ -4058,7 +4232,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           <span>3. AI Agent Marketplace Escrow</span>
           <span style="color: #f59e0b; font-weight: 700;">2% - 5% Take</span>
         </div>
-        <div id="revStream3Val" class="ops-card-val" style="color: #f59e0b; font-size: 1.5rem;">320.50 SOV</div>
+        <div id="revStream3Val" class="ops-card-val" style="color: #f59e0b; font-size: 1.5rem;">0.00 SOV</div>
         <div class="ops-card-sub">POST /api/ai/agents/hire automated moderation &amp; summarizer bots</div>
         <div style="margin-top: 8px; font-size: 0.72rem; color: #fbbf24; font-weight: 700;">● Autonomous Smart Escrow Active</div>
       </div>
@@ -4069,9 +4243,9 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           <span>4. Enterprise Studio Pro MRR</span>
           <span style="color: #a855f7; font-weight: 700;">$29 - $199/mo</span>
         </div>
-        <div id="revStream4Val" class="ops-card-val" style="color: #a855f7; font-size: 1.5rem;">$12,480 /mo</div>
+        <div id="revStream4Val" class="ops-card-val" style="color: #a855f7; font-size: 1.5rem;">$0 /mo</div>
         <div class="ops-card-sub">4K 60FPS BitSwap streaming, white-label domains, brand escrow (3%)</div>
-        <div style="margin-top: 8px; font-size: 0.72rem; color: #c084fc; font-weight: 700;">● 48 Enterprise Media House Seats</div>
+        <div style="margin-top: 8px; font-size: 0.72rem; color: #c084fc; font-weight: 700;">● Live Registered Enterprise Seats</div>
       </div>
 
       <!-- Stream 5: Premium Sovereign Handles & Web3 Domains -->
@@ -4080,7 +4254,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           <span>5. Sovereign .sovra Domains</span>
           <span style="color: #ec4899; font-weight: 700;">Auctions</span>
         </div>
-        <div id="revStream5Val" class="ops-card-val" style="color: #ec4899; font-size: 1.5rem;">8,900.00 SOV</div>
+        <div id="revStream5Val" class="ops-card-val" style="color: #ec4899; font-size: 1.5rem;">0.00 SOV</div>
         <div class="ops-card-sub">Short handles (@elon, @crypto) &amp; sovereign TLD domain registry</div>
         <div style="margin-top: 8px; font-size: 0.72rem; color: #f472b6; font-weight: 700;">● ENS-Grade Decentralized Registry</div>
       </div>
@@ -4091,9 +4265,9 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           <span>6. Arweave &amp; IPFS Archival SLAs</span>
           <span style="color: #06b6d4; font-weight: 700;">SLA Contracts</span>
         </div>
-        <div id="revStream6Val" class="ops-card-val" style="color: #06b6d4; font-size: 1.5rem;">4,150.00 SOV</div>
-        <div class="ops-card-sub">100-Year permanent content freeze contracts &amp; high-speed edge peering</div>
-        <div style="margin-top: 8px; font-size: 0.72rem; color: #22d3ee; font-weight: 700;">● 12 Enterprise Nodes Peered</div>
+        <div id="revStream6Val" class="ops-card-val" style="color: #06b6d4; font-size: 1.5rem;">0.00 SOV</div>
+        <div class="ops-card-sub">Permanent content freeze contracts &amp; high-speed edge peering</div>
+        <div style="margin-top: 8px; font-size: 0.72rem; color: #22d3ee; font-weight: 700;">● Live Edge Node Peering</div>
       </div>
     </div>
 
@@ -4108,12 +4282,12 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           <span id="takeRateDisplayBadge" style="font-size: 1.15rem; font-weight: 900; color: #10b981; font-family: var(--font-mono); background: rgba(16,185,129,0.15); padding: 4px 12px; border-radius: 8px; border: 1px solid rgba(16,185,129,0.4);">
             ${(revenueTakeRate || 5.0).toFixed(1)}%
           </span>
-          <button class="btn-ops" onclick="saveProtocolTakeRate()" style="background: rgba(16,185,129,0.2); border-color: rgba(16,185,129,0.5); color: #34d399; font-weight: 700;">Apply Rate</button>
+          <button class="btn-ops" id="saveProtocolTakeRateBtn" style="background: rgba(16,185,129,0.2); border-color: rgba(16,185,129,0.5); color: #34d399; font-weight: 700;">Apply Rate</button>
         </div>
       </div>
       <div style="display: flex; align-items: center; gap: 14px;">
-        <span style="font-size: 0.78rem; color: #94a3b8; font-family: var(--font-mono);">0.1%</span>
-        <input type="range" id="adminTakeRateSlider" min="0.1" max="5.0" step="0.1" value="${revenueTakeRate || 5.0}" oninput="document.getElementById('takeRateDisplayBadge').innerText = parseFloat(this.value).toFixed(1) + '%'" style="flex: 1; accent-color: #10b981; cursor: pointer;">
+        <span style="font-size: 0.78rem; color: #94a3b8; font-family: var(--font-mono);">2.5%</span>
+        <input type="range" id="adminTakeRateSlider" min="2.5" max="5.0" step="0.1" value="${Math.max(2.5, Number(revenueTakeRate || 5.0))}" style="flex: 1; accent-color: #10b981; cursor: pointer;">
         <span style="font-size: 0.78rem; color: #94a3b8; font-family: var(--font-mono);">5.0%</span>
       </div>
     </div>
@@ -4321,6 +4495,8 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
 
       if (tabId === 'treasury-war-room' || tabId === 'revenue-leakage-radar') {
         if (typeof loadSolvencyReport === 'function') loadSolvencyReport();
+      } else if (tabId === 'risk-management') {
+        if (typeof loadRiskManagementOverview === 'function') loadRiskManagementOverview();
       } else if (tabId === 'user-management') {
         if (typeof loadAdminUsers === 'function') loadAdminUsers();
       } else if (tabId === 'creator-management') {
@@ -4676,6 +4852,7 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
     const COMMAND_PALETTE_ITEMS = [
       { id: 'diagnostics', title: 'Node Diagnostics & Hardware Core', desc: 'Jump to CPU, RAM, TCP port, and Ed25519 identity bindings', icon: '💻', action: () => switchAdminTab('overview') },
       { id: 'treasury', title: 'Financial War Room & Solvency Engine', desc: 'Inspect 6-stream revenue, solvency delta, and take-rate slider', icon: '💎', action: () => switchAdminTab('treasury-war-room') },
+      { id: 'riskmanagement', title: 'Risk Management Engine & Company P&L', desc: 'Inspect real revenue, losses, leakage vectors, caps & 1-click fixes', icon: '🛡️', action: () => switchAdminTab('risk-management') },
       { id: 'users', title: 'Sovereign Users & Identity Cockpit', desc: 'Search handles, promote/demote roles, adjust SOV balance', icon: '👥', action: () => switchAdminTab('users-chat') },
       { id: 'telemetry', title: 'Mesh Telemetry & Live Network TPS', desc: 'Real-time Canvas TPS graph, BitSwap blocks, and peer health', icon: '⚡', action: () => switchAdminTab('telemetry') },
       { id: 'goddial', title: 'The God Dial & Virality Controls', desc: 'Algorithmic weights, organic reach, and recommendation dial', icon: '🎛️', action: () => switchAdminTab('god-dial') },
@@ -5862,6 +6039,296 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
         .catch(function(err) { showOpsToast('Audit error: ' + err.message); });
     }
 
+    function escRiskHtml(val) {
+      return String(val == null ? '' : val)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function renderRiskManagementDashboard(data) {
+      if (!data || !data.ok) return;
+      var pnl = data.pnl || {};
+      var rev = pnl.revenue || {};
+      var cost = pnl.costsAndLosses || {};
+      var net = pnl.pnl || {};
+      var sup = pnl.supply || {};
+      var audit = data.leakageAudit || {};
+      var pol = data.policies || {};
+
+      var setEl = function(id, txt) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = txt;
+      };
+
+      // Update Module 18 & Risk KPI cards dynamically (no static placeholders)
+      setEl('statDailyInflow', '+' + (rev.dailyRevenueRateSov || 0).toFixed(2) + ' SOV');
+      setEl('statDailyBurn', '-' + (cost.dailyCostRateSov || 0).toFixed(2) + ' SOV');
+      setEl('statRunwayDays', net.runwayLabel || '0 Days');
+      setEl('runwayHealthBadge', net.healthStatus || 'AUDITING');
+
+      setEl('riskGrossRevenue', (rev.grossProtocolRevenueSov || 0).toFixed(2) + ' SOV');
+      setEl('riskDailyRevRate', 'Daily Intake: ' + (rev.dailyRevenueRateSov || 0).toFixed(2) + ' SOV/d');
+      setEl('riskDirectCosts', (cost.totalDirectCostsAndSubsidiesSov || 0).toFixed(2) + ' SOV');
+      setEl('riskDailyCostRate', 'Daily Cost: ' + (cost.dailyCostRateSov || 0).toFixed(2) + ' SOV/d');
+      setEl('riskNetOperatingProfit', (net.netOperatingProfitSov >= 0 ? '+' : '') + (net.netOperatingProfitSov || 0).toFixed(2) + ' SOV');
+      setEl('riskOperatingMargin', 'Operating Margin: ' + (net.operatingMarginPct || 0).toFixed(1) + '%');
+      setEl('riskAdjustedPnl', (net.riskAdjustedNetPnLSov >= 0 ? '+' : '') + (net.riskAdjustedNetPnLSov || 0).toFixed(2) + ' SOV');
+      setEl('riskTotalExposure', 'Leakage Exposure: ' + (audit.totalExposureSov || 0).toFixed(2) + ' SOV');
+      setEl('riskRunwayLabel', net.runwayLabel || '0 Days');
+      setEl('riskBurnRemoved', 'Burn Sink Removed: ' + (sup.totalBurnedSov || 0).toFixed(2) + ' SOV');
+      setEl('riskRecoveredSavings', (net.recoveredSavingsSov || 0).toFixed(2) + ' SOV');
+      setEl('riskPreventedCount', (net.preventedAttacksCount || 0) + ' Exploits Blocked');
+
+      var badge = document.getElementById('riskOverallGradeBadge');
+      var navBadge = document.getElementById('sidebarRiskBadge');
+      if (badge) {
+        badge.textContent = 'RISK SCORE: ' + (audit.overallRiskScore || 0) + '/100 (' + (audit.riskGrade || 'LOW') + ')';
+        var col = audit.riskGrade === 'CRITICAL' ? '#ef4444' : audit.riskGrade === 'HIGH' ? '#f59e0b' : audit.riskGrade === 'ELEVATED' ? '#38bdf8' : '#10b981';
+        badge.style.color = col;
+        badge.style.borderColor = col;
+      }
+      if (navBadge) {
+        navBadge.textContent = (audit.riskGrade || 'LOW') + ' (' + (audit.overallRiskScore || 0) + ')';
+      }
+
+      var rowItem = function(label, val, color) {
+        return '<div style="display:flex;justify-content:space-between;padding:5px 8px;background:rgba(0,0,0,0.25);border-radius:6px;">' +
+          '<span style="color:#cbd5e1;">' + escRiskHtml(label) + '</span>' +
+          '<span style="font-weight:700;font-family:var(--font-mono);color:' + color + ';">' + Number(val || 0).toFixed(2) + ' SOV</span>' +
+        '</div>';
+      };
+
+      var revBody = document.getElementById('riskRevenueBreakdownBody');
+      if (revBody) {
+        revBody.innerHTML = [
+          rowItem('Creator & Platform Take Fees', rev.platformTakeFeesSov, '#34d399'),
+          rowItem('L1 / P2P Transfer & Settlement Fees', rev.transferAndSettlementFeesSov, '#34d399'),
+          rowItem('Handle Registration Protocol Yield', rev.handleBurnSinkYieldSov, '#34d399'),
+          rowItem('Storage Pinning Rent Yield', rev.storageRentYieldSov, '#34d399'),
+          rowItem('Boost & Promotion Staker Yield', rev.boostAndPromotionFeesSov, '#34d399'),
+          rowItem('AMM Swap Creator Royalties & Fees', rev.ammSwapRoyaltiesSov, '#38bdf8'),
+          rowItem('Cross-Chain Bridge Fees', rev.bridgeFeesSov, '#38bdf8'),
+          rowItem('AI Agent Marketplace Fees', rev.aiMarketplaceFeesSov, '#38bdf8'),
+          rowItem('Protocol Supply Burned (Deflation Sink)', rev.recordedBurnSinkTotalSov, '#a855f7'),
+        ].join('');
+      }
+
+      var costBody = document.getElementById('riskCostBreakdownBody');
+      if (costBody) {
+        costBody.innerHTML = [
+          rowItem('Referral Subsidies (+50/+25 SOV)', cost.referralSubsidiesSov, '#fb7185'),
+          rowItem('Genesis Faucet Starter Grants', cost.faucetGrantsSov, '#fb7185'),
+          rowItem('DePIN Unbacked Guest Subsidies', cost.depinUnbackedSubsidiesSov, '#f59e0b'),
+          rowItem('Seeder Bandwidth Emissions (50% Vested)', cost.seederEmissionCostsSov, '#f59e0b'),
+          rowItem('Meta-Tx EIP-2771 Gas Sponsorship', cost.metaTxRelayerSubsidySov, '#f59e0b'),
+          rowItem('Creator Bounties & Quadratic Matching', cost.creatorBountiesSov, '#fb7185'),
+          rowItem('Admin Manual Positive Credits', cost.adminManualCreditsSov, '#fb7185'),
+          rowItem('Recorded Infra / Ops Expenses', cost.operationalExpensesSov, '#fb7185'),
+          rowItem('Expired Unclaimed Offline Vouchers', cost.expiredOfflineVoucherLiabilitySov, '#fbbf24'),
+          rowItem('Off-Chain Transfer L1 Fee Backlog', cost.l1OffchainFeeDeficitSov, '#fbbf24'),
+          rowItem('Wash-Trading & Disintermediation Exposure', (cost.washTradingFeeRebateExposureSov || 0) + (cost.disintermediationEstimatedFeeLossSov || 0), '#fbbf24'),
+          rowItem('Solvency Gap Discrepancy', cost.solvencyDiscrepancySov, '#ef4444'),
+        ].join('');
+      }
+
+      var prioEl = document.getElementById('riskTopPrioritiesList');
+      if (prioEl && Array.isArray(audit.topPriorities)) {
+        prioEl.innerHTML = '<strong style="color:#fbbf24;">Top Priorities:</strong><ul style="margin:6px 0 0 18px;padding:0;">' +
+          audit.topPriorities.map(function(p) { return '<li style="margin-bottom:3px;">' + escRiskHtml(p) + '</li>'; }).join('') +
+        '</ul>';
+      }
+
+      var vecEl = document.getElementById('riskLeakageVectorsList');
+      if (vecEl && Array.isArray(audit.vectors)) {
+        vecEl.innerHTML = audit.vectors.map(function(v) {
+          var sevColor = v.severity === 'CRITICAL' ? '#ef4444' : v.severity === 'HIGH' ? '#f59e0b' : v.severity === 'MEDIUM' ? '#38bdf8' : '#10b981';
+          var stepsHtml = Array.isArray(v.howToPrevent)
+            ? '<ul style="margin:6px 0 0 16px;padding:0;color:#cbd5e1;font-size:0.78rem;">' +
+              v.howToPrevent.map(function(s) { return '<li>' + escRiskHtml(s) + '</li>'; }).join('') + '</ul>'
+            : '';
+          return '<div style="background:rgba(15,23,42,0.75);border:1px solid rgba(255,255,255,0.08);border-left:3px solid ' + sevColor + ';border-radius:10px;padding:12px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">' +
+              '<div><strong style="color:#f8fafc;">' + escRiskHtml(v.id + ' — ' + v.title) + '</strong> <span style="font-size:0.72rem;color:#94a3b8;">(' + escRiskHtml(v.codeLocation) + ')</span></div>' +
+              '<div style="display:flex;gap:6px;align-items:center;">' +
+                '<span style="font-size:0.72rem;font-weight:800;padding:2px 8px;border-radius:999px;background:rgba(0,0,0,0.4);color:' + sevColor + ';border:1px solid ' + sevColor + ';">' + escRiskHtml(v.severity + ' · ' + v.status) + '</span>' +
+                '<span style="font-family:var(--font-mono);font-size:0.76rem;color:#fbbf24;">Exp: ' + Number(v.detectedExposureSov || 0).toFixed(2) + ' SOV | Blocked: ' + (v.preventedCount || 0) + '</span>' +
+                '<button class="btn-ops risk-vector-fix-btn" style="padding:3px 9px;font-size:0.72rem;" data-risk-action="' + escRiskHtml(v.recommendedMitigationAction) + '">Fix / Enforce</button>' +
+              '</div>' +
+            '</div>' +
+            '<div style="font-size:0.78rem;color:#94a3b8;margin-top:4px;"><strong>Root Cause:</strong> ' + escRiskHtml(v.rootCause) + '</div>' +
+            '<div style="font-size:0.75rem;color:#34d399;margin-top:4px;"><strong>Active Control:</strong> ' + escRiskHtml(v.activeControl) + '</div>' +
+            '<div style="font-size:0.76rem;color:#38bdf8;margin-top:6px;"><strong>How to Stop Leakage:</strong>' + stepsHtml + '</div>' +
+          '</div>';
+        }).join('');
+      }
+
+      // Populate Policy form fields
+      var setVal = function(id, val) { var el = document.getElementById(id); if (el) el.value = val; };
+      var setChk = function(id, val) { var el = document.getElementById(id); if (el) el.checked = Boolean(val); };
+      setVal('rpDailyRefCap', pol.dailyReferralBudgetSov ?? 50000);
+      setVal('rpDailyFaucetCap', pol.dailyFaucetBudgetSov ?? 250000);
+      setVal('rpDepinRateCap', pol.maxUnbackedDepinRatePerMbSov ?? 0.01);
+      setVal('rpMetaTxCap', pol.dailyMetaTxSubsidyCapSov ?? 500);
+      setVal('rpAmmDrainPct', pol.maxSingleAmmDrainPct ?? 25);
+      setVal('rpTakeRateFloor', pol.platformTakeRateFloorPct ?? 2.5);
+      setVal('rpFiatMintCap', pol.dailyFiatMintCapSov ?? 100000);
+      setChk('rpRequireSeederBond', pol.requireSeederBondForYield);
+      setChk('rpStrictDepin', pol.strictDepinFundedClientOnly);
+      setChk('rpStrictAmm', pol.enforceStrictAmmDrainCap);
+
+      var ledgerRows = document.getElementById('riskEventLedgerRows');
+      if (ledgerRows && Array.isArray(data.recentLedger)) {
+        ledgerRows.innerHTML = data.recentLedger.length === 0
+          ? '<tr><td colspan="6" style="text-align:center;color:#64748b;padding:1rem;">No risk events recorded yet.</td></tr>'
+          : data.recentLedger.slice(0, 40).map(function(e) {
+              var st = e.prevented ? 'PREVENTED' : e.direction;
+              var stCol = e.prevented ? '#34d399' : (e.direction === 'LOSS_OR_COST' ? '#fb7185' : '#38bdf8');
+              return '<tr>' +
+                '<td style="font-family:var(--font-mono);font-size:0.74rem;color:#94a3b8;">' + new Date(e.createdAt).toLocaleTimeString() + '</td>' +
+                '<td><code style="color:#fbbf24;">' + escRiskHtml(e.category) + '</code></td>' +
+                '<td>' + escRiskHtml(e.severity) + '</td>' +
+                '<td style="font-family:var(--font-mono);font-weight:700;">' + Number(e.amountSov || 0).toFixed(4) + ' SOV</td>' +
+                '<td style="color:' + stCol + ';font-weight:700;">' + escRiskHtml(st) + '</td>' +
+                '<td style="font-size:0.78rem;">' + escRiskHtml(e.description) + '</td>' +
+              '</tr>';
+            }).join('');
+      }
+      initRiskUiEventDelegation();
+    }
+
+    function loadRiskManagementOverview() {
+      initRiskUiEventDelegation();
+      return fetch('/api/admin/risk/overview')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.ok) renderRiskManagementDashboard(data);
+          return data;
+        })
+        .catch(function() {});
+    }
+
+    function executeRiskMitigation(action) {
+      fetch('/api/admin/risk/mitigate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: action })
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          if (res && res.ok) {
+            if (typeof showOpsToast === 'function') showOpsToast('✅ ' + (res.summary || action + ' executed'));
+            loadRiskManagementOverview();
+            loadSolvencyReport();
+          } else {
+            if (typeof showOpsToast === 'function') showOpsToast('❌ ' + (res && res.error ? res.error : 'Mitigation failed'));
+          }
+        })
+        .catch(function(err) {
+          if (typeof showOpsToast === 'function') showOpsToast('Mitigation error: ' + err.message);
+        });
+    }
+
+    function saveRiskPolicies() {
+      var payload = {
+        dailyReferralBudgetSov: Number(document.getElementById('rpDailyRefCap')?.value || 50000),
+        dailyFaucetBudgetSov: Number(document.getElementById('rpDailyFaucetCap')?.value || 250000),
+        maxUnbackedDepinRatePerMbSov: Number(document.getElementById('rpDepinRateCap')?.value || 0.01),
+        dailyMetaTxSubsidyCapSov: Number(document.getElementById('rpMetaTxCap')?.value || 500),
+        maxSingleAmmDrainPct: Number(document.getElementById('rpAmmDrainPct')?.value || 25),
+        platformTakeRateFloorPct: Number(document.getElementById('rpTakeRateFloor')?.value || 2.5),
+        dailyFiatMintCapSov: Number(document.getElementById('rpFiatMintCap')?.value || 100000),
+        requireSeederBondForYield: Boolean(document.getElementById('rpRequireSeederBond')?.checked),
+        strictDepinFundedClientOnly: Boolean(document.getElementById('rpStrictDepin')?.checked),
+        enforceStrictAmmDrainCap: Boolean(document.getElementById('rpStrictAmm')?.checked),
+      };
+      fetch('/api/admin/risk/policies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          if (res && res.ok) {
+            if (typeof showOpsToast === 'function') showOpsToast('🛡️ Risk Policies saved & enforced across runtime guards');
+            loadRiskManagementOverview();
+          } else {
+            if (typeof showOpsToast === 'function') showOpsToast('❌ ' + (res && res.error ? res.error : 'Failed to save policy'));
+          }
+        })
+        .catch(function(err) {
+          if (typeof showOpsToast === 'function') showOpsToast('Save error: ' + err.message);
+        });
+    }
+
+    function recordManualRiskEntry() {
+      var category = document.getElementById('rlCategory')?.value || 'OPERATIONAL_INFRA_EXPENSE';
+      var amountSov = Number(document.getElementById('rlAmountSov')?.value || 0);
+      var description = document.getElementById('rlDescription')?.value || '';
+      var direction = category === 'MITIGATION_RECOVERY' ? 'RECOVERED_OR_SAVED' : 'LOSS_OR_COST';
+      fetch('/api/admin/risk/ledger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: category, amountSov: amountSov, description: description, direction: direction, severity: 'MEDIUM' })
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          if (res && res.ok) {
+            if (typeof showOpsToast === 'function') showOpsToast('📝 Recorded entry in Company Risk P&L Ledger');
+            if (document.getElementById('rlAmountSov')) document.getElementById('rlAmountSov').value = '';
+            if (document.getElementById('rlDescription')) document.getElementById('rlDescription').value = '';
+            loadRiskManagementOverview();
+          } else {
+            if (typeof showOpsToast === 'function') showOpsToast('❌ ' + (res && res.error ? res.error : 'Invalid entry'));
+          }
+        })
+        .catch(function(err) {
+          if (typeof showOpsToast === 'function') showOpsToast('Ledger error: ' + err.message);
+        });
+    }
+
+    function initRiskUiEventDelegation() {
+      if (window.__sovraRiskUiDelegated) return;
+      window.__sovraRiskUiDelegated = true;
+      document.addEventListener('click', function(ev) {
+        var target = ev.target && typeof ev.target.closest === 'function' ? ev.target : null;
+        if (!target) return;
+        var actionBtn = target.closest('[data-risk-action]');
+        if (actionBtn) {
+          var act = actionBtn.getAttribute('data-risk-action');
+          if (act) executeRiskMitigation(act);
+          return;
+        }
+        var tabBtn = target.closest('[data-admin-tab]');
+        if (tabBtn && typeof switchAdminTab === 'function') {
+          var tabName = tabBtn.getAttribute('data-admin-tab');
+          if (tabName) switchAdminTab(tabName);
+          return;
+        }
+        var opBtn = target.closest('[data-risk-op]');
+        if (opBtn) {
+          var op = opBtn.getAttribute('data-risk-op');
+          if (op === 'refresh') loadRiskManagementOverview();
+          else if (op === 'export') window.open('/api/admin/risk/export-report', '_blank');
+          else if (op === 'save-policies') saveRiskPolicies();
+          else if (op === 'record-manual') recordManualRiskEntry();
+          return;
+        }
+        if (target.closest('#saveProtocolTakeRateBtn')) {
+          saveProtocolTakeRate();
+        }
+      });
+      document.addEventListener('input', function(ev) {
+        var slider = ev.target && ev.target.id === 'adminTakeRateSlider' ? ev.target : null;
+        if (!slider) return;
+        var badge = document.getElementById('takeRateDisplayBadge');
+        if (badge) badge.textContent = parseFloat(slider.value || '2.5').toFixed(1) + '%';
+      });
+    }
+    initRiskUiEventDelegation();
+
     function loadSolvencyReport() {
       fetch('/api/admin/treasury/solvency')
         .then(function(r) { return r.json(); })
@@ -5882,6 +6349,26 @@ export function renderAdminHtml(opts: AdminConsoleOptions): string {
           if (gmvEl) gmvEl.textContent = (data.totalLedgerGrossVolume || 0).toFixed(2) + ' SOV';
           if (netEl) netEl.textContent = (data.totalPlatformFeesCollected || 0).toFixed(2) + ' SOV';
           if (escrowsMetricEl) escrowsMetricEl.textContent = (data.breakdown.escrowsLockedSov.total || 0).toFixed(2) + ' SOV';
+        })
+        .catch(function() {});
+      loadRiskManagementOverview();
+      fetch('/api/admin/revenue/six-streams')
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          if (!res || !res.ok || !res.streams) return;
+          var s = res.streams;
+          var s1 = document.getElementById('revStream1Val');
+          var s2 = document.getElementById('revStream2Val');
+          var s3 = document.getElementById('revStream3Val');
+          var s4 = document.getElementById('revStream4Val');
+          var s5 = document.getElementById('revStream5Val');
+          var s6 = document.getElementById('revStream6Val');
+          if (s1 && s.bridge) s1.textContent = s.bridge.revenueFormatted || '0.00 SOV';
+          if (s2 && s.treasury) s2.textContent = s.treasury.reserveFormatted || '100,000,000 SOV';
+          if (s3 && s.aiMarketplace) s3.textContent = s.aiMarketplace.revenueFormatted || '0.00 SOV';
+          if (s4 && s.studioPro) s4.textContent = s.studioPro.mrrFormatted || '$0 /mo';
+          if (s5 && s.domains) s5.textContent = s.domains.revenueFormatted || '0.00 SOV';
+          if (s6 && s.archival) s6.textContent = s.archival.revenueFormatted || '0.00 SOV';
         })
         .catch(function() {});
     }

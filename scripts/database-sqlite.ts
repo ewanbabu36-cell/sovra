@@ -286,13 +286,17 @@ export class SqliteSocialDatabaseEngine {
   }
 
   private initSchema(): void {
-    // Configure high-performance WAL mode, memory mapping and safety pragmas
+    // Configure busy_timeout FIRST before WAL switch acquires a lock across processes
+    this.db.exec('PRAGMA busy_timeout = 10000;');
+    this.executeWithRetry(() => {
+      this.db.exec(`
+        PRAGMA journal_mode = WAL;
+        PRAGMA synchronous = NORMAL;
+        PRAGMA foreign_keys = ON;
+        PRAGMA wal_autocheckpoint = 1000;
+      `);
+    });
     this.db.exec(`
-      PRAGMA journal_mode = WAL;
-      PRAGMA synchronous = NORMAL;
-      PRAGMA foreign_keys = ON;
-      PRAGMA busy_timeout = 10000;
-      PRAGMA wal_autocheckpoint = 1000;
       PRAGMA temp_store = FILE;
       PRAGMA mmap_size = 67108864;
       PRAGMA cache_size = -64000;
@@ -1567,6 +1571,31 @@ export class SqliteSocialDatabaseEngine {
     } catch (_) {}
     try {
       this.db.exec(`
+        -- 30b-3. RISK MANAGEMENT POLICIES & P&L LEDGER
+        CREATE TABLE IF NOT EXISTS risk_management_policies (
+          policy_key TEXT PRIMARY KEY,
+          policy_json TEXT NOT NULL,
+          updated_by TEXT NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS risk_management_ledger (
+          id TEXT PRIMARY KEY,
+          category TEXT NOT NULL,
+          severity TEXT NOT NULL,
+          direction TEXT NOT NULL,
+          amount_sov REAL NOT NULL,
+          actor_did TEXT,
+          endpoint TEXT,
+          description TEXT NOT NULL,
+          prevented INTEGER NOT NULL DEFAULT 0,
+          metadata_json TEXT,
+          created_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_risk_ledger_cat ON risk_management_ledger(category, created_at);
+      `);
+    } catch (_) {}
+    try {
+      this.db.exec(`
         -- 30c. DURABLE VIDEO UPLOAD SESSIONS AND CHUNK MANIFEST
         CREATE TABLE IF NOT EXISTS video_upload_sessions (
           upload_id TEXT PRIMARY KEY,
@@ -1590,6 +1619,40 @@ export class SqliteSocialDatabaseEngine {
         CREATE INDEX IF NOT EXISTS idx_upload_sessions_author ON video_upload_sessions(author_did);
         CREATE INDEX IF NOT EXISTS idx_upload_sessions_status ON video_upload_sessions(status);
         CREATE INDEX IF NOT EXISTS idx_upload_sessions_created ON video_upload_sessions(created_at);
+      `);
+    } catch (_) {}
+    try {
+      this.db.exec(`
+        -- 30d. ENTERPRISE KYC VERIFICATIONS & FIAT BANKING PAYOUT STATE MACHINE
+        CREATE TABLE IF NOT EXISTS kyc_verifications (
+          did TEXT PRIMARY KEY,
+          tier INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'UNVERIFIED',
+          provider TEXT NOT NULL DEFAULT 'internal',
+          country TEXT,
+          document_hash TEXT,
+          reviewed_by TEXT,
+          rejection_reason TEXT,
+          submitted_at INTEGER NOT NULL,
+          verified_at INTEGER,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS fiat_payouts (
+          id TEXT PRIMARY KEY,
+          user_did TEXT NOT NULL,
+          amount_sov REAL NOT NULL,
+          fiat_amount REAL NOT NULL,
+          currency TEXT NOT NULL,
+          destination_ref TEXT NOT NULL,
+          provider TEXT NOT NULL,
+          external_payout_id TEXT,
+          status TEXT NOT NULL,
+          failure_reason TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          settled_at INTEGER
+        );
+        CREATE INDEX IF NOT EXISTS idx_fiat_payouts_user ON fiat_payouts(user_did, created_at);
       `);
     } catch (_) {}
     try {
@@ -2975,6 +3038,17 @@ this.db.exec('COMMIT;');
     } catch (err: any) {
       try { this.db.exec('ROLLBACK'); } catch (_) {}
       return { ok: false, error: err?.message || 'Database error during account deletion' };
+    }
+  }
+
+  public deletePost(postId: string): boolean {
+    if (!postId) return false;
+    try {
+      this.db.prepare('DELETE FROM comments WHERE post_id = ?').run(postId);
+      const res = this.db.prepare('DELETE FROM posts WHERE id = ?').run(postId) as any;
+      return Number(res?.changes || 0) > 0;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -4485,25 +4559,39 @@ this.db.exec('COMMIT;');
     const solvency = this.getTreasurySolvencyReport();
     const liquidTreasurySov = solvency.breakdown.treasuryReserveSov;
 
-    // Calculate daily fee volume over past 7 days
+    // Calculate real daily fee intake & protocol subsidy/cost outflow over past 7 days (zero hardcoded assumptions)
     const sevenDaysAgo = Date.now() - 7 * 86400 * 1000;
     let feeSum7d = 0;
+    let faucetBurn7d = 0;
+    let riskCost7d = 0;
     try {
-      feeSum7d = (this.db.prepare('SELECT SUM(fee_sov) as s FROM token_transfers WHERE created_at >= ?').get(sevenDaysAgo) as any)?.s || 0;
+      feeSum7d = Number((this.db.prepare("SELECT COALESCE(SUM(fee_sov), 0) as s FROM token_transfers WHERE created_at >= ?").get(sevenDaysAgo) as any)?.s || 0);
+    } catch (_) {}
+    try {
+      faucetBurn7d = Number((this.db.prepare("SELECT COALESCE(SUM(amount_sov), 0) as s FROM token_transfers WHERE tx_type = 'FAUCET_CLAIM' AND created_at >= ?").get(sevenDaysAgo) as any)?.s || 0);
+    } catch (_) {}
+    try {
+      riskCost7d = Number((this.db.prepare("SELECT COALESCE(SUM(amount_sov), 0) as s FROM risk_management_ledger WHERE direction = 'LOSS_OR_COST' AND prevented = 0 AND created_at >= ?").get(sevenDaysAgo) as any)?.s || 0);
     } catch (_) {}
 
-    const dailyIntakeSov = Math.round((feeSum7d / 7 + 125.0) * 100) / 100; // base protocol commerce assumption
-    const dailyBurnSov = 45.0; // base DePIN relay rewards & promotional drip
+    const dailyIntakeSov = Math.round((feeSum7d / 7) * 100) / 100;
+    const dailyBurnSov = Math.round((Math.max(faucetBurn7d, riskCost7d) / 7) * 100) / 100;
 
     const netCashflowSov = Math.round((dailyIntakeSov - dailyBurnSov) * 100) / 100;
     const isCompounding = netCashflowSov > 0;
-    const runwayDays = isCompounding ? 9999 : Math.max(1, Math.round(liquidTreasurySov / Math.abs(netCashflowSov)));
+    const runwayDays = isCompounding
+      ? 9999
+      : dailyBurnSov <= 0 && netCashflowSov >= 0
+        ? (liquidTreasurySov > 0 ? 3650 : 0)
+        : Math.max(0, Math.round(liquidTreasurySov / Math.max(0.01, Math.abs(netCashflowSov))));
 
-    let healthStatus: 'PROFITABLE_COMPOUNDING' | 'STABLE_SUSTAINABLE' | 'RUNWAY_CRITICAL' = 'PROFITABLE_COMPOUNDING';
-    if (!isCompounding && runwayDays < 90) {
+    let healthStatus: 'PROFITABLE_COMPOUNDING' | 'STABLE_SUSTAINABLE' | 'RUNWAY_CRITICAL' = 'STABLE_SUSTAINABLE';
+    if (isCompounding) {
+      healthStatus = 'PROFITABLE_COMPOUNDING';
+    } else if (netCashflowSov < 0 && runwayDays < 90) {
       healthStatus = 'RUNWAY_CRITICAL';
-    } else if (!isCompounding) {
-      healthStatus = 'STABLE_SUSTAINABLE';
+    } else if (liquidTreasurySov <= 0 && dailyBurnSov > 0) {
+      healthStatus = 'RUNWAY_CRITICAL';
     }
 
     return {
@@ -4546,16 +4634,28 @@ this.db.exec('COMMIT;');
 
         let fees = 0;
         try {
-          fees = (this.db.prepare('SELECT SUM(fee_sov) as s FROM token_transfers WHERE to_did = ?').get(c.did) as any)?.s || 0;
+          fees = (this.db.prepare('SELECT COALESCE(SUM(fee_sov), 0) as s FROM token_transfers WHERE to_did = ? OR from_did = ?').get(c.did, c.did) as any)?.s || 0;
         } catch (_) {}
 
-        const bounties = 100.0;
-        const grossFees = Math.round((fees + posts * 1.5) * 100) / 100;
-        const roi = Math.round((grossFees / Math.max(1, bounties)) * 100) / 100;
+        let realBounties = 0;
+        try {
+          realBounties = Number((this.db.prepare("SELECT COALESCE(SUM(amount_sov), 0) as s FROM token_transfers WHERE to_did = ? AND tx_type IN ('BOUNTY', 'CREATOR_BOUNTY', 'FAUCET_CLAIM', 'REFERRAL_REWARD', 'ADMIN_ADJUSTMENT')").get(c.did) as any)?.s || 0);
+        } catch (_) {}
+        try {
+          realBounties += Number((this.db.prepare("SELECT COALESCE(SUM(amount_sov), 0) as s FROM risk_management_ledger WHERE actor_did = ? AND category IN ('CREATOR_BOUNTY', 'REFERRAL_SUBSIDY', 'ADMIN_BALANCE_CREDIT') AND prevented = 0").get(c.did) as any)?.s || 0);
+        } catch (_) {}
+
+        const bounties = Math.round(realBounties * 100) / 100;
+        const grossFees = Math.round(fees * 100) / 100;
+        const roi = bounties > 0
+          ? Math.round((grossFees / bounties) * 100) / 100
+          : grossFees > 0
+            ? Math.round(grossFees * 100) / 100
+            : 1.0;
 
         let status: 'VIP_HIGH_ROI' | 'SELF_SUSTAINING' | 'UNPROFITABLE_SUBSIDY' = 'SELF_SUSTAINING';
-        if (roi >= 2.0) status = 'VIP_HIGH_ROI';
-        else if (roi < 0.5) status = 'UNPROFITABLE_SUBSIDY';
+        if (roi >= 2.0 && grossFees > 0) status = 'VIP_HIGH_ROI';
+        else if (bounties > 0 && roi < 0.5) status = 'UNPROFITABLE_SUBSIDY';
 
         return {
           creatorDid: c.did,
@@ -5252,20 +5352,9 @@ this.db.exec('COMMIT;');
           this.db.prepare(`
             INSERT INTO users (did, handle, display_name, avatar, avatar_bg, balance_sov, device_type, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, 'Desktop', ?, ?)
-          `).run(memUser.did, memUser.handle || `@user_${memUser.did.slice(-6)}`, memUser.displayName || 'User', memUser.avatar || '👤', memUser.avatarBg || '#6366f1', typeof memUser.balanceSov === 'number' ? memUser.balanceSov : 500.0, now, now);
-          sender = { balance_sov: typeof memUser.balanceSov === 'number' ? memUser.balanceSov : 500.0, status: memUser.status || 'ACTIVE' };
+          `).run(memUser.did, memUser.handle || `@user_${memUser.did.slice(-6)}`, memUser.displayName || 'User', memUser.avatar || '👤', memUser.avatarBg || '#6366f1', typeof memUser.balanceSov === 'number' ? memUser.balanceSov : 0.0, now, now);
+          sender = { balance_sov: typeof memUser.balanceSov === 'number' ? memUser.balanceSov : 0.0, status: memUser.status || 'ACTIVE' };
         }
-      }
-      if (!sender && params.fromDid.startsWith('did:key:')) {
-        const now = Date.now();
-        const shortHandle = `@peer_${params.fromDid.slice(-6)}`;
-        try {
-          this.db.prepare(`
-            INSERT INTO users (did, handle, display_name, avatar, avatar_bg, balance_sov, device_type, created_at, updated_at)
-            VALUES (?, ?, 'Local P2P Node', '⚡', '#6366f1', 500.0, 'Mobile', ?, ?)
-          `).run(params.fromDid, shortHandle, now, now);
-          sender = { balance_sov: 500.0, status: 'ACTIVE' };
-        } catch (_) {}
       }
       if (!sender) {
         this.db.exec('ROLLBACK');
@@ -6343,7 +6432,7 @@ this.db.exec('COMMIT;');
         SELECT COALESCE(SUM(balance_sov), 0) as totalInUsers, COUNT(*) as userCount 
         FROM users
       `).get() as any;
-      const genesisAllocation = 200_000_000;
+      const genesisAllocation = 100_000_000;
       const circulating = Number(userBalRow?.totalInUsers || 0);
 
       // 3. Autonomous AI Agents Marketplace
@@ -6356,18 +6445,24 @@ this.db.exec('COMMIT;');
       `).get() as any;
 
       // 4. Verified Creators & Studio Pro
-      const creatorRow = this.db.prepare(`
-        SELECT COUNT(*) as creatorCount 
-        FROM users 
-        WHERE role = 'CREATOR'
-      `).get() as any;
+      let creatorRow: any = { creatorCount: 0 };
+      try {
+        creatorRow = this.db.prepare(`
+          SELECT COUNT(*) as creatorCount 
+          FROM users 
+          WHERE is_creator = 1
+        `).get() as any;
+      } catch (_) {}
 
       // 5. Sovereign Verified Domains & Handles
-      const domainRow = this.db.prepare(`
-        SELECT COUNT(*) as domainCount 
-        FROM channels 
-        WHERE is_verified = 1
-      `).get() as any;
+      let domainRow: any = { domainCount: 0 };
+      try {
+        domainRow = this.db.prepare(`
+          SELECT COUNT(*) as domainCount 
+          FROM users 
+          WHERE is_verified = 1
+        `).get() as any;
+      } catch (_) {}
 
       // 6. Blockstore Archival stats
       const pinnedBlocks = storageDaemon && typeof storageDaemon.getStats === 'function' ? storageDaemon.getStats().pinnedCount : 0;
@@ -7249,7 +7344,7 @@ this.db.exec('COMMIT;');
             this.db.exec('ROLLBACK');
             return { ok: false, statusCode: 403, error: `Ownership violation: Idempotency key '${rawKey}' does not belong to sender` };
           }
-          if (existing.state === 'COMMITTED') {
+          if (existing.state === 'COMMITTED' || existing.state === 'RECONCILIATION_REQUIRED') {
             this.db.exec('ROLLBACK');
             return {
               ok: true,
@@ -7260,9 +7355,10 @@ this.db.exec('COMMIT;');
                 ok: true,
                 txId: existing.id,
                 l1TxHash: existing.l1_tx_hash,
-                state: 'COMMITTED',
+                state: existing.state,
                 amount: existing.amount_sov,
-                message: 'Replay: Transfer already committed on Layer-1',
+                isReplay: true,
+                message: 'Replay: Transfer already processed',
               },
             };
           } else if (existing.state === 'RESERVED' || existing.state === 'SUBMITTED') {
@@ -7282,8 +7378,8 @@ this.db.exec('COMMIT;');
           this.db.prepare(`
             INSERT INTO users (did, handle, display_name, avatar, avatar_bg, balance_sov, device_type, created_at, updated_at)
             VALUES (?, ?, ?, '👤', '#6366f1', ?, 'Desktop', ?, ?)
-          `).run(memUser.did, memUser.handle || `@user_${memUser.did.slice(-6)}`, memUser.displayName || 'User', Number(memUser.balanceSov || 500.0), now, now);
-          sender = { balance_sov: Number(memUser.balanceSov || 500.0), status: memUser.status || 'ACTIVE' };
+          `).run(memUser.did, memUser.handle || `@user_${memUser.did.slice(-6)}`, memUser.displayName || 'User', Number(memUser.balanceSov ?? 0.0), now, now);
+          sender = { balance_sov: Number(memUser.balanceSov ?? 0.0), status: memUser.status || 'ACTIVE' };
         }
       }
 
@@ -7511,6 +7607,30 @@ this.db.exec('COMMIT;');
       return this.db.prepare('SELECT did, handle, display_name, balance_sov, status FROM users WHERE did = ?').get(did) || null;
     } catch (_) {
       return null;
+    }
+  }
+
+  public getRiskPolicies(): Record<string, any> | null {
+    try {
+      const row = this.db.prepare("SELECT policy_json FROM risk_management_policies WHERE policy_key = 'default'").get() as any;
+      if (row && row.policy_json) {
+        return JSON.parse(row.policy_json);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  public saveRiskPolicies(policy: Record<string, any>): boolean {
+    try {
+      this.db.prepare(`
+        INSERT OR REPLACE INTO risk_management_policies (policy_key, policy_json, updated_by, updated_at)
+        VALUES ('default', ?, ?, ?)
+      `).run(JSON.stringify(policy), String(policy.updatedBy || 'SYSTEM'), Number(policy.updatedAt || Date.now()));
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

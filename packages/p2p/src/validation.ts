@@ -15,6 +15,8 @@ export interface ValidationContext {
 const DEFAULT_MAX_SIZE = 1024 * 1024; // 1MB
 const DEFAULT_MAX_SKEW = 300; // 5 minutes
 const DEFAULT_MAX_AGE = 86400 * 7; // 7 days
+const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true });
+const UTF8_ENCODER = new TextEncoder();
 
 /**
  * 10-Step Protocol Event Validation Pipeline.
@@ -40,7 +42,7 @@ export class EventValidationPipeline {
     // Step 1: Decode safely
     let parsed: any;
     try {
-      const decodedStr = new TextDecoder('utf-8', { fatal: true }).decode(rawBytes);
+      const decodedStr = UTF8_DECODER.decode(rawBytes);
       parsed = JSON.parse(decodedStr);
     } catch (err) {
       return {
@@ -140,7 +142,7 @@ export class EventValidationPipeline {
         unsignedPayload.media = event.media;
       }
       const canonicalJson = serializeCanonicalJson(unsignedPayload);
-      const computedHash = bytesToHex(sha256(new TextEncoder().encode(canonicalJson)));
+      const computedHash = bytesToHex(sha256(UTF8_ENCODER.encode(canonicalJson)));
 
       let hashMatched = computedHash === event.id;
       if (!hashMatched) {
@@ -149,7 +151,7 @@ export class EventValidationPipeline {
           media: event.media ?? [],
         });
         const computedHashWithMedia = bytesToHex(
-          sha256(new TextEncoder().encode(canonicalJsonWithMedia)),
+          sha256(UTF8_ENCODER.encode(canonicalJsonWithMedia)),
         );
         hashMatched = computedHashWithMedia === event.id;
       }
@@ -167,7 +169,7 @@ export class EventValidationPipeline {
       const sigBytes = hexToBytes(event.sig);
       const isSigValid =
         verifyEd25519(authorPubBytes, hexToBytes(event.id), sigBytes) ||
-        verifyEd25519(authorPubBytes, new TextEncoder().encode(event.id), sigBytes);
+        verifyEd25519(authorPubBytes, UTF8_ENCODER.encode(event.id), sigBytes);
 
       if (!isSigValid) {
         return {

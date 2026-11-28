@@ -85,6 +85,34 @@ describe('SOVRA P2P Live Streaming & Swarm Broadcast Engine', () => {
       name: dataC.user.name,
       sessionToken: dataC.sessionToken,
     };
+
+    // Fund Viewer Bob cleanly via faucet claims + peer transfers (140 SOV >= 125 SOV total tips)
+    await fetch(`${BASE_URL}/api/wallet/faucet/claim`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${viewerBob.sessionToken}` },
+    });
+    for (let i = 1; i <= 2; i++) {
+      const peerRes = await fetch(`${BASE_URL}/api/user/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: `@bob_funder_${i}_${ts}`, name: `Funder ${i}` }),
+      });
+      const peerData = await peerRes.json();
+      if (peerData.sessionToken) {
+        await fetch(`${BASE_URL}/api/wallet/faucet/claim`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${peerData.sessionToken}` },
+        });
+        await fetch(`${BASE_URL}/api/wallet/transfer`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${peerData.sessionToken}`,
+          },
+          body: JSON.stringify({ recipientDid: viewerBob.did, amount: 45 }),
+        });
+      }
+    }
   });
 
   describe('1. Broadcast Initiation & WebRTC Live Room Provisioning', () => {

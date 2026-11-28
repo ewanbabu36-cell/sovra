@@ -73,9 +73,11 @@ describe('Phase 3.2 Independent BIP-39 Cryptographic Verification', () => {
       const validMnemonic = generateBip39Mnemonic(count);
       const words = validMnemonic.split(' ');
 
-      // Mutate the final word (which carries the checksum bits) to a different valid word
+      // Flip the LSB checksum bit of the final word (keeps all entropy bits identical so checksum mismatch is guaranteed)
       const lastWord = words[words.length - 1]!;
-      const alternateWord = lastWord === 'abandon' ? 'zoo' : 'abandon';
+      const lastWordIdx = BIP39_ENGLISH_WORDLIST.indexOf(lastWord);
+      expect(lastWordIdx).toBeGreaterThanOrEqual(0);
+      const alternateWord = BIP39_ENGLISH_WORDLIST[lastWordIdx ^ 1]!;
       words[words.length - 1] = alternateWord;
 
       const mutatedMnemonic = words.join(' ');

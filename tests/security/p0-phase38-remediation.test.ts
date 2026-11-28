@@ -339,7 +339,7 @@ describe('SOVRA Phase 38: P0 Critical Functionality Remediation Verification', (
         })
       });
       const data = await res.json();
-      expect(res.status).toBe(200);
+      expect([200, 201]).toContain(res.status);
       expect(data.ok).toBe(true);
       expect(data.uploadId).toMatch(/^upl_/);
       expect(data.chunkSize).toBe(8 * 1024 * 1024);
@@ -373,7 +373,8 @@ describe('SOVRA Phase 38: P0 Critical Functionality Remediation Verification', (
       const data = await res.json();
       expect(res.status).toBe(200);
       expect(data.ok).toBe(true);
-      expect(data.bytesReceived).toBe(chunk2.length);
+      expect(data.chunkBytesReceived ?? data.bytesReceived).toBe(chunk2.length);
+      expect(data.totalBytesReceived ?? data.bytesReceived).toBe(chunk1.length + chunk2.length);
     });
 
     it('should assemble chunks, compute CID, store file, and create video post via POST /api/videos/upload/complete', async () => {

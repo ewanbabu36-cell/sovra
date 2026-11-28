@@ -194,7 +194,7 @@ func TestBeginBlockerEpochAdvancementAndSeparatePoolDestinations(t *testing.T) {
 		t.Fatalf("expected lastProcessedEpoch = 1, got %d", k.GetLastProcessedEpoch(s))
 	}
 
-	// Verify exact allowances and 2:4:1 daily ratios
+	// Verify exact allowances and 2:1:4 daily ratios (Seeder-boosted DePIN weighting)
 	vAllow, cAllow, sAllow := types.ComputeEpochAllowance(1)
 
 	// Assert 3 separate destinations received exact allocations
@@ -208,12 +208,12 @@ func TestBeginBlockerEpochAdvancementAndSeparatePoolDestinations(t *testing.T) {
 		t.Fatalf("seeder_escrow received %s != %s", destinationMints[types.SeederEscrowPoolName], sAllow)
 	}
 
-	// Verify 2:4:1 daily ratio between the destinations
-	if !destinationMints[types.FeeCollectorName].Equal(destinationMints[types.SeederEscrowPoolName].MulRaw(2)) {
-		t.Fatalf("V != 2*S in destination mints")
+	// Verify 2:1:4 daily ratio between the destinations
+	if !destinationMints[types.FeeCollectorName].Equal(destinationMints[types.CommunityPoolName].MulRaw(2)) {
+		t.Fatalf("V != 2*C in destination mints")
 	}
-	if !destinationMints[types.CommunityPoolName].Equal(destinationMints[types.SeederEscrowPoolName].MulRaw(4)) {
-		t.Fatalf("C != 4*S in destination mints")
+	if !destinationMints[types.SeederEscrowPoolName].Equal(destinationMints[types.CommunityPoolName].MulRaw(4)) {
+		t.Fatalf("S != 4*C in destination mints")
 	}
 }
 

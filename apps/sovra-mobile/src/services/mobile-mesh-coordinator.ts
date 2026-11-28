@@ -478,9 +478,52 @@ export class MobileMeshCoordinator {
     return { success: true, envelopeId: envelope.envelopeId };
   }
 
-  // ==========================================
-  // TRUTHFUL STATE & TELEMETRY
-  // ==========================================
+  public async broadcastReaction(
+    targetPostId: string,
+    emoji = '❤️',
+    isRetraction = false,
+  ): Promise<{ success: boolean; envelopeId: string }> {
+    const payloadBytes = new TextEncoder().encode(
+      JSON.stringify({ kind: 'reaction', targetPostId, emoji, isRetraction, actorDid: this.localDid }),
+    );
+    const envelope = await this.router.sendEnvelope({
+      envelopeType: 'SIGNED_EVENT',
+      targetDid: '*',
+      payloadBytes,
+      priority: 1,
+    });
+    return { success: true, envelopeId: envelope.envelopeId };
+  }
+
+  public async broadcastComment(
+    postId: string,
+    text: string,
+    authorName = 'Local User',
+  ): Promise<{ success: boolean; envelopeId: string }> {
+    const payloadBytes = new TextEncoder().encode(
+      JSON.stringify({ kind: 'comment', postId, text, authorName, authorDid: this.localDid }),
+    );
+    const envelope = await this.router.sendEnvelope({
+      envelopeType: 'SIGNED_EVENT',
+      targetDid: '*',
+      payloadBytes,
+      priority: 1,
+    });
+    return { success: true, envelopeId: envelope.envelopeId };
+  }
+
+  public async broadcastProfileUpdate(profile: Record<string, any>): Promise<{ success: boolean; envelopeId: string }> {
+    const payloadBytes = new TextEncoder().encode(
+      JSON.stringify({ kind: 'profile_update', actorDid: this.localDid, ...profile }),
+    );
+    const envelope = await this.router.sendEnvelope({
+      envelopeType: 'SIGNED_EVENT',
+      targetDid: '*',
+      payloadBytes,
+      priority: 1,
+    });
+    return { success: true, envelopeId: envelope.envelopeId };
+  }
 
   public getRuntimeState(): MobileMeshRuntimeState {
     const diag = this.transportManager.getDiagnostics();

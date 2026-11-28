@@ -260,22 +260,29 @@ export class CommunityIncentivizedRelayProtocol {
   public static verifyBandwidthReceipt(
     receipt: RelayBandwidthReceipt,
     clientPublicKeyHex?: string,
+    seenReceiptIds?: Set<string>,
   ): boolean {
-    if (receipt.bytesRelayed <= 0) return false;
+    if (!receipt || !receipt.receiptId || receipt.bytesRelayed <= 0) return false;
     if (Date.now() - receipt.timestamp > 86400000) return false; // 24h expiration
-    if (clientPublicKeyHex && receipt.clientSignatureHex && receipt.clientSignatureHex !== '00'.repeat(64)) {
-      try {
-        const payload = `${receipt.relayPeerId}:${receipt.clientPeerId}:${receipt.bytesRelayed}:${receipt.sessionToken}:${receipt.timestamp}`;
-        return verifyEd25519(
-          hexToBytes(clientPublicKeyHex),
-          new TextEncoder().encode(payload),
-          hexToBytes(receipt.clientSignatureHex),
-        );
-      } catch {
-        return false;
-      }
+    if (receipt.timestamp > Date.now() + 300000) return false; // max 5m future skew
+    if (seenReceiptIds && seenReceiptIds.has(receipt.receiptId)) return false;
+    if (!clientPublicKeyHex || !receipt.clientSignatureHex || receipt.clientSignatureHex === '00'.repeat(64)) {
+      return false;
     }
-    return true;
+    try {
+      const payload = `${receipt.relayPeerId}:${receipt.clientPeerId}:${receipt.bytesRelayed}:${receipt.sessionToken}:${receipt.timestamp}`;
+      const okSig = verifyEd25519(
+        hexToBytes(clientPublicKeyHex),
+        new TextEncoder().encode(payload),
+        hexToBytes(receipt.clientSignatureHex),
+      );
+      if (okSig && seenReceiptIds) {
+        seenReceiptIds.add(receipt.receiptId);
+      }
+      return okSig;
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -296,7 +303,12 @@ export interface IceNegotiationPlan {
  */
 export class IceFallbackEngine {
   public static isIPv6Address(addr: string): boolean {
-    return addr.includes(':') && !addr.includes('.');
+    if (!addr) return false;
+    if (addr.includes('/ip6/')) return true;
+    const clean = addr.trim();
+    if (/^\[[0-9a-f:]+\](:\d+)?$/i.test(clean)) return true;
+    const colonCount = (clean.match(/:/g) || []).length;
+    return colonCount >= 2 && !clean.includes('.');
   }
 
   /**
@@ -365,12 +377,16 @@ export class IceFallbackEngine {
       };
     }
 
-    // Tier 4: Symmetric-to-Symmetric NAT deadlock -> Community Relay Fallback
+    // Tier 4: Symmetric-to-Symmetric NAT deadlock -> Volunteer / Local Relay Fallback (zero hardcoded central domain)
     const sortedRelays = [...availableRelays].sort(
       (a, b) => calculateDynamicRelayScore(b) - calculateDynamicRelayScore(a),
     );
     const bestRelay = sortedRelays[0];
-    const relayAddr = bestRelay ? bestRelay.relayAddress : 'p2p-relay.sovra.net:4001';
+    const envFallback =
+      typeof process !== 'undefined' && process.env?.SOVRA_FALLBACK_RELAY
+        ? process.env.SOVRA_FALLBACK_RELAY
+        : '127.0.0.1:4001';
+    const relayAddr = bestRelay ? bestRelay.relayAddress : envFallback;
     const relayRtt = bestRelay ? bestRelay.rttMs : 80;
 
     return {
@@ -491,6 +507,195 @@ export class DcutrCoordinator {
   public static calculateSyncDelay(rttMs: number): number {
     return Math.max(50, Math.min(500, Math.round(rttMs / 2)));
   }
+}
+
+export const STUN_MAGIC_COOKIE = 0x2112a442;
+export const STUN_BINDING_REQUEST = 0x0001;
+export const STUN_BINDING_SUCCESS_RESPONSE = 0x0101;
+export const STUN_ATTR_MAPPED_ADDRESS = 0x0001;
+export const STUN_ATTR_XOR_MAPPED_ADDRESS = 0x0020;
+
+/**
+ * Encodes an RFC 5389 binary STUN Binding Request (20 bytes header).
+ */
+export function buildStunBindingRequest(transactionId?: Uint8Array): {
+  packet: Uint8Array;
+  transactionId: Uint8Array;
+} {
+  const txId = new Uint8Array(12);
+  if (transactionId && transactionId.length === 12) {
+    txId.set(transactionId);
+  } else if (typeof globalThis.crypto?.getRandomValues === 'function') {
+    globalThis.crypto.getRandomValues(txId);
+  } else {
+    for (let i = 0; i < 12; i++) txId[i] = Math.floor(Math.random() * 256);
+  }
+  const packet = new Uint8Array(20);
+  const view = new DataView(packet.buffer);
+  view.setUint16(0, STUN_BINDING_REQUEST, false);
+  view.setUint16(2, 0, false);
+  view.setUint32(4, STUN_MAGIC_COOKIE, false);
+  packet.set(txId, 8);
+  return { packet, transactionId: txId };
+}
+
+/**
+ * Encodes an RFC 5389 STUN Binding Success Response with XOR-MAPPED-ADDRESS (IPv4).
+ */
+export function buildStunBindingSuccessResponse(
+  transactionId: Uint8Array,
+  observedIp: string,
+  observedPort: number,
+): Uint8Array {
+  const ipParts = observedIp.split('.').map(n => parseInt(n, 10) & 0xff);
+  if (ipParts.length !== 4 || ipParts.some(n => Number.isNaN(n))) {
+    throw new Error(`Invalid IPv4 address for STUN response: ${observedIp}`);
+  }
+  const packet = new Uint8Array(32);
+  const view = new DataView(packet.buffer);
+  view.setUint16(0, STUN_BINDING_SUCCESS_RESPONSE, false);
+  view.setUint16(2, 12, false);
+  view.setUint32(4, STUN_MAGIC_COOKIE, false);
+  packet.set(transactionId.slice(0, 12), 8);
+
+  view.setUint16(20, STUN_ATTR_XOR_MAPPED_ADDRESS, false);
+  view.setUint16(22, 8, false);
+  packet[24] = 0x00;
+  packet[25] = 0x01;
+  view.setUint16(26, (observedPort & 0xffff) ^ (STUN_MAGIC_COOKIE >>> 16), false);
+  const ipUint32 =
+    ((ipParts[0]! << 24) | (ipParts[1]! << 16) | (ipParts[2]! << 8) | ipParts[3]!) >>> 0;
+  view.setUint32(28, (ipUint32 ^ STUN_MAGIC_COOKIE) >>> 0, false);
+  return packet;
+}
+
+/**
+ * Decodes an RFC 5389 STUN Binding Success Response (supports XOR-MAPPED-ADDRESS and MAPPED-ADDRESS).
+ */
+export function parseStunBindingResponse(
+  packet: Uint8Array,
+  expectedTxId?: Uint8Array,
+): { observedIp: string; observedPort: number; transactionIdHex: string } | null {
+  if (!packet || packet.length < 20) return null;
+  const view = new DataView(packet.buffer, packet.byteOffset, packet.byteLength);
+  const msgType = view.getUint16(0, false);
+  const msgLen = view.getUint16(2, false);
+  const magic = view.getUint32(4, false);
+  if (msgType !== STUN_BINDING_SUCCESS_RESPONSE || magic !== STUN_MAGIC_COOKIE) {
+    return null;
+  }
+  const txId = packet.slice(8, 20);
+  if (expectedTxId && expectedTxId.length === 12) {
+    for (let i = 0; i < 12; i++) {
+      if (txId[i] !== expectedTxId[i]) return null;
+    }
+  }
+  const endOffset = Math.min(packet.length, 20 + msgLen);
+  let offset = 20;
+  while (offset + 4 <= endOffset) {
+    const attrType = view.getUint16(offset, false);
+    const attrLen = view.getUint16(offset + 2, false);
+    const valStart = offset + 4;
+    if (valStart + attrLen > endOffset) break;
+
+    if (attrType === STUN_ATTR_XOR_MAPPED_ADDRESS && attrLen >= 8 && packet[valStart + 1] === 0x01) {
+      const xorPort = view.getUint16(valStart + 2, false);
+      const xorIp = view.getUint32(valStart + 4, false);
+      const port = xorPort ^ (STUN_MAGIC_COOKIE >>> 16);
+      const ipNum = (xorIp ^ STUN_MAGIC_COOKIE) >>> 0;
+      const observedIp = `${(ipNum >>> 24) & 0xff}.${(ipNum >>> 16) & 0xff}.${(ipNum >>> 8) & 0xff}.${ipNum & 0xff}`;
+      return { observedIp, observedPort: port, transactionIdHex: bytesToHex(txId) };
+    }
+    if (attrType === STUN_ATTR_MAPPED_ADDRESS && attrLen >= 8 && packet[valStart + 1] === 0x01) {
+      const port = view.getUint16(valStart + 2, false);
+      const observedIp = `${packet[valStart + 4]}.${packet[valStart + 5]}.${packet[valStart + 6]}.${packet[valStart + 7]}`;
+      return { observedIp, observedPort: port, transactionIdHex: bytesToHex(txId) };
+    }
+
+    const paddedLen = (attrLen + 3) & ~3;
+    offset = valStart + paddedLen;
+  }
+  return null;
+}
+
+/**
+ * Executes a real RFC 5389 UDP STUN Binding Request against host:port and returns observed reflexive mapping.
+ * STUN alone cannot guarantee connectivity behind Symmetric NAT or restrictive CGNAT; Circuit Relay v2 fallback is required.
+ */
+export async function probeStunUdp(
+  serverHost: string,
+  serverPort = 3478,
+  timeoutMs = 1500,
+): Promise<StunProbeResult | null> {
+  if (typeof process === 'undefined' || !process.versions?.node) return null;
+  try {
+    const dgram = await import('node:dgram');
+    const socket = dgram.createSocket('udp4');
+    const { packet, transactionId } = buildStunBindingRequest();
+
+    return await new Promise<StunProbeResult | null>(resolve => {
+      let finished = false;
+      const done = (res: StunProbeResult | null) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        try {
+          socket.close();
+        } catch {}
+        resolve(res);
+      };
+
+      const timer = setTimeout(() => done(null), timeoutMs);
+      socket.on('error', () => done(null));
+      socket.on('message', (msg: Buffer) => {
+        const parsed = parseStunBindingResponse(new Uint8Array(msg), transactionId);
+        if (parsed) {
+          done({
+            serverAddr: `${serverHost}:${serverPort}`,
+            observedIp: parsed.observedIp,
+            observedPort: parsed.observedPort,
+          });
+        }
+      });
+
+      socket.send(Buffer.from(packet), serverPort, serverHost, err => {
+        if (err) done(null);
+      });
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Starts a real RFC 5389 UDP STUN server for deterministic NAT reflection probing & testing.
+ */
+export async function startLocalStunServer(
+  port = 0,
+  host = '127.0.0.1',
+): Promise<{ host: string; port: number; close: () => Promise<void> }> {
+  const dgram = await import('node:dgram');
+  const sock = dgram.createSocket('udp4');
+  sock.on('message', (msg: Buffer, rinfo: { address: string; port: number }) => {
+    if (msg.length < 20) return;
+    const view = new DataView(msg.buffer, msg.byteOffset, msg.byteLength);
+    if (view.getUint16(0, false) !== STUN_BINDING_REQUEST) return;
+    if (view.getUint32(4, false) !== STUN_MAGIC_COOKIE) return;
+    const txId = new Uint8Array(msg.subarray(8, 20));
+    const cleanAddr = rinfo.address.replace(/^::ffff:/, '');
+    const observedIp = cleanAddr === '::1' ? '127.0.0.1' : cleanAddr;
+    try {
+      const resp = buildStunBindingSuccessResponse(txId, observedIp, rinfo.port);
+      sock.send(Buffer.from(resp), rinfo.port, rinfo.address);
+    } catch {}
+  });
+  await new Promise<void>(resolve => sock.bind(port, host, resolve));
+  const addr = sock.address();
+  return {
+    host,
+    port: typeof addr === 'object' && addr ? addr.port : port,
+    close: () => new Promise<void>(resolve => sock.close(() => resolve())),
+  };
 }
 
 

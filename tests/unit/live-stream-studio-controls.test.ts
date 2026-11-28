@@ -123,6 +123,7 @@ describe('Sovra Creator Studio & Live Stream Command Center', () => {
         creatorAvatar: '🔴',
         title: 'Architectural Live Broadcast',
         category: 'tech',
+        forceNew: true,
       });
 
       expect(session).toBeDefined();

@@ -339,7 +339,7 @@ export function ReelsScreen(): React.JSX.Element {
   }, []);
 
   const handleShareReel = useCallback(async (reel: MobileReelItem) => {
-    const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/reel/${reel.id}` : `https://sovra.network/reel/${reel.id}`;
+    const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/reel/${reel.id}` : `sovra://reel/${reel.id}`;
     const shareData = {
       title: `${reel.creatorName} on Sovra`,
       text: reel.caption,

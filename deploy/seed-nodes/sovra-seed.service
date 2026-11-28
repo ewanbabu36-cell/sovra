@@ -1,0 +1,33 @@
+[Unit]
+Description=Sovra Production Bootstrap Seed Node Daemon
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sovra
+Group=sovra
+WorkingDirectory=/opt/sovra
+ExecStart=/usr/bin/node --experimental-strip-types scripts/bootstrap-node.ts
+Restart=always
+RestartSec=5s
+
+# Security Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+# Resource Limits
+LimitNOFILE=65535
+LimitNPROC=4096
+
+# Environment Configurations
+Environment=NODE_ENV=production
+Environment=SOVRA_P2P_HOST=0.0.0.0
+Environment=SOVRA_P2P_PORT=4001
+Environment=SOVRA_HTTP_PORT=8080
+Environment=SOVRA_DATA_DIR=/var/lib/sovra/seed-data
+
+[Install]
+WantedBy=multi-user.target

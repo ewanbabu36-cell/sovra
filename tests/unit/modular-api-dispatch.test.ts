@@ -120,9 +120,17 @@ describe('👑 Enterprise Modular API & Security Engineering Gate', () => {
   });
 
   it('4. Wallet Controller: queries sovereign vault balance and handles P2P transfer', async () => {
+    const { req: regReq, res: regRes } = createMockHttp('POST', '/api/auth/register', {
+      handle: 'architect_alpha',
+      displayName: 'Architect Alpha',
+    });
+    await dispatchApiRequest(regReq, regRes, '/api/auth/register');
+    expect(regRes.statusCode).toBe(201);
+    const { token } = JSON.parse(regRes.body);
+
     // 1. Check initial balance
     const { req: balReq, res: balRes } = createMockHttp('GET', '/api/wallet/balance', undefined, {
-      'x-sovra-did': 'did:sovra:architect_alpha',
+      authorization: `Bearer ${token}`,
     });
     await dispatchApiRequest(balReq, balRes, '/api/wallet/balance');
     expect(balRes.statusCode).toBe(200);
@@ -136,7 +144,7 @@ describe('👑 Enterprise Modular API & Security Engineering Gate', () => {
       amount: 150.0,
       memo: 'Peer node contribution',
     }, {
-      'x-sovra-did': 'did:sovra:architect_alpha',
+      authorization: `Bearer ${token}`,
     });
     await dispatchApiRequest(txReq, txRes, '/api/wallet/transfer');
     expect(txRes.statusCode).toBe(200);
@@ -159,6 +167,22 @@ describe('👑 Enterprise Modular API & Security Engineering Gate', () => {
   });
 
   it('6. Social Controller: manages post creation, reactions, comments, and soft deletion', async () => {
+    const { req: regArchReq, res: regArchRes } = createMockHttp('POST', '/api/auth/register', {
+      handle: 'lead_architect',
+      displayName: 'Lead Architect',
+    });
+    await dispatchApiRequest(regArchReq, regArchRes, '/api/auth/register');
+    expect(regArchRes.statusCode).toBe(201);
+    const archToken = JSON.parse(regArchRes.body).token;
+
+    const { req: regQaReq, res: regQaRes } = createMockHttp('POST', '/api/auth/register', {
+      handle: 'qa_engineer',
+      displayName: 'QA Engineer',
+    });
+    await dispatchApiRequest(regQaReq, regQaRes, '/api/auth/register');
+    expect(regQaRes.statusCode).toBe(201);
+    const qaToken = JSON.parse(regQaRes.body).token;
+
     // 1. Create a new post
     const { req: createReq, res: createRes } = createMockHttp(
       'POST',
@@ -168,7 +192,7 @@ describe('👑 Enterprise Modular API & Security Engineering Gate', () => {
         authorHandle: 'lead_architect',
         authorName: 'Lead Architect',
       },
-      { 'x-sovra-did': 'did:sovra:architect_test' }
+      { authorization: `Bearer ${archToken}` }
     );
     await dispatchApiRequest(createReq, createRes, '/api/posts');
     expect(createRes.statusCode).toBe(201);
@@ -191,7 +215,7 @@ describe('👑 Enterprise Modular API & Security Engineering Gate', () => {
       'POST',
       `/api/posts/${postId}/reactions`,
       { reaction: 'like' },
-      { 'x-sovra-did': 'did:sovra:architect_test' }
+      { authorization: `Bearer ${archToken}` }
     );
     await dispatchApiRequest(reactReq, reactRes, `/api/posts/${postId}/reactions`);
     expect(reactRes.statusCode).toBe(200);
@@ -207,7 +231,7 @@ describe('👑 Enterprise Modular API & Security Engineering Gate', () => {
         content: 'Verified by autonomous QA pipeline.',
         authorHandle: 'qa_engineer',
       },
-      { 'x-sovra-did': 'did:sovra:qa_bot' }
+      { authorization: `Bearer ${qaToken}` }
     );
     await dispatchApiRequest(commentReq, commentRes, `/api/posts/${postId}/comments`);
     expect(commentRes.statusCode).toBe(201);
@@ -229,7 +253,7 @@ describe('👑 Enterprise Modular API & Security Engineering Gate', () => {
       'DELETE',
       `/api/posts/${postId}`,
       undefined,
-      { 'x-sovra-did': 'did:sovra:architect_test' }
+      { authorization: `Bearer ${archToken}` }
     );
     await dispatchApiRequest(delReq, delRes, `/api/posts/${postId}`);
     expect(delRes.statusCode).toBe(200);
@@ -242,8 +266,25 @@ describe('👑 Enterprise Modular API & Security Engineering Gate', () => {
   });
 
   it('7. Chat Controller: manages end-to-end direct messages, thread retrieval, and read receipts', async () => {
-    const senderDid = 'did:sovra:alice_peer';
-    const recipientDid = 'did:sovra:bob_peer';
+    const { req: regAliceReq, res: regAliceRes } = createMockHttp('POST', '/api/auth/register', {
+      handle: 'alice_peer_mod',
+      displayName: 'Alice Peer',
+    });
+    await dispatchApiRequest(regAliceReq, regAliceRes, '/api/auth/register');
+    expect(regAliceRes.statusCode).toBe(201);
+    const aliceReg = JSON.parse(regAliceRes.body);
+    const senderDid = aliceReg.user.did;
+    const aliceToken = aliceReg.token;
+
+    const { req: regBobReq, res: regBobRes } = createMockHttp('POST', '/api/auth/register', {
+      handle: 'bob_peer_mod',
+      displayName: 'Bob Peer',
+    });
+    await dispatchApiRequest(regBobReq, regBobRes, '/api/auth/register');
+    expect(regBobRes.statusCode).toBe(201);
+    const bobReg = JSON.parse(regBobRes.body);
+    const recipientDid = bobReg.user.did;
+    const bobToken = bobReg.token;
 
     // 1. Send direct message
     const { req: sendReq, res: sendRes } = createMockHttp(
@@ -255,7 +296,7 @@ describe('👑 Enterprise Modular API & Security Engineering Gate', () => {
         attachmentCid: 'bafybeic52...sample',
         disappearingSeconds: 86400,
       },
-      { 'x-sovra-did': senderDid }
+      { authorization: `Bearer ${aliceToken}` }
     );
     await dispatchApiRequest(sendReq, sendRes, '/api/chat/messages');
     expect(sendRes.statusCode).toBe(201);
@@ -273,7 +314,9 @@ describe('👑 Enterprise Modular API & Security Engineering Gate', () => {
     // 2. Fetch thread messages
     const { req: getMsgReq, res: getMsgRes } = createMockHttp(
       'GET',
-      `/api/chat/messages/${threadId}`
+      `/api/chat/messages/${threadId}`,
+      undefined,
+      { authorization: `Bearer ${bobToken}` }
     );
     await dispatchApiRequest(getMsgReq, getMsgRes, `/api/chat/messages/${threadId}`);
     expect(getMsgRes.statusCode).toBe(200);
@@ -283,7 +326,9 @@ describe('👑 Enterprise Modular API & Security Engineering Gate', () => {
     // 3. Mark message as read
     const { req: readReq, res: readRes } = createMockHttp(
       'POST',
-      `/api/chat/messages/${messageId}/read`
+      `/api/chat/messages/${messageId}/read`,
+      undefined,
+      { authorization: `Bearer ${bobToken}` }
     );
     await dispatchApiRequest(readReq, readRes, `/api/chat/messages/${messageId}/read`);
     expect(readRes.statusCode).toBe(200);
@@ -295,7 +340,7 @@ describe('👑 Enterprise Modular API & Security Engineering Gate', () => {
       'GET',
       '/api/chat/threads',
       undefined,
-      { 'x-sovra-did': recipientDid }
+      { authorization: `Bearer ${bobToken}` }
     );
     await dispatchApiRequest(threadsReq, threadsRes, '/api/chat/threads');
     expect(threadsRes.statusCode).toBe(200);

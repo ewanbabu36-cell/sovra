@@ -9,6 +9,7 @@
 import http from 'node:http';
 import { sovraDb, toPublicUserDTO, type FriendRelationshipRecord, type UserRecord } from '../database-engine.ts';
 import type { AuthenticatedPrincipal } from '../../packages/identity/dist/index.js';
+import { executeHandleBurnSink } from './economy.routes.ts';
 
 export interface SocialRouteContext {
   req: http.IncomingMessage;
@@ -659,6 +660,17 @@ export async function handleSocialRoutes(ctx: SocialRouteContext): Promise<boole
       const defaultAvatar = isVideo ? '🎬' : '📺';
       const defaultBg = isVideo ? '#f43f5e' : '#6366f1';
 
+      let handleBurnReceipt: any = null;
+      if (parsed.premiumHandle || parsed.verifiedBadge || Number(parsed.handleFeeSov || 0) > 0) {
+        const sinkRes = executeHandleBurnSink(principal.did, cleanHandle, Number(parsed.handleFeeSov || 10));
+        if (!sinkRes.ok) {
+          res.writeHead(sinkRes.statusCode, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(sinkRes));
+          return true;
+        }
+        handleBurnReceipt = sinkRes;
+      }
+
       const newChan = {
         id: 'chan_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
         name: reqName,
@@ -668,7 +680,7 @@ export async function handleSocialRoutes(ctx: SocialRouteContext): Promise<boole
         bg: String(parsed.bg || parsed.avatarBg || defaultBg),
         subscribers: 1,
         subscriberCount: 1,
-        verified: true,
+        verified: Boolean(handleBurnReceipt) || Boolean(parsed.verified ?? true),
         channelType: String(parsed.channelType || 'PUBLIC_BROADCAST'),
         ownerDid: principal.did,
         bannerUrl: String(parsed.bannerUrl || parsed.banner || ''),
@@ -689,7 +701,7 @@ export async function handleSocialRoutes(ctx: SocialRouteContext): Promise<boole
         }
       } catch (_) {}
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, channel: newChan, message: 'Channel created successfully' }));
+      res.end(JSON.stringify({ ok: true, channel: newChan, burnReceipt: handleBurnReceipt, message: 'Channel created successfully' }));
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));

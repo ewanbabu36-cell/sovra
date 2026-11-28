@@ -4,7 +4,7 @@
  */
 
 import { Result, ok } from '@sovra/shared';
-import { PublicIdentity, SovraDeviceKey } from '@sovra/identity';
+import { PublicIdentity, SovraIdentityKey, SovraDeviceKey } from '@sovra/identity';
 import { SovraLightClient } from '@sovra/p2p';
 
 export interface DeviceScreenTimeLimits {
@@ -105,12 +105,20 @@ export class SovraIndexedDbStore {
   }
 }
 
+export interface SovraClientConfig {
+  readonly identityDid?: string;
+  readonly deviceId?: string;
+  readonly deviceName?: string;
+  readonly deviceKey?: SovraDeviceKey;
+  readonly preferredRelayMultiaddrs?: readonly string[];
+}
+
 export class SovraClient {
   private state: SovraClientState;
   public readonly lightClient: SovraLightClient;
   public readonly localStore: SovraIndexedDbStore;
 
-  constructor() {
+  constructor(config: SovraClientConfig = {}) {
     this.state = {
       currentIdentity: null,
       isCreatorModeActive: false,
@@ -125,16 +133,19 @@ export class SovraClient {
       },
     };
 
-    // Instantiate Mobile-First Transient Light Client from @sovra/p2p
-    const key = SovraDeviceKey.generate(
-      'dev-browser-client',
-      'Local Web Browser',
-      'did:sovra:user:local',
-      Math.floor(Date.now() / 1000) + 86400 * 365,
-    );
+    // Instantiate Mobile-First Transient Light Client from @sovra/p2p using dynamic sovereign identity
+    const resolvedIdentityDid = config.identityDid ?? SovraIdentityKey.generate().did;
+    const key =
+      config.deviceKey ??
+      SovraDeviceKey.generate(
+        config.deviceId ?? `device-${Date.now().toString(36)}`,
+        config.deviceName ?? 'Sovra Client Device',
+        resolvedIdentityDid,
+        Math.floor(Date.now() / 1000) + 86400 * 365,
+      );
     this.lightClient = new SovraLightClient({
       deviceKey: key,
-      preferredRelayMultiaddrs: ['/ip4/127.0.0.1/tcp/4001/p2p-circuit'],
+      preferredRelayMultiaddrs: [...(config.preferredRelayMultiaddrs ?? [])],
     });
 
     this.localStore = new SovraIndexedDbStore();

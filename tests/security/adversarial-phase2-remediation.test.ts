@@ -292,6 +292,7 @@ describe('PHASE 2: Critical Adversarial Security Remediation Matrix (DOS-01, AUT
       const devA = await postJson('/api/user/login', {
         handle: recoveryUserHandle,
         pin: initialPin,
+        deviceName: 'Device A',
       });
       expect(devA.status).toBe(200);
       tokenDeviceA = devA.body.sessionToken;
@@ -300,6 +301,7 @@ describe('PHASE 2: Critical Adversarial Security Remediation Matrix (DOS-01, AUT
       const devB = await postJson('/api/user/login', {
         handle: recoveryUserHandle,
         pin: initialPin,
+        deviceName: 'Device B',
       });
       expect(devB.status).toBe(200);
       tokenDeviceB = devB.body.sessionToken;

@@ -17,6 +17,7 @@ import { LocalDiskMediaDriver } from './media-storage-adapter.ts';
 const loopDelayMonitor = monitorEventLoopDelay({ resolution: 20 });
 loopDelayMonitor.enable();
 
+const CACHED_NUM_CPUS = (typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length) || 1;
 let lastCpuUsageSample = process.cpuUsage();
 let lastCpuTimeSample = process.hrtime.bigint();
 
@@ -28,7 +29,7 @@ function getRealSystemTelemetry(connectedPeersCount: number) {
   lastCpuUsageSample = process.cpuUsage();
 
   const totalCpuMicroseconds = currentCpuUsage.user + currentCpuUsage.system;
-  const numCpus = os.cpus().length || 1;
+  const numCpus = CACHED_NUM_CPUS;
   const rawCpuPercent = timeDiffUs > 0 ? (totalCpuMicroseconds / (timeDiffUs * numCpus)) * 100 : 0;
   const cpuUsagePercent = Math.min(100, Math.max(1, Math.round(rawCpuPercent * 10) / 10));
 
@@ -124,6 +125,7 @@ import { renderExplorerHtml } from './blockchain-explorer.ts';
 import { handleExplorerRoutes, initCometBftStreamHub, cometBftStreamHub } from './routes/explorer.routes.ts';
 import { l1ChainSupervisor } from './chain-supervisor.ts';
 import { handleWalletRoutes } from './routes/wallet.routes.ts';
+import { handleEconomyRoutes } from './routes/economy.routes.ts';
 import { handleTradingRoutes } from './routes/trading.routes.ts';
 import { handleReferralRoutes } from './routes/referral.routes.ts';
 import { handleContactsRoutes } from './routes/contacts.routes.ts';
@@ -146,6 +148,7 @@ import { handleWebRtcRoutes } from './routes/webrtc.routes.ts';
 import { handleAuthRoutes } from './routes/auth.routes.ts';
 import { handleSocialRoutes } from './routes/social.routes.ts';
 import { handleEnterpriseProtocolRoutes } from './routes/enterprise-protocol.routes.ts';
+import { L1SettlementRelayer } from './l1-relayer.ts';
 import { SOVRA_RTC_CONFIGURATION, getWebRtcConfiguration } from './webrtc-config.ts';
 import { renderAppHtml } from './views/index.view.ts';
 import {
@@ -183,14 +186,9 @@ import {
 const STORAGE_DIR = path.resolve(process.env.SOVRA_STORAGE_DIR || './.sovra-storage-dev');
 let cachedStorageDirSize = 0;
 let lastStorageDirCheckTime = 0;
-const STORAGE_DIR_CACHE_TTL_MS = 3000;
+const STORAGE_DIR_CACHE_TTL_MS = 10000;
 
-function getDirectorySize(dirPath: string): number {
-  const resolved = path.resolve(dirPath);
-  const now = Date.now();
-  if (resolved === STORAGE_DIR && (now - lastStorageDirCheckTime < STORAGE_DIR_CACHE_TTL_MS)) {
-    return cachedStorageDirSize;
-  }
+function computeDirSize(dirPath: string): number {
   let size = 0;
   try {
     if (fs.existsSync(dirPath)) {
@@ -198,13 +196,23 @@ function getDirectorySize(dirPath: string): number {
       for (const entry of entries) {
         const fullPath = path.join(dirPath, entry.name);
         if (entry.isDirectory()) {
-          size += getDirectorySize(fullPath);
+          size += computeDirSize(fullPath);
         } else if (entry.isFile()) {
           size += fs.statSync(fullPath).size;
         }
       }
     }
   } catch {}
+  return size;
+}
+
+function getDirectorySize(dirPath: string): number {
+  const resolved = path.resolve(dirPath);
+  const now = Date.now();
+  if (resolved === STORAGE_DIR && (now - lastStorageDirCheckTime < STORAGE_DIR_CACHE_TTL_MS)) {
+    return cachedStorageDirSize;
+  }
+  const size = computeDirSize(dirPath);
   if (resolved === STORAGE_DIR) {
     cachedStorageDirSize = size;
     lastStorageDirCheckTime = now;
@@ -855,17 +863,33 @@ async function bootstrapLocalNode() {
       ...(nodeLanIp && nodeLanIp !== '127.0.0.1' ? [`/ip4/${nodeLanIp}/tcp/${tcpPort}/p2p/${binding.peerId}`] : [])
     ],
     enableRelayService: true,
+    enableUpnp: process.env.SOVRA_ENABLE_UPNP === 'true',
+    ...(process.env.SOVRA_TOR_SOCKS5 || process.env.SOVRA_SOCKS5_PROXY
+      ? { socks5ProxyUrl: process.env.SOVRA_TOR_SOCKS5 || process.env.SOVRA_SOCKS5_PROXY }
+      : {}),
     relayConfig: {
       maxConcurrentCircuits: 150,
       defaultMaxDurationSeconds: 1200,
       defaultMaxBytesPerCircuit: 5 * 1024 * 1024,
       maxReservations: 500,
     },
-    relayAddresses: [
-      process.env.SOVRA_RELAY_ADDR || `/ip4/${nodeLanIp || '127.0.0.1'}/tcp/4001/p2p-circuit`,
-      '/dns4/seed1.sovra.network/tcp/4001/p2p/12D3KooWSa1ChBCEzDMBGLtvcDbySca9mmdiYaQZ1mBZJBHPuU1n/p2p-circuit',
-      '/dns4/ap-south-relay.sovra.network/tcp/4001/p2p/12D3KooWCreatorBroadcaster/p2p-circuit',
-    ],
+    relayAddresses: (() => {
+      const allowDns = process.env.SOVRA_ALLOW_DNS === 'true' || process.env.SOVRA_NO_DNS === 'false';
+      const customBootstrap = process.env.SOVRA_BOOTSTRAP_PEERS
+        ? process.env.SOVRA_BOOTSTRAP_PEERS.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+      const addrs = [
+        process.env.SOVRA_RELAY_ADDR || `/ip4/${nodeLanIp || '127.0.0.1'}/tcp/${tcpPort}/p2p-circuit`,
+        ...customBootstrap,
+      ];
+      if (allowDns) {
+        addrs.push(
+          '/dns4/seed1.sovra.network/tcp/4001/p2p/12D3KooWSa1ChBCEzDMBGLtvcDbySca9mmdiYaQZ1mBZJBHPuU1n/p2p-circuit',
+          '/dns4/ap-south-relay.sovra.network/tcp/4001/p2p/12D3KooWCreatorBroadcaster/p2p-circuit',
+        );
+      }
+      return Array.from(new Set(addrs));
+    })(),
   });
 
   await node.start();
@@ -1967,17 +1991,29 @@ function formatMetricCount(num?: number): string {
   return String(num);
 }
 
+let cachedLanIp = '';
+let lastLanIpCheckTime = 0;
+const LAN_IP_CACHE_TTL_MS = 10000;
+
 export function getLanIpAddress(): string {
+  const now = Date.now();
+  if (cachedLanIp && (now - lastLanIpCheckTime < LAN_IP_CACHE_TTL_MS)) {
+    return cachedLanIp;
+  }
   try {
     const interfaces = os.networkInterfaces();
     for (const name of Object.keys(interfaces)) {
       for (const net of interfaces[name] || []) {
         if (net.family === 'IPv4' && !net.internal && !net.address.startsWith('169.254')) {
+          cachedLanIp = net.address;
+          lastLanIpCheckTime = now;
           return net.address;
         }
       }
     }
   } catch (_) {}
+  cachedLanIp = '127.0.0.1';
+  lastLanIpCheckTime = now;
   return '127.0.0.1';
 }
 
@@ -1992,13 +2028,16 @@ export function getIceServers(userDid?: string): RTCIceServerConfig[] {
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
     { urls: 'stun:global.stun.twilio.com:3478' }
   ];
 
   const customStun = process.env.WEBRTC_STUN_SERVERS || process.env.SOVRA_STUN_SERVERS;
+  const zeroDomainNoPublicStun =
+    process.env.SOVRA_NO_DNS === 'true' && process.env.SOVRA_ALLOW_PUBLIC_STUN !== 'true';
   const stunServers: RTCIceServerConfig[] = customStun
     ? customStun.split(',').map(s => s.trim()).filter(Boolean).map(url => ({ urls: url }))
-    : defaultStunServers;
+    : (zeroDomainNoPublicStun ? [] : defaultStunServers);
 
   const turnServersEnv = process.env.WEBRTC_TURN_SERVERS || process.env.SOVRA_TURN_SERVERS;
   const turnSecret = process.env.WEBRTC_TURN_SECRET || process.env.SOVRA_TURN_SECRET;
@@ -2019,8 +2058,18 @@ export function getIceServers(userDid?: string): RTCIceServerConfig[] {
     }
   ];
 
+  const allowThirdPartyTurn =
+    process.env.SOVRA_ENABLE_PUBLIC_TURN === 'true' ||
+    process.env.SOVRA_ALLOW_DNS === 'true' ||
+    process.env.SOVRA_NO_DNS === 'false';
+
   if (!turnServersEnv) {
-    if (process.env.VITEST || process.env.NODE_ENV === 'test' || process.env.SOVRA_DISABLE_DEFAULT_TURN === 'true') {
+    if (
+      process.env.VITEST ||
+      process.env.NODE_ENV === 'test' ||
+      process.env.SOVRA_DISABLE_DEFAULT_TURN === 'true' ||
+      !allowThirdPartyTurn
+    ) {
       return stunServers;
     }
     return [...stunServers, ...defaultTurnServers];
@@ -2081,6 +2130,9 @@ function renderHtml(
 
 
 async function startDevServer() {
+  if (process.env.SOVRA_NO_DNS === undefined && process.env.SOVRA_ALLOW_DNS !== 'true') {
+    process.env.SOVRA_NO_DNS = 'true';
+  }
   console.log('------------------------------------------------------------');
   console.log('   SOVRA LOCALHOST DEVELOPMENT & P2P NODE RUNNER');
   console.log('------------------------------------------------------------');
@@ -3196,6 +3248,17 @@ async function startDevServer() {
           cachedAssetLinksContent = fs.readFileSync(staticAssetLinksPath, 'utf-8');
         } else {
           cachedAssetLinksContent = JSON.stringify([
+            {
+              relation: ['delegate_permission/common.handle_all_urls'],
+              target: {
+                namespace: 'android_app',
+                package_name: 'app.sovra.network',
+                sha256_cert_fingerprints: [
+                  '14:6D:E9:7D:0F:52:AB:F5:B5:4F:86:4E:2F:E9:B5:A4:9E:6F:E1:94:7A:B4:42:07:98:8C:72:48:99:A5:1B:1A',
+                  '5F:E9:60:5F:17:55:F2:0A:9E:6C:F9:55:9D:3A:DF:B2:EC:88:23:25:18:32:9C:45:57:E4:66:A6:33:D6:2B:1C',
+                ],
+              },
+            },
             {
               relation: ['delegate_permission/common.handle_all_urls'],
               target: {
@@ -5210,7 +5273,7 @@ async function startDevServer() {
           authorEntityHandle: authorEntityHandle,
           authorBadge: authorBadge,
           channelTargetId: parsed.channelTargetId ? String(parsed.channelTargetId) : undefined,
-          audioTrack: String(parsed.audioTrack || 'Original Audio • Sovra Mesh'),
+          audioTrack: parsed.audioTrack ? String(parsed.audioTrack) : ((postType === 'video' || postType === 'reel') ? 'Original Audio • Sovra Mesh' : undefined),
           mediaGradient,
           mediaEmoji,
           mediaTitle,
@@ -7366,6 +7429,20 @@ async function startDevServer() {
     }
 
     // ==========================================
+    // 💎 SOVRA 7-PILLAR TOKENOMICS, STAKING, VESTING & POL API
+    // ==========================================
+    if (await handleEconomyRoutes({
+      req,
+      res,
+      url,
+      readBoundedBody,
+      resolvePrincipal,
+      enforceAuth,
+    })) {
+      return;
+    }
+
+    // ==========================================
     // 🪙 MULTI-ASSET WEB3 WALLET & AMM SWAP API
     // ==========================================
     if (await handleWalletRoutes({
@@ -7375,6 +7452,7 @@ async function startDevServer() {
       readBoundedBody,
       resolvePrincipal,
       enforceAuth,
+      checkAdminRbac: createCheckAdminRbac(adminSecurity),
     })) {
       return;
     }
@@ -7473,7 +7551,7 @@ async function startDevServer() {
     // ==========================================
     // 🔊 OFFLINE ULTRASONIC & BLE TAP-TO-PAY API (TITAN-KILLER)
     // ==========================================
-    if (await handleOfflinePayRoutes(req, res)) {
+    if (await handleOfflinePayRoutes(req, res, { resolvePrincipal, enforceAuth })) {
       return;
     }
 
@@ -7635,6 +7713,33 @@ async function startDevServer() {
       return;
     }
 
+    // Unified Peer-Exchange (PEX) endpoint exposing zero-domain P2P multiaddrs & volunteer relay hints
+    if (url.pathname === '/api/peers' && req.method === 'GET') {
+      const localHost = getLanIpAddress() || '127.0.0.1';
+      const selfMultiaddr = `/ip4/${localHost}/tcp/${tcpPort}/p2p/${binding.peerId}`;
+      const connectedP2p = node.connManager.getAllConnections().map(c => ({
+        peerId: c.peerId,
+        remoteAddress: c.socket?.remoteAddress,
+        state: c.status,
+        multiaddr: c.multiaddr || (c.socket?.remoteAddress ? `/ip4/${c.socket.remoteAddress}/tcp/${c.socket.remotePort || tcpPort}/p2p/${c.peerId}` : selfMultiaddr),
+      }));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        zeroDomainMode: process.env.SOVRA_NO_DNS === 'true',
+        self: {
+          peerId: binding.peerId,
+          did: masterKey.did,
+          multiaddr: selfMultiaddr,
+          httpUrl: `http://${localHost}:${HTTP_PORT}`,
+          signedRecord: node.getSignedPeerRecord?.(3600) ?? undefined,
+        },
+        p2pPeers: connectedP2p,
+        peers: sovraDb.getAllPeers(),
+      }));
+      return;
+    }
+
     // ==========================================
     // 💬 SOVEREIGN CHAT, E2EE MESSAGING & OFFLINE MAILBOX (MODULAR CONTROLLER)
     // ==========================================
@@ -7730,7 +7835,7 @@ async function startDevServer() {
                   authorAvatarDataUrl: authorUser?.avatarDataUrl || payload.authorAvatarDataUrl,
                   authorType: payload.authorType || 'personal',
                   authorBadge: payload.authorBadge || '👤 Personal',
-                  audioTrack: String(payload.audioTrack || 'Original Audio • Sovra Mesh'),
+                  audioTrack: payload.audioTrack ? String(payload.audioTrack) : ((postType === 'video' || postType === 'reel') ? 'Original Audio • Sovra Mesh' : undefined),
                   mediaCid: payload.mediaCid || '',
                   caption: caption || 'Status update from offline queue',
                   tags: String(payload.tags || '#sovra #p2p #offline'),
@@ -10298,7 +10403,7 @@ async function startDevServer() {
 
     res.writeHead(404, { 'Content-Type': 'application/problem+json; charset=utf-8' });
     res.end(JSON.stringify({
-      type: 'https://sovra.network/errors/route-not-found',
+      type: '/errors/route-not-found',
       title: 'Route Not Found',
       status: 404,
       detail: 'The requested route was not found on this Sovra node.',
@@ -10377,17 +10482,21 @@ server.listen(HTTP_PORT, () => {
       });
     }
 
-    // Initialize Native CometBFT Consensus Supervisor & Stream Hub
-    try {
-      l1ChainSupervisor.start().then(() => {
-        try {
-          initCometBftStreamHub();
-        } catch (_) {}
-      }).catch(err => {
-        console.warn('[L1 CONSENSUS] Chain supervisor init error:', err);
-      });
-    } catch (wsErr) {
-      console.warn('[EXPLORER] CometBFT Stream Hub init warning:', wsErr);
+    // Initialize optional SOVRA-EXT-CONSENSUS (Go L1) only when explicitly opted in
+    if (process.env.SOVRA_ENABLE_EXT_CONSENSUS === 'true') {
+      try {
+        l1ChainSupervisor.start().then(() => {
+          try {
+            initCometBftStreamHub();
+          } catch (_) {}
+        }).catch(err => {
+          console.warn('[L1 CONSENSUS] Chain supervisor init error:', err);
+        });
+      } catch (wsErr) {
+        console.warn('[EXPLORER] CometBFT Stream Hub init warning:', wsErr);
+      }
+    } else {
+      console.info('[SOVRA-CORE] Operating standalone without SOVRA-EXT-CONSENSUS (set SOVRA_ENABLE_EXT_CONSENSUS=true to enable optional Go L1).');
     }
 
     // Periodic Maintenance: Video Cache Quota Pruning & SQLite WAL Checkpoint
@@ -10460,10 +10569,15 @@ server.listen(HTTP_PORT, () => {
       console.warn('[SELF-HEALING] Failed to initialize daemon:', daemonErr);
     }
 
-    // Periodic L1 Blockchain Settlement Mule (Every 45 seconds)
-    // Synchronizes offline SQLite payment vouchers to CometBFT L1 Consensus when sovrad.exe is active
+    // Periodic L1 Blockchain Settlement Relayer (Every 15 seconds)
+    // Synchronizes SUBMITTED / RECONCILIATION_REQUIRED settlement intents & offline vouchers to CometBFT L1
+    const autonomousL1Relayer = new L1SettlementRelayer({
+      store: sovraDb.getSovraStore(),
+    });
     const l1SettlementMuleInterval = setInterval(async () => {
       try {
+        await autonomousL1Relayer.processPendingIntents().catch(() => {});
+
         const state = sovraDb.getState();
         const vouchers = state.tip_vouchers || [];
         const pending = vouchers.filter((v: any) => v && v.status === 'pending_l1_settlement');
@@ -10489,7 +10603,7 @@ server.listen(HTTP_PORT, () => {
         }
         sovraDb.save();
       } catch (_) {}
-    }, 45 * 1000);
+    }, 15 * 1000);
     l1SettlementMuleInterval.unref();
   });
 }

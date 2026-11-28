@@ -37,6 +37,8 @@
       "required_approvals": 3,
       "total_council_seats": 5,
       "timelock_delay_seconds": 172800,
+      "sunset_height": 31536000,
+      "sunset_timestamp": 1826177117,
       "members": [
         {
           "seat": 1,
@@ -76,12 +78,49 @@
       ]
     }
   },
-  "accounts": {
-    "sovra188bf7314475bba74c0740246e3f23dce62c5086d": "30000000000000",
-    "sovra1community000000000000000000000000000000": "40000000000000",
-    "sovra1validatorpool00000000000000000000000000": "20000000000000",
-    "sovra1seederescrow000000000000000000000000000": "10000000000000"
+  "economic_params": {
+    "min_tx_fee_usov": 100,
+    "fee_burn_bps": 5000,
+    "unbonding_period_seconds": 1209600,
+    "security_council_sunset_height": 31536000,
+    "security_council_sunset_time": 1826177117
   },
+  "security_council": {
+    "threshold": "3-of-5",
+    "required_approvals": 3,
+    "total_council_seats": 5,
+    "timelock_delay_seconds": 172800,
+    "sunset_height": 31536000,
+    "sunset_timestamp": 1826177117
+  },
+  "accounts": {
+    "sovra188bf7314475bba74c0740246e3f23dce62c5086d": "15000000000000",
+    "sovra1ecosystempol00000000000000000000000000": "10000000000000",
+    "sovra1coretreasury00000000000000000000000000": "5000000000000"
+  },
+  "vesting_accounts": [
+    {
+      "address": "sovra188bf7314475bba74c0740246e3f23dce62c5086d",
+      "original_amount": "15000000000000",
+      "cliff_seconds": 31536000,
+      "vesting_duration_seconds": 94608000,
+      "label": "Genesis Validator Bootstrap Stake (12m Cliff + 36m Linear Vesting)"
+    },
+    {
+      "address": "sovra1ecosystempol00000000000000000000000000",
+      "original_amount": "10000000000000",
+      "cliff_seconds": 31536000,
+      "vesting_duration_seconds": 94608000,
+      "label": "Protocol-Owned Liquidity & Ecosystem Reserve (12m Cliff + 36m Linear)"
+    },
+    {
+      "address": "sovra1coretreasury00000000000000000000000000",
+      "original_amount": "5000000000000",
+      "cliff_seconds": 31536000,
+      "vesting_duration_seconds": 94608000,
+      "label": "Core Maintainer Reserve (12m Cliff + 36m Linear Vesting)"
+    }
+  ],
   "validators": [
     {
       "name": "sovra-mainnet-seed",

@@ -18,7 +18,10 @@
   },
   "dependencies": {
     "@sovra/protocol": "workspace:*",
-    "@sovra/shared": "workspace:*"
+    "@sovra/shared": "workspace:*",
+    "@types/pg": "^8.23.1",
+    "ioredis": "^6.1.0",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "typescript": "^5.8.2",

@@ -13,15 +13,16 @@ import {
   sha256,
   bytesToHex,
 } from '@sovra/crypto';
-import { Result, ok } from '@sovra/shared';
+import { Result, ok, err, ValidationError } from '@sovra/shared';
 
 export interface DevicePushRegistration {
   readonly deviceId: string;
   readonly deviceDid: string;
   readonly platform: 'android' | 'ios' | 'web';
-  readonly pushToken: string; // Opaque FCM registration token or APNs device hex
+  readonly pushToken: string; // Opaque FCM/APNs/UnifiedPush token or endpoint
   readonly blindChannelId: string; // SHA-256 derived blind channel topic
   readonly updatedAt: number;
+  readonly expiresAt?: number;
 }
 
 export interface BlindPushPayload {
@@ -37,11 +38,138 @@ export interface PushDispatchResult {
   readonly platform: 'android' | 'ios' | 'web';
   readonly messageId: string;
   readonly latencyMs: number;
+  readonly error?: string;
+}
+
+export interface PushDeliveryRequest {
+  readonly platform: 'android' | 'ios' | 'web';
+  readonly pushToken: string;
+  readonly blindChannelId: string;
+  readonly opaqueWakeupHint: string;
+  readonly priority: 'high' | 'normal';
+  readonly timestamp: number;
+}
+
+export interface PushTransportProvider {
+  sendPush(request: PushDeliveryRequest): Promise<{ messageId: string }>;
+}
+
+export interface HttpPushTransportOptions {
+  readonly endpointUrl: string;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly timeoutMs?: number;
+  readonly maxRetries?: number;
+  readonly baseRetryDelayMs?: number;
+}
+
+export class HttpPushTransportError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = 'HttpPushTransportError';
+  }
+}
+
+/**
+ * Real HTTP push delivery transport (UnifiedPush / self-hosted ntfy / WebPush / FCM / Relay Gateway).
+ * Includes bounded exponential backoff for transient 429/5xx errors and status propagation for 404/410 pruning.
+ */
+export class HttpEndpointPushTransport implements PushTransportProvider {
+  private readonly endpointUrl: string;
+  private readonly headers: Readonly<Record<string, string>>;
+  private readonly timeoutMs: number;
+  private readonly maxRetries: number;
+  private readonly baseRetryDelayMs: number;
+
+  constructor(options: HttpPushTransportOptions) {
+    if (!options.endpointUrl || (!options.endpointUrl.startsWith('http://') && !options.endpointUrl.startsWith('https://'))) {
+      throw new ValidationError('Valid HTTP/HTTPS endpointUrl is required for HttpEndpointPushTransport');
+    }
+    this.endpointUrl = options.endpointUrl;
+    this.headers = options.headers ?? {};
+    this.timeoutMs = options.timeoutMs ?? 5000;
+    this.maxRetries = options.maxRetries ?? 2;
+    this.baseRetryDelayMs = options.baseRetryDelayMs ?? 150;
+  }
+
+  public async sendPush(request: PushDeliveryRequest): Promise<{ messageId: string }> {
+    let lastError: Error | undefined;
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+      try {
+        const res = await fetch(this.endpointUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...this.headers,
+          },
+          body: JSON.stringify({
+            platform: request.platform,
+            pushToken: request.pushToken,
+            blindChannelId: request.blindChannelId,
+            opaqueWakeupHint: request.opaqueWakeupHint,
+            priority: request.priority,
+            timestamp: request.timestamp,
+          }),
+          signal: controller.signal,
+        });
+
+        const rawText = await res.text().catch(() => '');
+        if (res.ok) {
+          let parsedId: string | undefined;
+          try {
+            const parsed = JSON.parse(rawText) as { messageId?: string; name?: string; id?: string };
+            parsedId = parsed.messageId || parsed.name || parsed.id;
+          } catch {}
+          const headerId = res.headers.get('apns-id') || res.headers.get('x-message-id');
+          return {
+            messageId: String(parsedId || headerId || `push_${request.platform}_${request.timestamp}`),
+          };
+        }
+
+        const httpErr = new HttpPushTransportError(
+          `Push transport HTTP ${res.status}: ${rawText || res.statusText}`,
+          res.status,
+        );
+        // Never retry permanent 4xx errors other than 429 Too Many Requests
+        if (res.status !== 429 && res.status < 500) {
+          throw httpErr;
+        }
+        lastError = httpErr;
+        if (attempt < this.maxRetries) {
+          const retryAfterHdr = Number(res.headers.get('retry-after'));
+          const delayMs = Number.isFinite(retryAfterHdr) && retryAfterHdr > 0
+            ? Math.min(2000, retryAfterHdr * 1000)
+            : this.baseRetryDelayMs * Math.pow(2, attempt);
+          await new Promise(r => setTimeout(r, delayMs));
+        }
+      } catch (err) {
+        if (err instanceof HttpPushTransportError && err.statusCode !== 429 && err.statusCode < 500) {
+          throw err;
+        }
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (attempt < this.maxRetries) {
+          await new Promise(r => setTimeout(r, this.baseRetryDelayMs * Math.pow(2, attempt)));
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    throw lastError ?? new Error('Push delivery failed after retries');
+  }
 }
 
 export class BlindPushRelayServer {
   private readonly deviceRegistry = new Map<string, DevicePushRegistration>();
   private readonly channelToDevices = new Map<string, Set<string>>();
+  private readonly transport?: PushTransportProvider | undefined;
+
+  constructor(options?: { transport?: PushTransportProvider | undefined }) {
+    this.transport = options?.transport;
+  }
 
   /**
    * Registers a mobile device with an opaque push token and blind channel ID.
@@ -80,35 +208,68 @@ export class BlindPushRelayServer {
   public async dispatchBlindSignal(
     payload: BlindPushPayload,
   ): Promise<Result<readonly PushDispatchResult[]>> {
-    const start = Date.now();
     const targetDeviceIds = this.channelToDevices.get(payload.blindChannelId);
 
     if (!targetDeviceIds || targetDeviceIds.size === 0) {
       return ok([]);
     }
 
+    if (!this.transport) {
+      return err(
+        new ValidationError(
+          'No push delivery transport configured; BlindPushRelayServer refuses mock delivery and fails closed.',
+        ),
+      );
+    }
+
     const results: PushDispatchResult[] = [];
 
-    for (const devId of targetDeviceIds) {
+    for (const devId of Array.from(targetDeviceIds)) {
       const dev = this.deviceRegistry.get(devId);
       if (!dev) continue;
+      if (dev.expiresAt !== undefined && Date.now() > dev.expiresAt) {
+        this.unregisterDevice(devId);
+        continue;
+      }
 
-      // In production, this invokes FCM HTTP v1 or APNs HTTP/2 client
-      // Zero-knowledge push dispatch:
-      void {
-        token: dev.pushToken,
-        channel: payload.blindChannelId,
-        hint: payload.opaqueWakeupHint,
-      };
+      const devStart = Date.now();
+      try {
+        const dispatched = await this.transport.sendPush({
+          platform: dev.platform,
+          pushToken: dev.pushToken,
+          blindChannelId: payload.blindChannelId,
+          opaqueWakeupHint: payload.opaqueWakeupHint,
+          priority: payload.priority,
+          timestamp: payload.timestamp,
+        });
+        results.push({
+          success: true,
+          targetDeviceId: dev.deviceId,
+          platform: dev.platform,
+          messageId: dispatched.messageId,
+          latencyMs: Math.max(1, Date.now() - devStart),
+        });
+      } catch (transportErr: any) {
+        if (transportErr instanceof HttpPushTransportError && (transportErr.statusCode === 404 || transportErr.statusCode === 410)) {
+          this.unregisterDevice(devId);
+        }
+        results.push({
+          success: false,
+          targetDeviceId: dev.deviceId,
+          platform: dev.platform,
+          messageId: '',
+          latencyMs: Math.max(1, Date.now() - devStart),
+          error: transportErr?.message || 'Push transport error',
+        });
+      }
+    }
 
-      const latency = Math.max(1, Date.now() - start);
-      results.push({
-        success: true,
-        targetDeviceId: dev.deviceId,
-        platform: dev.platform,
-        messageId: `fcm_msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        latencyMs: latency,
-      });
+    if (results.length > 0 && results.every(r => !r.success)) {
+      return err(
+        new ValidationError(
+          `Blind push dispatch failed across all ${results.length} target device(s): ${results[0]?.error ?? 'unknown error'}`,
+        ),
+      );
     }
 
     return ok(results);

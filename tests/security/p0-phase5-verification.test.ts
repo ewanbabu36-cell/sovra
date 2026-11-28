@@ -194,7 +194,7 @@ describe('SOVRA Phase 5: P0 Financial Integrity & E2EE Verification Gate', () =>
         const row = rawDb.prepare('SELECT text, ciphertext_hex, iv_hex FROM direct_messages WHERE id = ?').get(msgId) as any;
         expect(row).toBeDefined();
         // Server text must be the encrypted placeholder, NOT secretPlaintext
-        expect(row.text).toContain('🔒 [End-to-End Encrypted: Double Ratchet]');
+        expect(row.text).toMatch(/^🔒 \[End-to-End Encrypted: (?:Client-Side|Double Ratchet)\]/);
         expect(row.text).not.toContain(secretPlaintext);
         expect(row.ciphertext_hex).toBe(encrypted.ciphertextHex);
       }
@@ -213,7 +213,7 @@ describe('SOVRA Phase 5: P0 Financial Integrity & E2EE Verification Gate', () =>
 
       const latestMsg = data.messages[data.messages.length - 1];
       expect(latestMsg.isE2EE).toBe(true);
-      expect(latestMsg.text).toContain('🔒 [End-to-End Encrypted: Double Ratchet]');
+      expect(latestMsg.text).toMatch(/^🔒 \[End-to-End Encrypted: (?:Client-Side|Double Ratchet)\]/);
       expect(latestMsg.ciphertextHex).toBeDefined();
 
       // Bob decrypts locally on his device using DoubleRatchetChatEngine

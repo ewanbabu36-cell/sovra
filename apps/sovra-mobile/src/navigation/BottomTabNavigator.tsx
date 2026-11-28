@@ -555,11 +555,11 @@ export function BottomTabNavigator(): React.JSX.Element {
                 (navigator as any).share({
                   title: `${profile.displayName || 'Sovereign Peer'} on SOVRA`,
                   text: `Connect with ${profile.handle || '@sovereign'} on the SOVRA P2P Mesh Network`,
-                  url: `https://sovra.network/?peer=${profile.did}`,
+                  url: `sovra://peer/${profile.did}`,
                 }).catch(() => {});
               } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                navigator.clipboard.writeText(`https://sovra.network/?peer=${profile.did}`);
-                alert('Profile link copied to clipboard!');
+                navigator.clipboard.writeText(`sovra://peer/${profile.did}`);
+                alert('Sovereign peer link copied to clipboard!');
               }
             }}
           />

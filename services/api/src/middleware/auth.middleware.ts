@@ -229,19 +229,6 @@ export class AuthMiddleware {
       }
     }
 
-    // In test harness (e.g. modular API dispatcher unit tests), allow mock test principal when only x-sovra-did is provided
-    if (process.env.VITEST && req.headers['x-sovra-did'] && !sigHeader && !authHeader) {
-      const mockDid = String(req.headers['x-sovra-did']).trim();
-      const principal: ApiPrincipal = {
-        did: mockDid,
-        role: 'USER',
-        authenticationMethod: 'BEARER_TOKEN',
-        sessionId: `test_sess_${mockDid}`,
-      };
-      (req as any).principal = principal;
-      return principal;
-    }
-
     // Direct header trust is strictly forbidden
     return null;
   }

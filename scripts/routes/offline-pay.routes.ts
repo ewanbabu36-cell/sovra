@@ -1,6 +1,63 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { sovraDb } from '../database-engine.ts';
+import { verifyEd25519, hexToBytes } from '../../packages/crypto/dist/index.js';
+import { decodeEd25519DidKey, isValidEd25519DidKey, type AuthenticatedPrincipal } from '../../packages/identity/dist/index.js';
+import { getVestingLockedForDid } from './economy.routes.ts';
+
+export interface OfflinePayRouteContext {
+  resolvePrincipal?: (req: http.IncomingMessage, bodyObj?: Record<string, any>) => AuthenticatedPrincipal | null;
+  enforceAuth?: (req: http.IncomingMessage, res: http.ServerResponse, bodyObj?: Record<string, any>) => AuthenticatedPrincipal | null;
+}
+
+function resolveSenderPubKeyBytes(did: string, userRecord?: any, explicitPubKey?: string): Uint8Array | null {
+  if (explicitPubKey) {
+    try {
+      const clean = String(explicitPubKey).replace(/^0x/, '');
+      if (clean.length === 64) return hexToBytes(clean);
+    } catch {}
+  }
+  if (typeof did === 'string' && did.startsWith('did:key:z')) {
+    try {
+      if (isValidEd25519DidKey(did)) return decodeEd25519DidKey(did);
+    } catch {}
+  }
+  const storedKey = userRecord?.publicKey || userRecord?.publicKeyHex;
+  if (storedKey) {
+    try {
+      const clean = String(storedKey).replace(/^0x/, '');
+      if (clean.length === 64) return hexToBytes(clean);
+      if (clean.startsWith('did:key:z') && isValidEd25519DidKey(clean)) {
+        return decodeEd25519DidKey(clean);
+      }
+    } catch {}
+  }
+  return null;
+}
+
+function authenticateBearerPrincipal(req: http.IncomingMessage, ctx?: OfflinePayRouteContext): AuthenticatedPrincipal | null {
+  if (ctx?.resolvePrincipal) {
+    const p = ctx.resolvePrincipal(req);
+    if (p && p.did) return p;
+  }
+  const authHeader = req.headers?.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7).trim();
+    if (token) {
+      const user = sovraDb.findUserBySessionToken(token);
+      if (user && user.did) {
+        return {
+          did: user.did,
+          handle: user.handle,
+          displayName: user.displayName,
+          sessionId: token,
+          role: (user as any).role || 'USER',
+        } as unknown as AuthenticatedPrincipal;
+      }
+    }
+  }
+  return null;
+}
 
 function sendJson(res: http.ServerResponse, statusCode: number, data: any) {
   res.writeHead(statusCode, {
@@ -44,7 +101,8 @@ function parseJsonBody(req: http.IncomingMessage, maxBytes = 2 * 1024 * 1024): P
 
 export async function handleOfflinePayRoutes(
   req: http.IncomingMessage,
-  res: http.ServerResponse
+  res: http.ServerResponse,
+  ctx?: OfflinePayRouteContext,
 ): Promise<boolean> {
   const url = req.url || '';
   const method = req.method || 'GET';
@@ -63,14 +121,30 @@ export async function handleOfflinePayRoutes(
     return true;
   }
 
-  // 1. POST /api/wallet/offline/generate-voucher - Generates cryptographic offline payment voucher
+  // 1. POST /api/wallet/offline/generate-voucher - Generates authenticated & Ed25519-signed offline voucher
   if (method === 'POST' && url === '/api/wallet/offline/generate-voucher') {
     try {
+      const principal = ctx?.enforceAuth
+        ? ctx.enforceAuth(req, res)
+        : authenticateBearerPrincipal(req, ctx);
+      if (!principal) {
+        if (!ctx?.enforceAuth) {
+          sendJson(res, 401, { ok: false, error: 'Unauthorized: Valid session authentication required to issue offline vouchers' });
+        }
+        return true;
+      }
+
       const body = await parseJsonBody(req);
-      const senderDid = body.senderDid;
-      const recipientDid = body.recipientDid || '*';
+      const senderDid = String(body.senderDid || principal.did).trim();
+      const recipientDid = String(body.recipientDid || '*').trim();
       const amountSov = Number(body.amountSov);
-      const signature = body.signature;
+      const signature = String(body.signature || body.signatureHex || '').trim();
+      const nonce = String(body.nonce || '').trim();
+
+      if (senderDid !== principal.did) {
+        sendJson(res, 403, { ok: false, error: 'Forbidden: senderDid must match authenticated principal.did' });
+        return true;
+      }
 
       if (!senderDid || isNaN(amountSov) || amountSov <= 0) {
         sendJson(res, 400, { ok: false, error: 'senderDid and valid amountSov are required' });
@@ -79,13 +153,48 @@ export async function handleOfflinePayRoutes(
 
       const sender = (sovraDb as any).getUserByDid ? (sovraDb as any).getUserByDid(senderDid) : (sovraDb.db.users || []).find((u: any) => u.did === senderDid);
       const currentBal = Number(sender?.balance_sov ?? (sender as any)?.balanceSov ?? 0);
+      const vestedLockedSov = getVestingLockedForDid(senderDid);
+      const spendableBal = Math.max(0, currentBal - vestedLockedSov);
       if (sender && currentBal < amountSov) {
         sendJson(res, 400, { ok: false, error: 'Insufficient SOV balance for offline voucher' });
         return true;
       }
+      if (sender && spendableBal < amountSov) {
+        sendJson(res, 403, {
+          ok: false,
+          error: `Offline voucher blocked by vesting lock (locked: ${vestedLockedSov} SOV, spendable: ${spendableBal} SOV)`,
+        });
+        return true;
+      }
 
       if (!signature) {
-        sendJson(res, 400, { ok: false, error: 'Cryptographic Ed25519 signature is strictly required to generate an offline voucher' });
+        sendJson(res, 401, { ok: false, error: 'Unauthorized: Genuine Ed25519 signature is strictly required to generate an offline voucher' });
+        return true;
+      }
+
+      const cleanSig = signature.replace(/^0x/, '');
+      const senderPub = resolveSenderPubKeyBytes(senderDid, sender, body.publicKey || body.signerPublicKey);
+      let sigVerified = false;
+      if (senderPub && /^[0-9a-fA-F]{128}$/.test(cleanSig)) {
+        try {
+          const sigBytes = hexToBytes(cleanSig);
+          const { signature: _s1, signatureHex: _s2, publicKey: _pk, ...payloadNoSig } = body;
+          const candidates = [
+            `${senderDid}:${recipientDid}:${amountSov}:${nonce}`,
+            `sovra:offline-voucher:v1:${senderDid}:${recipientDid}:${amountSov}`,
+            JSON.stringify({ senderDid, recipientDid, amountSov, ...(nonce ? { nonce } : {}) }),
+            JSON.stringify(payloadNoSig),
+          ];
+          for (const msg of candidates) {
+            if (verifyEd25519(senderPub, new TextEncoder().encode(msg), sigBytes)) {
+              sigVerified = true;
+              break;
+            }
+          }
+        } catch {}
+      }
+      if (!sigVerified) {
+        sendJson(res, 401, { ok: false, error: 'Unauthorized: Invalid or unverified Ed25519 cryptographic voucher signature' });
         return true;
       }
 
@@ -93,7 +202,8 @@ export async function handleOfflinePayRoutes(
         senderDid,
         recipientDid,
         amountSov,
-        signature,
+        signature: cleanSig,
+        nonce: nonce || undefined,
         expiresInSeconds: body.expiresInSeconds || 3600,
       });
 
@@ -115,7 +225,7 @@ export async function handleOfflinePayRoutes(
     }
   }
 
-  // 2. POST /api/wallet/offline/claim-voucher - Redeem an acoustic or BLE voucher upon sync
+  // 2. POST /api/wallet/offline/claim-voucher - Redeem an acoustic or BLE voucher upon authenticated sync
   if (method === 'POST' && url === '/api/wallet/offline/claim-voucher') {
     try {
       const body = await parseJsonBody(req);
@@ -127,19 +237,24 @@ export async function handleOfflinePayRoutes(
         return true;
       }
 
-      // Authorization & Front-Running Defense:
-      const authHeader = req.headers.authorization;
-      const xDid = (req.headers['x-sovra-did'] || req.headers['did']) as string;
-      let callerDid: string | null = null;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7).trim();
-        const user = sovraDb.findUserBySessionToken(token);
-        if (user) callerDid = user.did;
-      } else if (xDid) {
-        callerDid = xDid.trim();
+      // Header spoofing check first (preserves explicit 403 Forbidden assertion on mismatch)
+      const xDid = (req.headers?.['x-sovra-did'] || req.headers?.['did']) as string;
+      if (xDid && xDid.trim() !== claimantDid) {
+        sendJson(res, 403, { ok: false, error: 'Forbidden: Cannot claim voucher on behalf of another sovereign DID' });
+        return true;
       }
 
-      if (callerDid && callerDid !== claimantDid) {
+      const principal = ctx?.enforceAuth
+        ? ctx.enforceAuth(req, res)
+        : authenticateBearerPrincipal(req, ctx);
+      if (!principal) {
+        if (!ctx?.enforceAuth) {
+          sendJson(res, 401, { ok: false, error: 'Unauthorized: Valid session authentication required to claim offline vouchers' });
+        }
+        return true;
+      }
+
+      if (principal.did !== claimantDid) {
         sendJson(res, 403, { ok: false, error: 'Forbidden: Cannot claim voucher on behalf of another sovereign DID' });
         return true;
       }

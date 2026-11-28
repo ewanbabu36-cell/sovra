@@ -67,7 +67,7 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
     tagCounts.forEach((count, tag) => {
       dynamicList.push({
         tag,
-        count: count * 150 + 120,
+        count,
         category: 'Trending',
       });
     });
@@ -76,7 +76,7 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
       if (!tagCounts.has(base.tag.toLowerCase())) {
         dynamicList.push({
           tag: base.tag,
-          count: base.count * 100,
+          count: base.count,
           category: base.category,
         });
       }
@@ -109,7 +109,10 @@ export function handleFeedDiscoveryRoutes(ctx: FeedRouteContext): boolean {
       const ageHours = Math.max(0, (now - (p.createdAt || now)) / (1000 * 3600));
       const freshnessDecay = Math.exp(-0.05 * ageHours);
       const engagementScore = ((p.likesCount || 0) * 2) + ((p.commentsCount || 0) * 3) + ((p.sharesCount || 0) * 4);
-      const relevance = p.isPinned ? 100 : 1;
+      const boostBonus = (Number((p as any).boostUntil || 0) > now && Number((p as any).boostSov || 0) > 0)
+        ? Math.min(500, Number((p as any).boostSov) * 10)
+        : 0;
+      const relevance = (p.isPinned ? 100 : 1) + boostBonus;
       const totalScore = (engagementScore + relevance) * freshnessDecay;
       return { post: p, score: totalScore };
     });

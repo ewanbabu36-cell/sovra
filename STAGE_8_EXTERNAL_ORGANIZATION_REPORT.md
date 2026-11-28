@@ -1,0 +1,27 @@
+# Stage 8 — External Organization Certification Report
+
+**Phase:** Stage 8 — Independent External Field Certification (Evidence-Gathering Only; Zero Code Modified)  
+**Timestamp:** `2026-11-26T12:49:50+05:30`  
+**Host Workstation:** Windows (`D:\Sovra`), `git HEAD = 6c0e705efef39874792fa30f82e4501f673b7ab5`  
+**Overall Section Status:** **`NOT TESTED`** *(No independent external `ORG-A`, `ORG-B`, or `ORG-C` infrastructure provisioned or reachable from this environment)*
+
+---
+
+## 1. Environment & Resource Availability Probe
+
+- **Probed Commands:**
+  - `Test-Path "$env:USERPROFILE\.ssh\config"` -> `SSH_CONFIG_EXISTS=False` (Exit `0`)
+  - `[Environment]::GetEnvironmentVariable('SOVRA_EXTERNAL_PEERS')` -> `SOVRA_EXTERNAL_PEERS=UNSET`
+  - `node --experimental-strip-types scripts/external-certification-check.ts` -> Exit `0` (`status: "READY_FOR_EXTERNAL_EXECUTION"`)
+- **Finding:** This execution environment is a single Windows development machine with **zero** accessible external `ORG-A`, `ORG-B`, or `ORG-C` servers, administrators, separate ASNs, or remote SSH targets. Multi-organization field tests **cannot** be simulated locally under Stage 8 Non-Negotiable Rules (`"Do not simulate external organizations, ASNs, carrier networks or physical devices"` and `"Do not count localhost tests as WAN tests"`).
+
+---
+
+## 2. Finding Matrix (`ORG-A`, `ORG-B`, `ORG-C`)
+
+| Finding ID | Criterion | Verification Record |
+|---|---|---|
+| **S8-ORG-01** | **Requirement ID:** `S8-SEC2-01` — Establish 3 independent orgs (`ORG-A`, `ORG-B`, `ORG-C`) with separate admins, credentials, key material, deployment envs & ASNs<br>**Test methodology:** Inspect remote host configs, SSH inventory, `SOVRA_EXTERNAL_PEERS`, and run [scripts/external-certification-check.ts](file:///d:/Sovra/scripts/external-certification-check.ts)<br>**Environment:** Single Windows host (`10.155.170.224` Wi-Fi / `223.238.130.171` reflexive IPv4)<br>**Actual execution evidence:** `SSH_CONFIG_EXISTS=False`; `SOVRA_EXTERNAL_PEERS=UNSET`; 0 remote operator endpoints exist<br>**Result:** **`NOT TESTED`**<br>**Evidence location:** [external-certification-check.ts](file:///d:/Sovra/scripts/external-certification-check.ts), [EXTERNAL_MULTI_ORG_CERTIFICATION.md](file:///d:/Sovra/RECOVERY/EXTERNAL_MULTI_ORG_CERTIFICATION.md)<br>**Remaining limitations:** Requires 3 external organizations provisioning independent servers across separate public ASNs and publishing peer multiaddrs. | **`NOT TESTED`** |
+| **S8-ORG-02** | **Requirement ID:** `S8-SEC2-02` — Cross-org peer discovery without founder infrastructure & cross-org identity verification (`ORG-A <-> ORG-B <-> ORG-C`)<br>**Test methodology:** Planned live `/sovra/pex/1.0.0` + signed QR/peer-record exchange over public WAN per [EXTERNAL_MULTI_ORG_CERTIFICATION.md](file:///d:/Sovra/RECOVERY/EXTERNAL_MULTI_ORG_CERTIFICATION.md)<br>**Environment:** Localhost-only multi-process reference baseline exists in [founder-independence-multiprocess.test.ts](file:///d:/Sovra/tests/integration/founder-independence-multiprocess.test.ts) (`4478ms` in `task-55780`), excluded as WAN proof per Stage 8 Rule 1<br>**Actual execution evidence:** External WAN peer dials not executed (`0` external targets)<br>**Result:** **`NOT TESTED`**<br>**Evidence location:** [EXTERNAL_MULTI_ORG_CERTIFICATION.md#L29-L53](file:///d:/Sovra/RECOVERY/EXTERNAL_MULTI_ORG_CERTIFICATION.md#L29-L53), `task-55780` (`stage8-section7-verify.log`)<br>**Remaining limitations:** Requires 3 independent operators online simultaneously. | **`NOT TESTED`** |
+| **S8-ORG-03** | **Requirement ID:** `S8-SEC2-03` — Cross-org signed `SOVRA-EVT` exchange, message delivery & distributed BitSwap replication<br>**Test methodology:** Live WAN event replication & storage pinning with distinct `operatorId` diversity across `ORG-A/B/C`<br>**Environment:** Single workstation only<br>**Actual execution evidence:** Only local multi-process BitSwap & CBOR event tests verified locally (`storage-integrity.test.ts`, `founder-independence-multiprocess.test.ts`); cross-org WAN execution = `0` runs<br>**Result:** **`NOT TESTED`**<br>**Evidence location:** [storage-integrity.test.ts](file:///d:/Sovra/nodes/storage-node/test/storage-integrity.test.ts)<br>**Remaining limitations:** Public Internet packet loss, TLS/firewall middleboxes, and multi-org storage churn untested externally. | **`NOT TESTED`** |
+| **S8-ORG-04** | **Requirement ID:** `S8-SEC2-04` — Cross-org disconnect/reconnect, WAN partition recovery, relay fallback & IPv4/IPv6 interop<br>**Test methodology:** Network firewall partition & relay kill failover between `ORG-A/B/C` per Phase C & Phase E of [EXTERNAL_MULTI_ORG_CERTIFICATION.md#L54-L74](file:///d:/Sovra/RECOVERY/EXTERNAL_MULTI_ORG_CERTIFICATION.md#L54-L74)<br>**Environment:** Single workstation only (loopback interop only in [transport-interop.test.ts](file:///d:/Sovra/packages/p2p/test/transport-interop.test.ts))<br>**Actual execution evidence:** Zero external partition/failover executions performed across distinct ASNs<br>**Result:** **`NOT TESTED`**<br>**Evidence location:** [transport-interop.test.ts](file:///d:/Sovra/packages/p2p/test/transport-interop.test.ts), [EXTERNAL_MULTI_ORG_CERTIFICATION.md](file:///d:/Sovra/RECOVERY/EXTERNAL_MULTI_ORG_CERTIFICATION.md)<br>**Remaining limitations:** Real BGP/firewall asymmetric partitions cannot be exercised on one machine. | **`NOT TESTED`** |

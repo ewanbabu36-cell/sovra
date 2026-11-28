@@ -4,12 +4,8 @@
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {
-    "url": "https://sovra.network",
-    "cleartext": false,
-    "allowNavigation": [
-      "sovra.network",
-      "*.sovra.network"
-    ]
+    "iosScheme": "sovra",
+    "cleartext": false
   },
   "ios": {
     "contentInset": "automatic",

@@ -17,23 +17,44 @@ android {
 
     signingConfigs {
         release {
-            storeFile file(System.getenv("SOVRA_RELEASE_KEYSTORE_FILE") ?: System.getenv("SOVRA_KEYSTORE_FILE") ?: "sovra-release-key.jks")
-            storePassword(System.getenv("SOVRA_RELEASE_KEYSTORE_PASSWORD") ?: System.getenv("SOVRA_KEYSTORE_PASSWORD") ?: "sovraSecure2026!")
-            keyAlias(System.getenv("SOVRA_RELEASE_KEY_ALIAS") ?: System.getenv("SOVRA_KEY_ALIAS") ?: "sovra-upload")
-            keyPassword(System.getenv("SOVRA_RELEASE_KEY_PASSWORD") ?: System.getenv("SOVRA_KEY_PASSWORD") ?: "sovraSecure2026!")
+            def ksFile = System.getenv("SOVRA_RELEASE_KEYSTORE_FILE") ?: System.getenv("SOVRA_KEYSTORE_FILE")
+            def ksPass = System.getenv("SOVRA_RELEASE_KEYSTORE_PASSWORD") ?: System.getenv("SOVRA_KEYSTORE_PASSWORD")
+            def ksAlias = System.getenv("SOVRA_RELEASE_KEY_ALIAS") ?: System.getenv("SOVRA_KEY_ALIAS")
+            def ksKeyPass = System.getenv("SOVRA_RELEASE_KEY_PASSWORD") ?: System.getenv("SOVRA_KEY_PASSWORD")
+            def isReleaseTask = gradle.startParameter.taskNames.any {
+                def lower = it.toLowerCase()
+                lower.contains("release") || lower.contains("bundle")
+            }
+            if (isReleaseTask && (!ksFile || !ksPass || !ksAlias || !ksKeyPass)) {
+                throw new GradleException(
+                    "Release builds require SOVRA_RELEASE_KEYSTORE_FILE, SOVRA_RELEASE_KEYSTORE_PASSWORD, SOVRA_RELEASE_KEY_ALIAS, and SOVRA_RELEASE_KEY_PASSWORD environment variables."
+                )
+            }
+            if (ksFile && ksPass && ksAlias && ksKeyPass) {
+                storeFile file(ksFile)
+                storePassword ksPass
+                keyAlias ksAlias
+                keyPassword ksKeyPass
+            }
         }
     }
 
     buildTypes {
         release {
-            minifyEnabled = false
+            minifyEnabled = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig = signingConfigs.release
         }
     }
 
     lint {
-        abortOnError = false
-        checkReleaseBuilds = false
+        abortOnError = true
+        checkReleaseBuilds = true
+    }
+
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 
     compileOptions {
@@ -44,6 +65,11 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+}
+
+tasks.withType(org.gradle.api.tasks.bundling.AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
 }
 
 dependencies {

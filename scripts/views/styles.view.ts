@@ -42,6 +42,215 @@ body.sovra-mode-app .app-layout { display: flex !important; }
   box-sizing: border-box;
 }
 
+/* Studio Pro Full-Width Mode (YouTube Studio Parity) */
+body.tab-active-studio .app-left-rail,
+body.tab-active-studio .app-right-rail,
+body.tab-active-studio #spatialCoPilotDrawer,
+body.tab-active-studio #appStageFooter {
+  display: none !important;
+}
+
+body.tab-active-studio #feed-view {
+  display: none !important;
+}
+
+body.tab-active-studio .app-center-stage {
+  max-width: 100% !important;
+  width: 100% !important;
+  flex: 1 1 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+body.tab-active-studio #studio-view {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Hide Android System Nav on Desktop */
+@media (min-width: 769px) {
+  .sovra-android-nav-bar,
+  #sovraAndroidNavBar,
+  nav[aria-label="Android System Navigation"] {
+    display: none !important;
+  }
+}
+
+/* ========================================================
+   TABLET PORTRAIT & MEDIUM SCREENS (768px - 1023px) 64px PERSISTENT RAIL
+   ======================================================== */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .app-layout {
+    display: flex !important;
+    flex-direction: row !important;
+    width: 100% !important;
+  }
+  .app-left-rail {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 64px !important;
+    min-width: 64px !important;
+    max-width: 64px !important;
+    padding: 0.75rem 0.35rem !important;
+    align-items: center !important;
+    position: sticky !important;
+    top: 58px !important;
+    height: calc(100vh - 58px) !important;
+    box-sizing: border-box !important;
+    z-index: 100 !important;
+    background: rgba(11, 15, 25, 0.95) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  }
+  .app-left-rail .rail-brand,
+  .app-left-rail .rail-label,
+  .app-left-rail .rail-badge,
+  .app-left-rail .rail-user-profile > div:not(#railUserAvatar),
+  .app-left-rail .rail-user-profile .rail-logout-quick-btn,
+  .app-left-rail .rail-post-btn span {
+    display: none !important;
+  }
+  .app-left-rail .rail-nav {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+  .app-left-rail .rail-nav-item {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    align-items: center !important;
+    border-radius: 12px !important;
+  }
+  .app-left-rail .rail-icon {
+    font-size: 1.35rem !important;
+    margin: 0 !important;
+  }
+  .app-left-rail .rail-actions-group {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    margin: 0.5rem 0 !important;
+  }
+  .app-left-rail .rail-post-btn {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    padding: 0 !important;
+    border-radius: 12px !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+  .app-left-rail .rail-post-btn svg {
+    margin: 0 !important;
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .app-left-rail .rail-user-profile {
+    width: 48px !important;
+    height: 48px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+  .app-left-rail #railUserAvatar {
+    width: 38px !important;
+    height: 38px !important;
+  }
+  .app-right-rail,
+  #spatialCoPilotDrawer {
+    display: none !important;
+  }
+  .app-center-stage {
+    flex: 1 1 auto !important;
+    max-width: calc(100vw - 64px) !important;
+    width: calc(100vw - 64px) !important;
+    min-width: 0 !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+  .mobile-bottom-nav,
+  .app-bottom-nav {
+    display: none !important;
+  }
+}
+
+/* ========================================================
+   WCAG 2.5.5 / ANDROID MATERIAL 44×44PX TOUCH HITBOX POLISH
+   ======================================================== */
+.header-action-icon-btn,
+#headerCreateBtn,
+#headerChatBtn,
+#headerNotificationBell,
+#headerThemeToggleBtn {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  width: 44px !important;
+  height: 44px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
+@media (min-width: 861px) {
+  #headerMobileSearchBtn,
+  .header-menu-toggle-btn {
+    display: none !important;
+  }
+}
+
+/* Mobile Bottom Dock visible and cleanly stacked above Android System Bar */
+@media (max-width: 860px) {
+  #headerMobileSearchBtn {
+    display: inline-flex !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    width: 40px !important;
+    height: 40px !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  body.sovra-mode-app .mobile-bottom-nav,
+  body.sovra-mode-app .app-bottom-nav {
+    display: flex !important;
+    bottom: 48px !important;
+    z-index: 9998 !important;
+  }
+  body.sovra-mode-home .mobile-bottom-nav,
+  body.sovra-mode-home .app-bottom-nav {
+    display: none !important;
+  }
+}
+
+/* Calls & Hybrid Mesh Dialer High-Contrast Theme Fix */
+#calls-view,
+#calls-view h1,
+#calls-view h2,
+#calls-view h3,
+#calls-view h4,
+#calls-view p,
+#calls-view span,
+#calls-view div {
+  color: #f1f5f9;
+}
+#calls-view .dialpad-btn,
+#calls-view .dialer-key {
+  color: #f8fafc !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
 #studioDashboardShell {
   width: 100%;
 }

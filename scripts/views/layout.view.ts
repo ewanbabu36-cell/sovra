@@ -272,20 +272,51 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     </defs>
   </svg>
   <script>
+    window.handleMediaError = function(imgEl, postId) {
+      if (!imgEl) return;
+      imgEl.style.display = 'none';
+      var fb = document.getElementById('fallback-media-' + postId);
+      if (fb) fb.style.display = 'flex';
+    };
     (function() {
       try {
         var isLoggedOut = localStorage.getItem('sovra_logged_out') === 'true';
         var sessionToken = localStorage.getItem('sovra_session_token');
         var savedProfile = localStorage.getItem('sovra_user_profile');
         var isAuthActive = localStorage.getItem('sovra_auth_active') === 'true';
-        if (isLoggedOut || !savedProfile) {
+        var hasHydratedToken = false;
+        var isAuthenticated = !isLoggedOut && (Boolean(savedProfile) || isAuthActive || Boolean(sessionToken) || hasHydratedToken);
+
+        if (!isAuthenticated) {
           document.documentElement.classList.add('sovra-unauthenticated');
         } else {
           document.documentElement.classList.remove('sovra-unauthenticated');
-          if (document.body) {
-            document.body.classList.remove('sovra-mode-home');
-            document.body.classList.add('sovra-mode-app', 'tab-active-feed');
-            document.body.setAttribute('data-active-tab', 'feed');
+        }
+
+        var pathname = (window.location && window.location.pathname) ? window.location.pathname.toLowerCase().replace(/^[/]+/, '') : '';
+        var hash = (window.location && window.location.hash) ? window.location.hash.toLowerCase() : '';
+        var targetTab = 'feed';
+        if (pathname.startsWith('studio') || hash.includes('studio') || hash.includes('dashboard')) targetTab = 'studio';
+        else if (pathname.startsWith('live') || hash.includes('live')) targetTab = 'live';
+        else if (pathname.startsWith('watch') || hash.includes('watch') || pathname.startsWith('youtube')) targetTab = 'youtube';
+        else if (pathname.startsWith('reels') || hash.includes('reels')) targetTab = 'reels';
+        else if (pathname.startsWith('chat') || hash.includes('chat')) targetTab = 'chat';
+        else if (pathname.startsWith('admin') || hash.includes('admin')) targetTab = 'admin';
+        else if (pathname.startsWith('me') || pathname.startsWith('profile') || hash.includes('me')) targetTab = 'me';
+        else if (pathname.startsWith('calls') || hash.includes('calls')) targetTab = 'calls';
+        else if (pathname.startsWith('communities') || hash.includes('communities')) targetTab = 'communities';
+        else if (pathname.startsWith('settings') || hash.includes('settings')) targetTab = 'settings';
+        else if (pathname.startsWith('dapps') || hash.includes('dapps')) targetTab = 'dapps';
+
+        if (document.body) {
+          document.body.classList.remove('sovra-mode-home');
+          document.body.classList.add('sovra-mode-app', 'tab-active-' + targetTab);
+          document.body.setAttribute('data-active-tab', targetTab);
+          if (targetTab === 'studio') {
+            var fv = document.getElementById('feed-view');
+            var sv = document.getElementById('studio-view');
+            if (fv) fv.style.display = 'none';
+            if (sv) sv.style.display = 'block';
           }
         }
       } catch(e) {}
@@ -340,8 +371,8 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         ☰
       </button>
 
-      <!-- SOVRA Master Brand Identity: Sophisticated, Simple, Smart & Elegant -->
-      <div id="sovraCoreBtn" class="sovra-core-gateway-btn" onclick="switchTab('feed'); event.stopPropagation();" aria-label="Open SOVRA holographic command center" title="SOVRA — Sovereign Social & P2P Mesh">
+      <!-- SOVRA Master Brand Identity: Opens Holographic Command Core -->
+      <div id="sovraCoreBtn" class="sovra-core-gateway-btn" onclick="toggleHolographicNav(this); event.stopPropagation();" aria-label="Open SOVRA holographic command center" aria-expanded="false" title="SOVRA Command Core — Tap to open navigation">
         <div class="sovra-brand-emblem-box">
           <svg class="sovra-brand-emblem-svg" viewBox="0 0 512 512" width="36" height="36" aria-hidden="true">
             <defs>
@@ -421,7 +452,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <button type="button" class="header-nav-btn" id="navTabDApps" onclick="switchTab('dapps')" title="Sovereign Mini-DApps">
         <span class="hnav-icon">🎮</span> <span>DApps</span>
       </button>
-      <button type="button" class="header-nav-btn" id="navTabMarketplace" onclick="openMarketplaceDrawer()" title="P2P Local Marketplace">
+      <button type="button" class="header-nav-btn" id="navTabMarketplace" onclick="switchTab('market')" title="P2P Local Marketplace">
         <span class="hnav-icon">🛍️</span> <span>Market</span>
       </button>
       <!-- Hidden buttons preserved for JS & test compatibility -->
@@ -447,12 +478,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       <span class="badge tcp-port-badge">TCP :${tcpPort}</span>
     </div>
 
-    <!-- 🔒 Quantum-Safe & ZK-Human Verified Security Badges (Conditionally rendered on verified attestation) -->
-    <div class="header-security-badges" id="headerSecurityBadges" style="display: flex; align-items: center; gap: 8px;">
-      <span id="pqcSecurityBadge" class="pqc-badge" style="display: none;" title="Post-Quantum Cryptography Hybrid Enclave (Prototype)">
-        <span id="spacesPqcLock">🔒</span> Quantum-Safe
+    <!-- 🔒 Hybrid PQC Prototype & ZK-Human Verified Security Badges -->
+    <div class="header-security-badges" id="headerSecurityBadges">
+      <span id="pqcSecurityBadge" class="pqc-badge" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.74rem; font-weight: 500; color: #cbd5e1; cursor: default; white-space: nowrap;" title="Experimental Hybrid PQC Prototype (Not NIST FIPS-certified)">
+        <span id="spacesPqcLock">🔒</span> Quantum-Safe (Experimental)
       </span>
-      <span id="zkVerifiedBadge" class="zk-badge" style="display: none;" title="Zero-Knowledge Humanity Attestation (Verified)">
+      <span id="zkVerifiedBadge" class="zk-badge" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.74rem; font-weight: 500; color: #cbd5e1; cursor: default; white-space: nowrap;" title="Zero-Knowledge Humanity Attestation (Verified)">
         <span id="spacesZkShield">🛡️</span> ZK-Human Verified
       </span>
     </div>
@@ -481,7 +512,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
     <!-- Anycast Edge Relay Pill -->
     <div id="edgeRelayContainer" style="display: none;">
-      <span id="edgeRelayPill" class="edge-pill">Edge Relay: edge-iad-01.sovra.network (18ms)</span>
+      <span id="edgeRelayPill" class="edge-pill">Edge Relay: local-p2p-node (4ms)</span>
     </div>
 
     <!-- Web3 Cashout Controls Section -->
@@ -811,7 +842,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
         <button class="rail-nav-item" id="tab-chat" data-action="switch-tab" data-tab="chat" onclick="switchTab('chat')" title="Chats (E2EE Messages & Calls)">
           <span class="rail-icon">💬</span>
           <span class="rail-label">Chats</span>
-          <span class="rail-badge" id="railChatBadge" style="background: #38bdf8; color: #020617; font-weight: 800;">12</span>
+          <span class="rail-badge" id="railChatBadge" style="display: none; background: #38bdf8; color: #020617; font-weight: 800;">0</span>
         </button>
         <button class="rail-nav-item" id="tab-hub" data-action="switch-tab" data-tab="explore" onclick="switchTab('explore')" title="Explore (DApps, Hub & Communities)">
           <span class="rail-icon">🌐</span>
@@ -821,7 +852,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <span class="rail-icon">👤</span>
           <span class="rail-label">Vault</span>
         </button>
-        <button class="rail-nav-item" id="tab-marketplace" data-action="switch-tab" data-tab="marketplace" onclick="openMarketplaceDrawer()" title="P2P Local Marketplace">
+        <button class="rail-nav-item" id="tab-marketplace" data-action="switch-tab" data-tab="market" onclick="switchTab('market')" title="P2P Local Marketplace">
           <span class="rail-icon">🛍️</span>
           <span class="rail-label">Market</span>
         </button>
@@ -881,6 +912,20 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
           <div id="drawerProfileHandle" style="font-size: 11px; color: #38bdf8;">@you</div>
         </div>
         <span style="font-size: 12px; color: #94a3b8;">→</span>
+      </div>
+
+      <!-- 🔴 Emergency Active Live Stream Controller in Drawer -->
+      <div id="drawerActiveLiveItem" style="display: none; padding: 12px 16px; margin: 10px 14px 6px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(185, 28, 28, 0.3)); border: 1.5px solid #ef4444; border-radius: 14px; align-items: center; justify-content: space-between; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444; animation: sovraLivePulse 1s infinite alternate;"></span>
+          <div style="min-width: 0;">
+            <div style="font-size: 13px; font-weight: 800; color: #fff;">Live Broadcast Active</div>
+            <div id="drawerActiveLiveTitle" style="font-size: 11px; color: #fca5a5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Streaming...</div>
+          </div>
+        </div>
+        <button type="button" onclick="window.confirmAndEndLiveBroadcast(); toggleDevMainMenu(false);" style="background: #ef4444; border: none; color: #fff; font-size: 11px; font-weight: 800; padding: 5px 12px; border-radius: 8px; cursor: pointer; flex-shrink: 0;">
+          🔴 End
+        </button>
       </div>
 
       <!-- 📲 PWA App Installation Item (Shown only if NOT already installed on user's phone) -->
@@ -1422,7 +1467,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
               <!-- ⚡ Smart AI Suggestions Toolbar -->
               <div class="composer-smart-toolbar" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 5px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;">
+                <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 5px; max-width: 100%; min-width: 0; padding-bottom: 2px;">
                   <span style="font-size: 0.72rem; color: #38bdf8; font-weight: 800; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;">
                     <span>⚡</span> <span>Smart:</span>
                   </span>
@@ -1780,7 +1825,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                       </span>
                       ${(post as any).updatedAt ? `<span style="color: #f59e0b; font-size: 0.68rem; margin-left: 2px;">(Edited)</span>` : ''}
                     </div>
-                    ${post.audioTrack ? `
+                    ${(post.audioTrack && (post.postType === 'video' || post.postType === 'reel' || (post as any).postType === 'audio')) ? `
                     <div style="font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
                       <span>🎵</span> <span>${escapeHtml(post.audioTrack)}</span>
                     </div>` : ''}
@@ -2098,16 +2143,6 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 </button>
               </div>
 
-              <!-- 3. Write a Comment Row (Facebook Parity) -->
-              <div class="fb-comment-composer-row" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px 4px 16px;">
-                <div style="width: 32px; height: 32px; border-radius: 50%; background: #3a3b3c; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: #fff;">
-                  ${hostUser && hostUser.avatarDataUrl ? `<img src="${hostUser.avatarDataUrl}" style="width:100%;height:100%;object-fit:cover;" />` : (hostUser ? hostUser.avatar || 'S' : 'S')}
-                </div>
-                <div style="flex: 1; position: relative;">
-                  <input type="text" id="comment-input-${post.id}" class="fb-comment-input" placeholder="Write a comment..." onkeydown="if(event.key==='Enter') submitFeedComment('${post.id}')" style="width: 100%; box-sizing: border-box; background: #3a3b3c; border: none; border-radius: 18px; padding: 8px 14px; color: #e4e6eb; font-size: 14px; outline: none; font-family: inherit;" />
-                </div>
-              </div>
-
               <!-- Comments Preview -->
               <div class="insta-comments-preview" id="comments-box-${post.id}">
                 ${(post.comments && post.comments.length > 0) ? `
@@ -2207,9 +2242,9 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
           <!-- Interactive Node Target Strip (Ref Image 1) -->
           <div style="display: flex; gap: 8px; justify-content: center; margin-top: 12px; position: relative; z-index: 2; flex-wrap: wrap;">
-            <button type="button" onclick="inspectTacticalNode('NODE-01 (Alice)', '192.168.31.144:4001', '-52', '94')" style="background: rgba(0,240,255,0.1); border: 1px solid rgba(0,240,255,0.4); color: #00f0ff; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">🎯 Node-01 [Alice]</button>
-            <button type="button" onclick="inspectTacticalNode('NODE-02 (Bob)', '192.168.31.189:4001', '-68', '76')" style="background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.4); color: #38bdf8; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">🎯 Node-02 [Bob]</button>
-            <button type="button" onclick="inspectTacticalNode('NODE-03 (Carol)', '192.168.31.202:4001', '-61', '89')" style="background: rgba(129,140,248,0.1); border: 1px solid rgba(129,140,248,0.4); color: #818cf8; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">🎯 Node-03 [Carol]</button>
+            <button type="button" onclick="inspectTacticalNode('NODE-01 (Alice)', '127.0.0.1:4001', '-52', '94')" style="background: rgba(0,240,255,0.1); border: 1px solid rgba(0,240,255,0.4); color: #00f0ff; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">🎯 Node-01 [Alice]</button>
+            <button type="button" onclick="inspectTacticalNode('NODE-02 (Bob)', '127.0.0.1:4002', '-68', '76')" style="background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.4); color: #38bdf8; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">🎯 Node-02 [Bob]</button>
+            <button type="button" onclick="inspectTacticalNode('NODE-03 (Carol)', '127.0.0.1:4003', '-61', '89')" style="background: rgba(129,140,248,0.1); border: 1px solid rgba(129,140,248,0.4); color: #818cf8; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">🎯 Node-03 [Carol]</button>
           </div>
 
           <!-- Inline Node Inspector HUD Card (Ref Image 1) -->
@@ -2609,7 +2644,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <div class="profile-bio-box">
                   <div style="font-weight: 700; color: #fff;" id="profileSheetName">Alice ⚡ P2P Architect</div>
                   <div id="profileSheetBio" style="margin-top: 0.25rem;">Decentralized P2P Architect • Zero middleman servers ⚡ • Building on Sovra protocol</div>
-                  <div style="color: #60a5fa; font-size: 0.75rem; margin-top: 0.35rem;" id="profileSheetLink">🔗 sovra.network/alice</div>
+                  <div style="color: #60a5fa; font-size: 0.75rem; margin-top: 0.35rem;" id="profileSheetLink">🔗 sovra://profile/alice</div>
                 </div>
 
                 <div class="profile-actions-row">
@@ -2979,7 +3014,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     </div>
 
     <!-- 🌱 PHASE 8: DEVICE-SIDE DIGITAL WELLBEING & SCREEN-TIME MODAL -->
-    <div id="wellbeingStatusBanner" style="display: none; position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 9980; background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 9999px; padding: 6px 16px; font-size: 0.8rem; color: #38bdf8; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 8px 24px rgba(0,0,0,0.5); cursor: pointer; align-items: center; gap: 8px;" onclick="openWellbeingModal()">
+    <div id="wellbeingStatusBanner" class="wellbeing-status-banner" style="display: none;" onclick="openWellbeingModal()">
       🌙 <b>Quiet Hours Active</b> &bull; Wind-down mode until 07:00
     </div>
 
@@ -5234,7 +5269,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
         <!-- Shareable Link Box -->
         <div style="background: #090d16; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 0.85rem;">
-          <input type="text" id="ytShareUrlInput" readonly style="background: transparent; border: none; color: #38bdf8; font-size: 0.85rem; width: 100%; outline: none;" value="https://sovra.network/watch?v=..." />
+          <input type="text" id="ytShareUrlInput" readonly style="background: transparent; border: none; color: #38bdf8; font-size: 0.85rem; width: 100%; outline: none;" value="sovra://watch?v=..." />
           <button class="btn btn-primary" onclick="copyYtShareUrl()" style="padding: 6px 14px; font-size: 0.8rem; font-weight: 700; white-space: nowrap;">Copy Link</button>
         </div>
 
@@ -6443,7 +6478,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
               Biometric Hardware Enclave
             </div>
             <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
-              Hardware enclave authentication via WebAuthn, TouchID, and Windows Hello with phishing-resistant security.
+              Sovereign Passkey Protected authentication via WebAuthn, TouchID, and Windows Hello with phishing-resistant security.
             </div>
             <div class="hub-card-action-btn" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.35); background: rgba(56, 189, 248, 0.12);">
               <span>Security Passkeys</span>
@@ -6769,6 +6804,28 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             <!-- TAB 1: YOUTUBE STUDIO COMMAND DASHBOARD        -->
             <!-- ============================================== -->
             <div id="studioSectionDashboard" style="display: block;">
+              <!-- 🔴 Live Stream Active Alert Banner (YouTube Studio Parity) -->
+              <div id="studioDashboardLiveStreamBanner" style="display: none; background: linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(185, 28, 28, 0.25)); border: 1.5px solid #ef4444; border-radius: 14px; padding: 14px 18px; margin-bottom: 1.25rem; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <span style="width: 10px; height: 10px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 12px #ef4444; animation: sovraLivePulse 1s infinite alternate;"></span>
+                  <div>
+                    <div style="font-weight: 800; color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+                      <span>YOU ARE BROADCASTING LIVE</span>
+                      <span class="badge" style="background: #ef4444; color: #fff; font-size: 0.68rem; padding: 1px 6px;">ON AIR</span>
+                    </div>
+                    <div id="studioDashboardLiveBannerTitle" style="font-size: 0.82rem; color: #fca5a5; margin-top: 2px;">Sovereign Mesh Broadcast</div>
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <button type="button" onclick="SovraCreatorStudioEngine.switchStudioTab('live')" style="background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: #fff; font-size: 0.8rem; font-weight: 700; border-radius: 8px; padding: 7px 14px; cursor: pointer;">
+                    Control Room
+                  </button>
+                  <button type="button" onclick="window.confirmAndEndLiveBroadcast()" style="background: #ef4444; border: none; color: #fff; font-size: 0.82rem; font-weight: 800; border-radius: 8px; padding: 7px 18px; cursor: pointer; box-shadow: 0 2px 10px rgba(239, 68, 68, 0.4);">
+                    🔴 End Live Broadcast
+                  </button>
+                </div>
+              </div>
+
               <!-- Header Bar with Quick Action Buttons matching YouTube Studio -->
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
                 <div>
@@ -7765,7 +7822,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                     </div>
                     <div>
                       <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">EXTERNAL LINKS</label>
-                      <input type="text" id="customChannelLinks" placeholder="https://..." value="https://sovra.network" style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.82rem;">
+                      <input type="text" id="customChannelLinks" placeholder="https://..." value="http://127.0.0.1:3001" style="width: 100%; background: #090d16; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 0.82rem;">
                     </div>
                     <div>
                       <label style="display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">DID CRYPTOGRAPHIC FINGERPRINT</label>
@@ -9310,7 +9367,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
                 <div style="font-weight: 800; color: #f87171; font-size: 0.95rem;">Session Management</div>
                 <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">Safely terminate your sovereign session on this device.</div>
               </div>
-              <button type="button" id="headerLogoutBtn" onclick="openLogoutModal(event)" class="header-action-logout-btn" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #ffffff; padding: 8px 18px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Log out from Sovra">
+              <button type="button" id="settingsLogoutBtn" onclick="openLogoutModal(event)" class="header-action-logout-btn" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #ffffff; padding: 8px 18px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Log out from Sovra">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                 <span>Log Out</span>
               </button>
@@ -9577,7 +9634,223 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
     </main>
 
-    <!-- 🎵 PERSISTENT FLOATING MINI-PLAYER (Plays in Background Across Feeds & Chats) -->
+    <!-- =========================================================================
+         🛍️ SOVRA P2P LOCAL MARKETPLACE (NATIVE ZERO-POPUP IN-STAGE VIEW)
+         ========================================================================= -->
+    <main class="main-content" id="market-view" style="display: none; width: 100%; max-width: 1080px; margin: 0 auto; padding: 1.5rem 1rem; box-sizing: border-box; flex-direction: column; gap: 1.25rem;">
+      <!-- Marketplace Header Bar -->
+      <div style="background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,41,59,0.8)); border: 1px solid rgba(56,189,248,0.3); border-radius: 20px; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, #0284c7, #10b981); display: flex; align-items: center; justify-content: center; font-size: 26px; box-shadow: 0 0 20px rgba(16,185,129,0.3);">
+            🛍️
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h2 style="font-size: 1.25rem; font-weight: 800; color: #fff; margin: 0; letter-spacing: -0.02em;">Local P2P Marketplace</h2>
+              <span style="font-size: 0.7rem; font-weight: 800; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.4); padding: 2px 8px; border-radius: 999px;">Zero Platform Fee &bull; Escrow Protected</span>
+            </div>
+            <p style="font-size: 0.8rem; color: #94a3b8; margin: 3px 0 0 0;">Trustless Escrow in SOV • Geohash Privacy Radius • Local Neighborhood Circles</p>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" onclick="openCreateListingModal()" style="padding: 9px 18px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; background: #10b981; color: #fff; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(16,185,129,0.35);">
+            <span>➕</span> <span>Sell Item</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Controls & Subtabs Bar -->
+      <div style="padding: 1rem 1.25rem; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; gap: 10px;">
+          <button type="button" id="mktSubtabItems" onclick="switchMarketplaceSubtab('items')" class="btn" style="flex: 1; padding: 9px 14px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; background: #0284c7; color: #fff; border: none; cursor: pointer;">🛍️ Local Items</button>
+          <button type="button" id="mktSubtabGroups" onclick="switchMarketplaceSubtab('groups')" class="btn" style="flex: 1; padding: 9px 14px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; background: rgba(255, 255, 255, 0.05); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer;">🏘️ Neighborhood Groups</button>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <input type="text" id="mktSearchInput" placeholder="Search nearby items or neighborhood groups..." oninput="handleMarketplaceSearch(this.value)" style="flex: 1; min-width: 240px; padding: 9px 14px; border-radius: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255, 255, 255, 0.14); color: #fff; font-size: 0.85rem; outline: none;" />
+          <select id="mktRadiusSelect" onchange="handleMarketplaceFilterChange()" style="padding: 9px 12px; border-radius: 10px; background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.14); color: #38bdf8; font-size: 0.82rem; font-weight: 700; outline: none; cursor: pointer;">
+            <option value="5">📍 5 km</option>
+            <option value="10" selected>📍 10 km</option>
+            <option value="25">📍 25 km</option>
+            <option value="50">📍 50 km</option>
+          </select>
+          <select id="mktCategorySelect" onchange="handleMarketplaceFilterChange()" style="padding: 9px 12px; border-radius: 10px; background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.14); color: #fff; font-size: 0.82rem; outline: none; cursor: pointer;">
+            <option value="all">All Categories</option>
+            <option value="electronics">Electronics</option>
+            <option value="vehicles">Vehicles</option>
+            <option value="furniture">Furniture</option>
+            <option value="clothing">Clothing</option>
+            <option value="services">Services</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Stage Body Content -->
+      <div style="width: 100%;">
+        <div id="mktItemsView" style="display: flex; flex-direction: column; gap: 14px;">
+          <div id="marketplaceItemsContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <div id="mktGroupsView" style="display: none; flex-direction: column; gap: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 0.95rem; font-weight: 700; color: #fff;">Neighborhood Circles Nearby</span>
+            <button type="button" onclick="openCreateGroupModal()" style="font-size: 0.8rem; padding: 6px 14px; border-radius: 8px; background: #6366f1; border: none; color: #fff; font-weight: 700; cursor: pointer;">➕ Create Local Circle</button>
+          </div>
+          <div id="marketplaceGroupsContainer" style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- =========================================================================
+         💳 SOVRA SOVEREIGN WALLET & VAULT 2.0 (NATIVE ZERO-POPUP IN-STAGE VIEW)
+         ========================================================================= -->
+    <main class="main-content" id="vault-view" style="display: none; width: 100%; max-width: 1080px; margin: 0 auto; padding: 1.5rem 1rem; box-sizing: border-box; flex-direction: column; gap: 1.25rem;">
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,41,59,0.8)); border: 1px solid rgba(16,185,129,0.3); border-radius: 20px; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, #10b981, #0284c7); display: flex; align-items: center; justify-content: center; font-size: 26px; box-shadow: 0 0 20px rgba(16,185,129,0.4);">
+            💳
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h2 style="font-size: 1.25rem; font-weight: 800; color: #fff; margin: 0; letter-spacing: -0.02em;">Sovereign Wallet &amp; Vault</h2>
+              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 6px;">VAULT 2.0</span>
+            </div>
+            <p style="font-size: 0.8rem; color: #94a3b8; margin: 3px 0 0 0;">Self-custodial creator earnings, P2P micro-tips, and Merkle-verified receipts.</p>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="badge verifiable-state-badge" id="vaultVerifiableStateBadge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.74rem; padding: 6px 12px; border-radius: 10px;">
+            <span class="pulse-dot"></span>
+            <span>Self-Custody &bull; Zero Fees</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Scrollable Native Wallet Stage Body -->
+      <div style="width: 100%; display: flex; flex-direction: column; gap: 1.25rem;">
+        <!-- Sovereign Bandwidth & Creator Wallet Card -->
+        <div class="sovereign-wallet-card" id="stageSovereignWalletCard" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 18px; padding: 1.5rem; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.4);">
+          <!-- Live Layer-1 Consensus Banner -->
+          <div class="wallet-l1-network-banner" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 10px 14px; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981;"></span>
+              <span style="font-size: 0.82rem; font-weight: 700; color: #f8fafc;">Sovra Testnet-0</span>
+              <span style="font-size: 0.72rem; background: rgba(255,255,255,0.08); padding: 2px 7px; border-radius: 6px; color: #94a3b8; font-family: monospace;">Block #---</span>
+              <span style="font-size: 0.72rem; background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 7px; border-radius: 6px; font-weight: 600;">&bull; Invariant Verified</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 0.72rem; color: #94a3b8; font-family: monospace;">sovra1dd77...4448</span>
+              <button type="button" onclick="copyL1Address()" title="Copy L1 Address" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #38bdf8; font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; cursor: pointer;">Copy L1</button>
+              <a href="/explorer" target="_blank" title="Open Blockchain Web Explorer" style="background: rgba(0, 240, 255, 0.12); border: 1px solid rgba(0, 240, 255, 0.35); color: #00f0ff; font-size: 0.72rem; font-weight: 700; padding: 2px 9px; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">Explorer ↗</a>
+            </div>
+          </div>
+
+          <!-- Balance Block -->
+          <div class="wallet-balance-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+            <div>
+              <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.04em; margin-bottom: 4px;">Total Cryptographic Balance</div>
+              <div style="display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;">
+                <span class="wallet-balance-sov" id="stageWalletBalanceSovDisplay" style="font-size: 2.2rem; font-weight: 800; color: #10b981; letter-spacing: -0.02em;">0.00 SOV</span>
+                <span class="wallet-balance-fiat" id="stageWalletBalanceFiatDisplay" style="font-size: 1.15rem; color: #94a3b8; font-weight: 600;">≈ $0.00 USD</span>
+              </div>
+            </div>
+            <div class="wallet-peg-pill" title="Oracle Mesh Consensus Peg: 1 SOV = $3.00 USD" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 12px; color: #34d399; font-size: 0.82rem; font-weight: 700;">
+              <span>1 SOV = $3.00 USD</span>
+            </div>
+          </div>
+
+          <!-- Sub-Metric 4-Column Grid -->
+          <div class="wallet-metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 1.25rem;">
+            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
+              <div class="wallet-metric-label" style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: #94a3b8; font-weight: 600; margin-bottom: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #fbbf24;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span>Network Rewards</span>
+              </div>
+              <div class="wallet-metric-value" id="stageWalletBandwidthEarned" style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">+0.00 SOV</div>
+              <div class="wallet-metric-subtext" style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Community incentives</div>
+            </div>
+            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
+              <div class="wallet-metric-label" style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: #94a3b8; font-weight: 600; margin-bottom: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #f472b6;"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+                <span>Tips &amp; Gifts</span>
+              </div>
+              <div class="wallet-metric-value" id="stageWalletTipsEarned" style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">+0.00 SOV</div>
+              <div class="wallet-metric-subtext" style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Creator earnings</div>
+            </div>
+            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
+              <div class="wallet-metric-label" style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: #94a3b8; font-weight: 600; margin-bottom: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #38bdf8;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <span>Security Deposit</span>
+              </div>
+              <div class="wallet-metric-value" style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">50.00 SOV</div>
+              <div class="wallet-metric-subtext" style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Refundable reserve</div>
+            </div>
+            <div class="wallet-metric-box" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px;">
+              <div class="wallet-metric-label" style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: #94a3b8; font-weight: 600; margin-bottom: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a78bfa;"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+                <span>Network Credits</span>
+              </div>
+              <div class="wallet-metric-value" style="font-size: 1.15rem; font-weight: 800; color: #f8fafc;">+15.00 SOV</div>
+              <div class="wallet-metric-subtext" style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Active balance</div>
+            </div>
+          </div>
+
+          <!-- Financial Action Buttons -->
+          <div class="wallet-action-hub" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1.5rem;">
+            <button type="button" class="wallet-action-btn" onclick="openWalletReceiveModal()" title="Show Sovereign Receive QR & DID deep link" style="flex: 1; min-width: 125px; padding: 10px 14px; border-radius: 12px; background: rgba(56, 189, 248, 0.16); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>📲 Receive / QR</span>
+            </button>
+            <button type="button" class="wallet-action-btn" onclick="claimSeederYieldAction()" title="Claim accumulated bandwidth rewards from seeded P2P chunks" style="flex: 1; min-width: 150px; padding: 10px 14px; border-radius: 12px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.3)); border: 1px solid rgba(16, 185, 129, 0.45); color: #34d399; font-weight: 800; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>⚡ Claim Seeder Yield</span>
+            </button>
+            <button type="button" class="wallet-action-btn" onclick="claimTestnetFaucetAction()" title="Claim 50 SOV Testnet Faucet" aria-label="Testnet Faucet" style="flex: 1; min-width: 140px; padding: 10px 14px; border-radius: 12px; background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); color: #fff; font-weight: 800; font-size: 0.88rem; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);">
+              <span>💧 Claim Faucet (+50 SOV)</span>
+            </button>
+            <button class="wallet-action-btn wallet-btn-primary" onclick="openWithdrawModal()" title="Withdraw SOV earnings to external account" aria-label="Cash Out" style="flex: 1; min-width: 120px; padding: 10px 14px; border-radius: 12px; background: #10b981; color: #080d14; font-weight: 800; font-size: 0.88rem; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+              <span>Cash Out</span>
+            </button>
+            <button class="wallet-action-btn wallet-btn-secondary" onclick="openDepositModal()" title="Add money or deposit SOV to wallet" aria-label="Add Money" style="flex: 1; min-width: 120px; padding: 10px 14px; border-radius: 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #f8fafc; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+              <span>Add Money</span>
+            </button>
+            <button class="wallet-action-btn wallet-btn-secondary" onclick="openSendSovModal()" title="Send SOV instantly to any friend or creator" aria-label="Send" style="flex: 1; min-width: 120px; padding: 10px 14px; border-radius: 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #f8fafc; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              <span>P2P Send</span>
+            </button>
+            <button class="wallet-action-btn wallet-btn-secondary" onclick="openL1SendModal()" title="Send native Layer-1 transaction directly to the Sovra blockchain" aria-label="L1 Transfer" style="flex: 1; min-width: 120px; padding: 10px 14px; border-radius: 12px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>L1 Send</span>
+            </button>
+            <button class="wallet-action-btn wallet-btn-secondary" onclick="openWalletBridgeModal()" title="Cross-chain Bridge &amp; Creator Settlement" aria-label="Cross-Chain Bridge" style="flex: 1; min-width: 125px; padding: 10px 14px; border-radius: 12px; background: rgba(99, 102, 241, 0.16); border: 1px solid rgba(99, 102, 241, 0.4); color: #c7d2fe; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
+              <span>Cross-Chain Bridge</span>
+            </button>
+            <button class="wallet-action-btn wallet-btn-trading" onclick="openTradingExchangeModal()" title="Buy, sell &amp; trade fractional SOVRA on the sovereign matching engine" aria-label="Trade Exchange" style="flex: 1; min-width: 130px; padding: 10px 14px; border-radius: 12px; background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.45); color: #fde68a; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10h14l-4-4"/><path d="M17 14H3l4 4"/><circle cx="12" cy="12" r="2"/></svg>
+              <span>Exchange &amp; Trade</span>
+            </button>
+            <button class="wallet-action-btn wallet-btn-ghost" onclick="openL1BurnModal()" title="Execute on-chain protocol burn" aria-label="L1 Burn" style="padding: 10px 12px; border-radius: 12px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); color: #f87171; font-weight: 600; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+              <span>Burn</span>
+            </button>
+            <button class="wallet-action-btn wallet-btn-ghost" onclick="refreshWalletBalanceLive()" title="Update wallet balance" aria-label="Refresh" style="padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-weight: 600; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+              <span>Refresh</span>
+            </button>
+            <button class="wallet-action-btn wallet-btn-ghost" onclick="exportWalletStatement('csv')" title="Download CSV ledger statement" aria-label="Export" style="padding: 10px 16px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #38bdf8; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+              <span>Export</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
     <div id="sovraFloatingMiniPlayer" style="display: none; position: fixed; bottom: 82px; right: 20px; z-index: 99998; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 18px; padding: 10px 14px; box-shadow: 0 12px 35px rgba(0,0,0,0.85); backdrop-filter: blur(16px); align-items: center; gap: 12px; max-width: 360px; width: calc(100% - 40px); box-sizing: border-box; animation: slideUpMini 0.25s ease-out;">
       <div id="miniPlayerSpinDisc" style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #0284c7, #6366f1); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; box-shadow: 0 0 10px rgba(56,189,248,0.4);">
         🎵
@@ -9774,7 +10047,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
     </main>
 
-  <footer id="appStageFooter" style="text-align: center; padding: 1.5rem 1.5rem 5rem 1.5rem; font-size: 0.8rem; color: var(--text-muted); border-top: 1px solid var(--surface-border);">
+  <footer id="appStageFooter" style="text-align: center; padding: 1.5rem 1.5rem 6.5rem 1.5rem; font-size: 0.8rem; color: var(--text-muted); border-top: 1px solid var(--surface-border);">
     Sovra Protocol & Monorepo Foundation &bull; Production P2P Stack &bull; Localhost Dev Runner
   </footer>
 </div> <!-- Close Column 2: .app-center-stage -->
@@ -9813,12 +10086,11 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     <div id="copilotActiveThreadCard" class="card" style="padding: 0.85rem; border-radius: 14px; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255, 255, 255, 0.14);">
       <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 8px; margin-bottom: 8px;">
         <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
-          <div id="copilotPeerAvatar" style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #0284c7, #6366f1); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.82rem; color: #fff; flex-shrink: 0;">A</div>
+          <div id="copilotPeerAvatar" style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #0284c7, #6366f1); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.82rem; color: #fff; flex-shrink: 0;">💬</div>
           <div style="min-width: 0;">
-            <div id="copilotPeerName" style="font-weight: 700; font-size: 0.84rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">Alice Sovereign</div>
+            <div id="copilotPeerName" style="font-weight: 700; font-size: 0.84rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">Direct Chat</div>
             <div style="display: flex; align-items: center; gap: 4px;">
-              <span id="copilotPeerHandle" style="font-size: 0.68rem; color: #38bdf8;">@alice</span>
-              <span style="font-size: 0.65rem; color: #34d399;">● Online</span>
+              <span id="copilotPeerHandle" style="font-size: 0.68rem; color: #94a3b8;">Select a contact</span>
             </div>
           </div>
         </div>
@@ -9829,17 +10101,12 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
       </div>
 
       <!-- Messages Stream -->
-      <div id="copilotChatStream" style="max-height: 200px; min-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 4px; font-size: 0.78rem;">
+      <div id="copilotChatStream" style="max-height: 200px; min-height: 110px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 4px; font-size: 0.78rem;">
         <div style="align-self: center; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 999px; padding: 2px 10px; font-size: 0.65rem; color: #38bdf8;">
-          🔒 Double Ratchet Ratchet Step #1 Active
+          🔒 Double Ratchet E2EE Ready
         </div>
-        <div style="align-self: flex-start; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px 12px 12px 2px; padding: 6px 10px; color: #f1f5f9; max-width: 82%;">
-          <div>Hey! Just checked your post on the sovereign mesh. Ready for the live demo?</div>
-          <div style="font-size: 0.62rem; color: #94a3b8; text-align: right; margin-top: 2px;">12:04 PM</div>
-        </div>
-        <div style="align-self: flex-end; background: linear-gradient(135deg, #0284c7, #6366f1); border-radius: 12px 12px 2px 12px; padding: 6px 10px; color: #fff; max-width: 82%;">
-          <div>Yes! Mesh gossip is running smooth at D=6.</div>
-          <div style="font-size: 0.62rem; color: #e0e7ff; text-align: right; margin-top: 2px;">12:05 PM ✓✓</div>
+        <div style="text-align: center; color: #94a3b8; font-size: 0.75rem; padding: 14px 8px;">
+          Select a contact below or open Chats to start an end-to-end encrypted conversation.
         </div>
       </div>
 
@@ -10653,7 +10920,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
 
         <div>
           <label style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; display: block; margin-bottom: 4px;">WEBSITE / LINK</label>
-          <input type="url" id="editProfileWebsiteInput" placeholder="https://sovra.network" style="width: 100%; padding: 0.75rem 1rem; background: #1e293b; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #38bdf8; font-size: 0.92rem; box-sizing: border-box;" />
+          <input type="url" id="editProfileWebsiteInput" placeholder="https://127.0.0.1:3443" style="width: 100%; padding: 0.75rem 1rem; background: #1e293b; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #38bdf8; font-size: 0.92rem; box-sizing: border-box;" />
         </div>
 
         <div>
@@ -12394,7 +12661,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
             ✨ Universal 1-Tap &bull; Auto-detects existing account or registers instantly
           </div>
           <div id="womSecureContextHint" style="display: none; margin: 0 0 1rem 0; padding: 7px 10px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; font-size: 0.72rem; color: #38bdf8; text-align: left; line-height: 1.4;">
-            🔒 <strong>Hardware Fingerprint:</strong> Mobile browsers require HTTPS for real biometrics. <a id="womHttpsSwitchLink" href="https://10.42.22.224:3443/" style="color: #67e8f9; text-decoration: underline; font-weight: 700;">Switch to Secure Mode</a>.
+            🔒 <strong>Hardware Fingerprint:</strong> Mobile browsers require HTTPS for real biometrics. <a id="womHttpsSwitchLink" href="#" onclick="event.preventDefault(); window.location.href='https://' + (window.location.hostname || '127.0.0.1') + ':3443/';" style="color: #67e8f9; text-decoration: underline; font-weight: 700;">Switch to Secure Mode</a>.
           </div>
 
           <div style="display: flex; align-items: center; margin-bottom: 1.1rem; gap: 8px;">
@@ -14030,8 +14297,8 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     </div>
   </div>
 
-  <!-- 💳 6F. FULL PAGE SOVEREIGN WALLET MODAL / VIEW -->
-  <div id="fullPageWalletModal" style="display: none; position: fixed; inset: 0; width: 100vw; height: 100vh; background: #080d14; z-index: 100060; overflow-y: auto; -webkit-overflow-scrolling: touch; flex-direction: column;">
+  <!-- 💳 6F. FULL PAGE SOVEREIGN WALLET (Legacy overlay eliminated; native view is #vault-view) -->
+  <div id="fullPageWalletModal" style="display: none !important;" aria-hidden="true">
     
     <!-- Full Page Header (Sticky Top) -->
     <div style="position: sticky; top: 0; z-index: 100; padding: 0.9rem 1.25rem; background: rgba(11, 17, 32, 0.96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
@@ -15209,18 +15476,18 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
   </div>
 
   <!-- 📱 PWA INSTALL FLOATING BANNER -->
-  <div id="pwaInstallBanner" style="display: none; position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 480px; z-index: 9999; background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(17, 24, 39, 0.98)); backdrop-filter: blur(12px); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 14px; padding: 12px 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 0 20px rgba(99, 102, 241, 0.2); align-items: center; justify-content: space-between; gap: 12px;">
-    <div style="display: flex; align-items: center; gap: 10px;">
+  <div id="pwaInstallBanner" class="pwa-install-banner" style="display: none;">
+    <div class="pwa-install-info" style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 180px;">
       <div style="width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 800; color: #fff; flex-shrink: 0; box-shadow: 0 2px 8px rgba(99,102,241,0.4);">S</div>
-      <div>
+      <div style="min-width: 0;">
         <div style="font-weight: 700; font-size: 0.85rem; color: #fff;">Install Sovra App</div>
         <div style="font-size: 0.72rem; color: #94a3b8;">Run Fullscreen (Hides browser URL bar)</div>
       </div>
     </div>
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <button id="pwaFullscreenBtn" onclick="toggleNativeFullscreen()" style="background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 0.75rem; font-weight: 600; padding: 6px 10px; border-radius: 8px; cursor: pointer;" title="Toggle Fullscreen (Hides URL bar instantly)">⛶ Fullscreen</button>
-      <button id="pwaInstallDismissBtn" onclick="dismissPwaPrompt()" style="background: rgba(255, 255, 255, 0.08); border: none; color: #cbd5e1; font-size: 0.75rem; font-weight: 600; padding: 6px 10px; border-radius: 8px; cursor: pointer;">Later</button>
-      <button id="pwaInstallActionBtn" onclick="triggerPwaInstall()" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; color: #fff; font-size: 0.75rem; font-weight: 700; padding: 6px 14px; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);">Install</button>
+    <div class="pwa-install-actions" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;">
+      <button id="pwaFullscreenBtn" onclick="toggleNativeFullscreen()" style="background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 0.75rem; font-weight: 600; padding: 6px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap;" title="Toggle Fullscreen (Hides URL bar instantly)">⛶ Fullscreen</button>
+      <button id="pwaInstallDismissBtn" onclick="dismissPwaPrompt()" style="background: rgba(255, 255, 255, 0.08); border: none; color: #cbd5e1; font-size: 0.75rem; font-weight: 600; padding: 6px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap;">Later</button>
+      <button id="pwaInstallActionBtn" onclick="triggerPwaInstall()" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; color: #fff; font-size: 0.75rem; font-weight: 700; padding: 6px 14px; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4); white-space: nowrap;">Install</button>
     </div>
   </div>
 
@@ -16176,68 +16443,7 @@ export function renderAppLayout(ctx: AppLayoutContext): string {
     </div>
   </div>
 
-  <!-- P2P Local Marketplace & Neighborhood Groups Drawer -->
-  <div id="marketplaceDrawer" style="display: none; position: fixed; inset: 0; z-index: 99990; background: rgba(5, 7, 15, 0.85); backdrop-filter: blur(20px);">
-    <div style="position: absolute; right: 0; top: 0; bottom: 0; width: 100%; max-width: 640px; background: #0b1120; border-left: 1px solid rgba(255, 255, 255, 0.12); display: flex; flex-direction: column; box-shadow: -10px 0 30px rgba(0,0,0,0.7);">
-      <!-- Drawer Header -->
-      <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: space-between;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="font-size: 1.5rem;">🛍️</span>
-          <div>
-            <div style="font-size: 1.1rem; font-weight: 800; color: #fff;">Local P2P Marketplace</div>
-            <div style="font-size: 0.72rem; color: #38bdf8; font-weight: 600;">Trustless Escrow in SOV • Geohash Privacy Radius</div>
-          </div>
-        </div>
-        <button type="button" onclick="closeMarketplaceDrawer()" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer; padding: 4px 8px;">✕</button>
-      </div>
-
-      <!-- Controls & Subtabs Bar -->
-      <div style="padding: 0.85rem 1.5rem; background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; flex-direction: column; gap: 10px;">
-        <div style="display: flex; gap: 8px;">
-          <button type="button" id="mktSubtabItems" onclick="switchMarketplaceSubtab('items')" class="btn" style="flex: 1; padding: 7px 12px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; background: #0284c7; color: #fff; border: none; cursor: pointer;">🛍️ Local Items</button>
-          <button type="button" id="mktSubtabGroups" onclick="switchMarketplaceSubtab('groups')" class="btn" style="flex: 1; padding: 7px 12px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; background: rgba(255, 255, 255, 0.05); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer;">🏘️ Neighborhood Groups</button>
-          <button type="button" onclick="openCreateListingModal()" style="padding: 7px 14px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; background: #10b981; color: #fff; border: none; cursor: pointer;">➕ Sell Item</button>
-        </div>
-
-        <div style="display: flex; gap: 10px; align-items: center;">
-          <input type="text" id="mktSearchInput" placeholder="Search nearby items or neighborhood groups..." oninput="handleMarketplaceSearch(this.value)" style="flex: 1; padding: 7px 12px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255, 255, 255, 0.14); color: #fff; font-size: 0.82rem; outline: none;" />
-          <select id="mktRadiusSelect" onchange="handleMarketplaceFilterChange()" style="padding: 7px 10px; border-radius: 8px; background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.14); color: #38bdf8; font-size: 0.8rem; font-weight: 700; outline: none; cursor: pointer;">
-            <option value="5">📍 5 km</option>
-            <option value="10" selected>📍 10 km</option>
-            <option value="25">📍 25 km</option>
-            <option value="50">📍 50 km</option>
-          </select>
-          <select id="mktCategorySelect" onchange="handleMarketplaceFilterChange()" style="padding: 7px 10px; border-radius: 8px; background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.14); color: #fff; font-size: 0.8rem; outline: none; cursor: pointer;">
-            <option value="all">All Categories</option>
-            <option value="electronics">Electronics</option>
-            <option value="vehicles">Vehicles</option>
-            <option value="furniture">Furniture</option>
-            <option value="clothing">Clothing</option>
-            <option value="services">Services</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Drawer Body Content -->
-      <div style="flex: 1; overflow-y: auto; padding: 1.25rem 1.5rem;">
-        <div id="mktItemsView" style="display: flex; flex-direction: column; gap: 12px;">
-          <div id="marketplaceItemsContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;">
-            <!-- Rendered dynamically -->
-          </div>
-        </div>
-
-        <div id="mktGroupsView" style="display: none; flex-direction: column; gap: 12px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <span style="font-size: 0.88rem; font-weight: 700; color: #fff;">Neighborhood Circles Nearby</span>
-            <button type="button" onclick="openCreateGroupModal()" style="font-size: 0.76rem; padding: 4px 10px; border-radius: 6px; background: #6366f1; border: none; color: #fff; font-weight: 700; cursor: pointer;">➕ Create Local Circle</button>
-          </div>
-          <div id="marketplaceGroupsContainer" style="display: flex; flex-direction: column; gap: 10px;">
-            <!-- Rendered dynamically -->
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- Legacy #marketplaceDrawer removed: native view is #market-view above (zero duplicate DOM IDs) -->
 
   <!-- Create Listing Modal -->
   <div id="mktCreateListingModal" style="display: none; position: fixed; inset: 0; z-index: 99995; background: rgba(0,0,0,0.8); backdrop-filter: blur(16px); align-items: center; justify-content: center;">

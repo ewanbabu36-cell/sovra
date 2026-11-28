@@ -3,7 +3,7 @@ import * as net from 'node:net';
 import { createHash } from 'node:crypto';
 
 export interface DuplexTransportStream {
-  write(data: Uint8Array, callback?: (err?: Error) => void): boolean;
+  write(data: Uint8Array, callback?: (err?: Error | null) => void): boolean;
   on(event: 'data', listener: (chunk: Buffer) => void): this;
   on(event: 'error', listener: (err: Error) => void): this;
   on(event: 'close', listener: () => void): this;
@@ -25,6 +25,7 @@ export class WebSocketDuplexStream implements DuplexTransportStream {
   private dataListeners: Array<(chunk: Buffer) => void> = [];
   private errorListeners: Array<(err: Error) => void> = [];
   private closeListeners: Array<() => void> = [];
+  private bufferedPayloads: Buffer[] = [];
   private _destroyed = false;
   private buffer = Buffer.alloc(0);
 
@@ -55,7 +56,15 @@ export class WebSocketDuplexStream implements DuplexTransportStream {
   }
 
   public on(event: 'data' | 'error' | 'close', listener: any): this {
-    if (event === 'data') this.dataListeners.push(listener);
+    if (event === 'data') {
+      this.dataListeners.push(listener);
+      if (this.bufferedPayloads.length > 0 && this.dataListeners.length === 1) {
+        const queued = this.bufferedPayloads.splice(0, this.bufferedPayloads.length);
+        for (const payload of queued) {
+          for (const l of this.dataListeners) l(payload);
+        }
+      }
+    }
     if (event === 'error') this.errorListeners.push(listener);
     if (event === 'close') this.closeListeners.push(listener);
     return this;
@@ -159,8 +168,12 @@ export class WebSocketDuplexStream implements DuplexTransportStream {
       }
 
       // Opcode 0x02 = binary frame
-      for (const listener of this.dataListeners) {
-        listener(payload);
+      if (this.dataListeners.length === 0) {
+        this.bufferedPayloads.push(payload);
+      } else {
+        for (const listener of this.dataListeners) {
+          listener(payload);
+        }
       }
     }
   }

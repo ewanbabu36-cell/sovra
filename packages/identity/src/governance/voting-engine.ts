@@ -28,6 +28,7 @@ export interface VoterProfile {
   readonly stakeMicroSov: bigint; // 1 SOV = 1,000,000 micro-SOV
   readonly accountAgeDays: number;
   readonly usageScore: number; // 0.0 to 1.0 (Proof-of-Usage / engagement)
+  readonly lockDays?: number | undefined; // Optional veSOV lock duration (90d=1.5x, 365d=2.5x, 730d=3.0x)
 }
 
 export interface VoterEligibilityRecord {
@@ -37,6 +38,7 @@ export interface VoterEligibilityRecord {
   readonly usageScore: number;
   readonly isEligible: boolean;
   readonly snapshotId: string;
+  readonly lockDays?: number | undefined;
 }
 
 export interface AuthoritativeVoterDataProvider {
@@ -88,6 +90,8 @@ export interface CastVoteParams {
   voterPublicKeyBytes?: Uint8Array | undefined;
 }
 
+export const GOVERNANCE_TOKEN_EXTENSION_ID = 'SOVRA-EXT-CONSENSUS';
+
 export class GovernanceVotingEngine {
   private readonly votes = new Map<string, Map<string, CastVoteRecord>>(); // proposalId -> voterDid -> record
   private readonly authoritativeStore = new Map<string, Map<string, { record: VoterEligibilityRecord; pubKey: Uint8Array }>>(); // snapshotId -> did -> data
@@ -95,6 +99,7 @@ export class GovernanceVotingEngine {
   private readonly dataProvider?: AuthoritativeVoterDataProvider | undefined;
   private readonly defaultChainId: string;
   private readonly strictAuthoritativeMode: boolean;
+  private readonly coreTokenFreeMode: boolean;
 
   public static readonly MIN_ACCOUNT_AGE_DAYS = 30; // 30-day anti-Sybil maturity gate (PROPOSED — NOT RATIFIED)
   public static readonly MAX_SINGLE_VOTER_SHARE = 0.05; // Whale cap: 5% maximum influence (PROPOSED — NOT RATIFIED)
@@ -103,10 +108,32 @@ export class GovernanceVotingEngine {
     dataProvider?: AuthoritativeVoterDataProvider;
     chainId?: string;
     strictAuthoritativeMode?: boolean;
+    /** When true (SOVRA-CORE compliant), token stake weighting is ignored in favor of 1-identity-1-vote + reputation. */
+    coreTokenFreeMode?: boolean;
   }) {
     this.dataProvider = options?.dataProvider;
     this.defaultChainId = options?.chainId ?? 'sovra-testnet';
     this.strictAuthoritativeMode = options?.strictAuthoritativeMode ?? false;
+    this.coreTokenFreeMode = options?.coreTokenFreeMode ?? false;
+  }
+
+  public isExtensionTokenVotingEnabled(): boolean {
+    return !this.coreTokenFreeMode;
+  }
+
+  /**
+   * Token-free core governance weight independent of blockchain balances or stake.
+   */
+  public static calculateTokenFreeWeight(profile: VoterProfile | VoterEligibilityRecord): number {
+    if (profile.accountAgeDays < GovernanceVotingEngine.MIN_ACCOUNT_AGE_DAYS) {
+      throw new ValidationError(
+        `Sybil protection active: Account age (${profile.accountAgeDays}d) is below the 30-day maturity threshold`,
+      );
+    }
+    const maturityMultiplier = 1 + Math.min(1.0, profile.accountAgeDays / 365);
+    const clampedUsage = Math.max(0, Math.min(1.0, profile.usageScore));
+    const usageMultiplier = 0.5 + 0.5 * clampedUsage;
+    return maturityMultiplier * usageMultiplier;
   }
 
   public setProposalSnapshot(proposalId: string, snapshotId: string): void {
@@ -216,8 +243,18 @@ export class GovernanceVotingEngine {
   }
 
   /**
+   * Resolves veSOV lock multiplier matching L1 staking tiers (subject to SIP-001 5% cap).
+   */
+  public static resolveVeSovMultiplier(lockDays = 0): number {
+    if (lockDays >= 730) return 3.0;
+    if (lockDays >= 365) return 2.5;
+    if (lockDays >= 90) return 1.5;
+    return 1.0;
+  }
+
+  /**
    * Calculates the quadratic and reputation-weighted voting power:
-   * V = sqrt(stake_SOV) * (1 + min(1.0, age / 365)) * (0.5 + 0.5 * usage)
+   * V = sqrt(stake_SOV) * veSovMultiplier * (1 + min(1.0, age / 365)) * (0.5 + 0.5 * usage)
    */
   public static calculateRawWeight(profile: VoterProfile | VoterEligibilityRecord): number {
     if (profile.accountAgeDays < GovernanceVotingEngine.MIN_ACCOUNT_AGE_DAYS) {
@@ -228,7 +265,8 @@ export class GovernanceVotingEngine {
 
     // Convert micro-SOV to whole SOV units for quadratic root
     const wholeSov = Number(profile.stakeMicroSov) / 1_000_000;
-    const stakeComponent = Math.sqrt(Math.max(0, wholeSov));
+    const veMultiplier = GovernanceVotingEngine.resolveVeSovMultiplier(profile.lockDays ?? 0);
+    const stakeComponent = Math.sqrt(Math.max(0, wholeSov)) * veMultiplier;
 
     const maturityMultiplier = 1 + Math.min(1.0, profile.accountAgeDays / 365);
     const clampedUsage = Math.max(0, Math.min(1.0, profile.usageScore));
@@ -334,8 +372,10 @@ export class GovernanceVotingEngine {
       }
     }
 
-    // Compute raw weight from verified authoritative profile
-    const rawWeight = GovernanceVotingEngine.calculateRawWeight(authoritativeRecord);
+    // Compute raw weight from verified authoritative profile (token-free in core mode; quadratic extension when opted in)
+    const rawWeight = this.coreTokenFreeMode
+      ? GovernanceVotingEngine.calculateTokenFreeWeight(authoritativeRecord)
+      : GovernanceVotingEngine.calculateRawWeight(authoritativeRecord);
 
     let proposalVotes = this.votes.get(params.proposalId);
     let previousVote: string | undefined;

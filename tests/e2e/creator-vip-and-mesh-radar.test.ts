@@ -229,7 +229,37 @@ describe('Sovra Creator VIP Monetization & AirDrop Mesh Radar Engine Suite', () 
   // =========================================================================
   describe('6. Portable Sovereign Audience Graph Exporter', () => {
     it('exports a cryptographically signed .sovra.json archive of user audience, posts, and keys', async () => {
-      const res = await fetch(`${BASE_URL}/api/user/export-sovereign-graph?did=did:sovra:soundwave_sender`);
+      const uniqueTs = Date.now();
+      const targetDid = 'did:sovra:soundwave_export_' + uniqueTs;
+      const peerHandle = '@export_peer_' + uniqueTs;
+      const regTarget = await fetch(`${BASE_URL}/api/user/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ did: targetDid, handle: '@soundwave_exp_' + uniqueTs, name: 'Soundwave Exporter' }),
+      });
+      const targetData = await regTarget.json();
+      const regPeer = await fetch(`${BASE_URL}/api/user/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: peerHandle, name: 'Export Peer' }),
+      });
+      const peerData = await regPeer.json();
+      await fetch(`${BASE_URL}/api/feed/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${targetData.sessionToken}` },
+        body: JSON.stringify({ caption: 'Sovereign Graph Export Test Post #export', theme: 'mesh' }),
+      });
+      await fetch(`${BASE_URL}/api/friends/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${targetData.sessionToken}` },
+        body: JSON.stringify({ toDid: peerData.user.did }),
+      });
+      await fetch(`${BASE_URL}/api/friends/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${peerData.sessionToken}` },
+        body: JSON.stringify({ fromDid: targetDid, status: 'accepted' }),
+      });
+      const res = await fetch(`${BASE_URL}/api/user/export-sovereign-graph?did=${encodeURIComponent(targetDid)}`);
       expect(res.status).toBe(200);
 
       const disposition = res.headers.get('content-disposition');
@@ -239,7 +269,7 @@ describe('Sovra Creator VIP Monetization & AirDrop Mesh Radar Engine Suite', () 
       const archive = await res.json();
       expect(archive.format).toBe('sovra_sovereign_graph_v1');
       expect(archive.version).toBe('1.0.0');
-      expect(archive.did).toBe('did:sovra:soundwave_sender');
+      expect(archive.did).toBe(targetDid);
       expect(archive.profile.handle).toBeDefined();
       expect(archive.postsCount).toBeGreaterThanOrEqual(1);
       expect(archive.followersCount).toBeGreaterThanOrEqual(1);

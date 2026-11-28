@@ -15,7 +15,9 @@ import { describe, it, expect } from 'vitest';
 const BASE_URL = process.env.SOVRA_BASE_URL || 'http://localhost:3001';
 
 describe('CosmWasm Creator Token AMM Swap & Token-Gated Content Engine Suite', () => {
-  let creatorDid = 'did:sovra:creator_amm_test_' + Date.now();
+  let creatorDid = '';
+  let creatorToken = '';
+  let fanToken = '';
   let creatorAddress = 'sovra12a806ca82d506a025d580d40600abc77a69e10e7';
   let fanAddress = 'sovra1fan99482f7c082e66d8ba9264fa58ef2110c900';
   let tokenContractAddress = '';
@@ -24,9 +26,32 @@ describe('CosmWasm Creator Token AMM Swap & Token-Gated Content Engine Suite', (
 
   // 1. Deploy CW20 Creator Token for tests
   it('prepares creator token via Creator Studio Launchpad (POST /api/studio/token/launch)', async () => {
-    const res = await fetch(`${BASE_URL}/api/studio/token/launch`, {
+    const ts = Date.now();
+    const regCreator = await fetch(`${BASE_URL}/api/user/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ handle: `@creator_amm_${ts}`, name: 'AMM Creator', device: 'Workstation' }),
+    });
+    expect(regCreator.status).toBe(200);
+    const regCreatorData = await regCreator.json();
+    creatorToken = regCreatorData.sessionToken;
+    creatorDid = regCreatorData.user.did;
+
+    const regFan = await fetch(`${BASE_URL}/api/user/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ handle: `@fan_amm_${ts}`, name: 'AMM Fan', device: 'Mobile' }),
+    });
+    expect(regFan.status).toBe(200);
+    const regFanData = await regFan.json();
+    fanToken = regFanData.sessionToken;
+
+    const res = await fetch(`${BASE_URL}/api/studio/token/launch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${creatorToken}`,
+      },
       body: JSON.stringify({
         name: tokenName,
         symbol: tokenSymbol,
@@ -81,7 +106,10 @@ describe('CosmWasm Creator Token AMM Swap & Token-Gated Content Engine Suite', (
       const sovInput = '1000000'; // 1.0 SOV
       const res = await fetch(`${BASE_URL}/api/wallet/swap`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${fanToken}`,
+        },
         body: JSON.stringify({
           address: fanAddress,
           tokenAddress: tokenContractAddress,
@@ -117,7 +145,10 @@ describe('CosmWasm Creator Token AMM Swap & Token-Gated Content Engine Suite', (
       const sellAmount = (BigInt(tokensAcquired) / 2n).toString();
       const res = await fetch(`${BASE_URL}/api/wallet/swap`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${fanToken}`,
+        },
         body: JSON.stringify({
           address: fanAddress,
           tokenAddress: tokenContractAddress,
@@ -163,7 +194,10 @@ describe('CosmWasm Creator Token AMM Swap & Token-Gated Content Engine Suite', (
     it('configures token-gating on media item via POST /api/media/token-gate', async () => {
       const res = await fetch(`${BASE_URL}/api/media/token-gate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${creatorToken}`,
+        },
         body: JSON.stringify({
           mediaId: gatedMediaId,
           contractAddress: tokenContractAddress,

@@ -33,6 +33,7 @@ export interface RelayHopMessage {
   readonly type: RelayHopType;
   readonly peerId?: string;
   readonly targetPeerId?: string;
+  readonly circuitId?: string;
   readonly status?: RelayResponseStatus;
   readonly reservation?: RelayReservationInfo;
   readonly limit?: RelayLimit;
@@ -420,6 +421,7 @@ export class CircuitRelayV2 {
       return {
         type: 'STATUS',
         status: 'OK',
+        circuitId: circuitResult.value.circuitId,
         limit: {
           durationSeconds: this.defaultMaxDurationSeconds,
           maxDataBytes: circuitResult.value.maxBytes,

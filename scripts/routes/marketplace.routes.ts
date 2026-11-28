@@ -16,6 +16,7 @@
 import http from 'node:http';
 import { sovraDb } from '../database-engine.ts';
 import type { AuthenticatedPrincipal } from '../../packages/identity/dist/index.js';
+import { resolveAllowedOrigin, DEFAULT_SECURITY_POLICY } from '../../packages/shared/dist/index.js';
 
 export interface MarketplaceRouteContext {
   req: http.IncomingMessage;
@@ -26,15 +27,22 @@ export interface MarketplaceRouteContext {
   enforceAuth: (req: http.IncomingMessage, res: http.ServerResponse) => AuthenticatedPrincipal | null;
 }
 
-function sendJson(res: http.ServerResponse, statusCode: number, data: Record<string, any>): void {
+function sendJson(res: http.ServerResponse, statusCode: number, data: Record<string, any>, req?: http.IncomingMessage): void {
   const payload = JSON.stringify(data);
-  res.writeHead(statusCode, {
+  const headers: Record<string, string | number> = {
     'Content-Type': 'application/json',
     'Content-Length': Buffer.byteLength(payload),
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Sovra-Benchmark',
-  });
+  };
+  const origin = req?.headers?.origin;
+  const allowedOrigin = resolveAllowedOrigin(origin, DEFAULT_SECURITY_POLICY);
+  if (allowedOrigin && allowedOrigin !== '*') {
+    headers['Access-Control-Allow-Origin'] = allowedOrigin;
+    headers['Access-Control-Allow-Credentials'] = 'true';
+    headers['Vary'] = 'Origin';
+  }
+  res.writeHead(statusCode, headers);
   res.end(payload);
 }
 
@@ -69,7 +77,7 @@ export async function handleMarketplaceRoutes(ctx: MarketplaceRouteContext): Pro
       items,
       count: items.length,
       filters: { geohash, latitude, longitude, radiusKm, category },
-    });
+    }, req);
     return true;
   }
 
@@ -86,12 +94,12 @@ export async function handleMarketplaceRoutes(ctx: MarketplaceRouteContext): Pro
       const { title, description, priceSov, category, latitude, longitude, images, condition } = parsed;
 
       if (!title || typeof title !== 'string' || title.trim().length < 3) {
-        sendJson(res, 400, { ok: false, error: 'Title is required (min 3 chars)' });
+        sendJson(res, 400, { ok: false, error: 'Title is required (min 3 chars)' }, req);
         return true;
       }
 
       if (typeof priceSov !== 'number' || priceSov <= 0) {
-        sendJson(res, 400, { ok: false, error: 'priceSov must be a positive number' });
+        sendJson(res, 400, { ok: false, error: 'priceSov must be a positive number' }, req);
         return true;
       }
 
@@ -110,10 +118,10 @@ export async function handleMarketplaceRoutes(ctx: MarketplaceRouteContext): Pro
         condition: condition || 'good',
       });
 
-      sendJson(res, 201, { ok: true, item });
+      sendJson(res, 201, { ok: true, item }, req);
       return true;
     } catch (err: any) {
-      sendJson(res, 400, { ok: false, error: err.message || 'Failed to create item listing' });
+      sendJson(res, 400, { ok: false, error: err.message || 'Failed to create item listing' }, req);
       return true;
     }
   }
@@ -130,7 +138,7 @@ export async function handleMarketplaceRoutes(ctx: MarketplaceRouteContext): Pro
       const parsed = JSON.parse(body || '{}');
       const { itemId } = parsed;
       if (!itemId) {
-        sendJson(res, 400, { ok: false, error: 'itemId is required' });
+        sendJson(res, 400, { ok: false, error: 'itemId is required' }, req);
         return true;
       }
 
@@ -145,10 +153,10 @@ export async function handleMarketplaceRoutes(ctx: MarketplaceRouteContext): Pro
           deliverySecret,
           amountSov: escrow.amountSov,
         },
-      });
+      }, req);
       return true;
     } catch (err: any) {
-      sendJson(res, 400, { ok: false, error: err.message || 'Failed to create escrow' });
+      sendJson(res, 400, { ok: false, error: err.message || 'Failed to create escrow' }, req);
       return true;
     }
   }
@@ -165,15 +173,15 @@ export async function handleMarketplaceRoutes(ctx: MarketplaceRouteContext): Pro
       const parsed = JSON.parse(body || '{}');
       const { escrowId } = parsed;
       if (!escrowId) {
-        sendJson(res, 400, { ok: false, error: 'escrowId is required' });
+        sendJson(res, 400, { ok: false, error: 'escrowId is required' }, req);
         return true;
       }
 
       const escrow = sovraDb.dispatchMarketplaceEscrow(principal.did, escrowId);
-      sendJson(res, 200, { ok: true, escrow });
+      sendJson(res, 200, { ok: true, escrow }, req);
       return true;
     } catch (err: any) {
-      sendJson(res, 400, { ok: false, error: err.message || 'Failed to dispatch escrow' });
+      sendJson(res, 400, { ok: false, error: err.message || 'Failed to dispatch escrow' }, req);
       return true;
     }
   }
@@ -190,15 +198,15 @@ export async function handleMarketplaceRoutes(ctx: MarketplaceRouteContext): Pro
       const parsed = JSON.parse(body || '{}');
       const { escrowId, deliverySecret } = parsed;
       if (!escrowId || !deliverySecret) {
-        sendJson(res, 400, { ok: false, error: 'escrowId and deliverySecret are required' });
+        sendJson(res, 400, { ok: false, error: 'escrowId and deliverySecret are required' }, req);
         return true;
       }
 
       const escrow = sovraDb.releaseMarketplaceEscrow(principal.did, escrowId, deliverySecret);
-      sendJson(res, 200, { ok: true, escrow, released: true });
+      sendJson(res, 200, { ok: true, escrow, released: true }, req);
       return true;
     } catch (err: any) {
-      sendJson(res, 400, { ok: false, error: err.message || 'Failed to release escrow' });
+      sendJson(res, 400, { ok: false, error: err.message || 'Failed to release escrow' }, req);
       return true;
     }
   }
@@ -215,15 +223,15 @@ export async function handleMarketplaceRoutes(ctx: MarketplaceRouteContext): Pro
       const parsed = JSON.parse(body || '{}');
       const { escrowId, reason } = parsed;
       if (!escrowId) {
-        sendJson(res, 400, { ok: false, error: 'escrowId is required' });
+        sendJson(res, 400, { ok: false, error: 'escrowId is required' }, req);
         return true;
       }
 
       const escrow = sovraDb.disputeMarketplaceEscrow(principal.did, escrowId, reason || 'Transaction disputed');
-      sendJson(res, 200, { ok: true, escrow, disputed: true });
+      sendJson(res, 200, { ok: true, escrow, disputed: true }, req);
       return true;
     } catch (err: any) {
-      sendJson(res, 400, { ok: false, error: err.message || 'Failed to dispute escrow' });
+      sendJson(res, 400, { ok: false, error: err.message || 'Failed to dispute escrow' }, req);
       return true;
     }
   }
@@ -250,7 +258,7 @@ export async function handleMarketplaceRoutes(ctx: MarketplaceRouteContext): Pro
       ok: true,
       groups,
       count: groups.length,
-    });
+    }, req);
     return true;
   }
 
@@ -267,7 +275,7 @@ export async function handleMarketplaceRoutes(ctx: MarketplaceRouteContext): Pro
       const { name, description, latitude, longitude, radiusKm, category, isPrivate } = parsed;
 
       if (!name || typeof name !== 'string' || name.trim().length < 3) {
-        sendJson(res, 400, { ok: false, error: 'Group name is required (min 3 chars)' });
+        sendJson(res, 400, { ok: false, error: 'Group name is required (min 3 chars)' }, req);
         return true;
       }
 
@@ -285,10 +293,10 @@ export async function handleMarketplaceRoutes(ctx: MarketplaceRouteContext): Pro
         isPrivate: Boolean(isPrivate),
       });
 
-      sendJson(res, 201, { ok: true, group });
+      sendJson(res, 201, { ok: true, group }, req);
       return true;
     } catch (err: any) {
-      sendJson(res, 400, { ok: false, error: err.message || 'Failed to create local group' });
+      sendJson(res, 400, { ok: false, error: err.message || 'Failed to create local group' }, req);
       return true;
     }
   }

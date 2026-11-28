@@ -8,6 +8,7 @@
 
 import http from 'node:http';
 import { sovraDb } from '../database-engine.ts';
+import { riskManagementEngine } from '../risk-management-engine.ts';
 
 export interface AdminFeatureContext {
   req: http.IncomingMessage;
@@ -259,9 +260,9 @@ export async function handleAdminFeatureRoute(ctx: AdminFeatureContext): Promise
       },
       treasury: {
         name: 'Native SOV Core Developer Treasury',
-        genesisAllocation: 200000000,
+        genesisAllocation: 100000000,
         circulatingInUsers: circulatingSov,
-        reserveFormatted: (200000000 - circulatingSov).toLocaleString() + ' SOV',
+        reserveFormatted: (100000000 - circulatingSov).toLocaleString() + ' SOV',
         status: 'COLD_STORAGE_LOCKED'
       },
       aiMarketplace: {
@@ -316,18 +317,44 @@ export async function handleAdminFeatureRoute(ctx: AdminFeatureContext): Promise
     if (!ok) return true;
     try {
       const parsed = JSON.parse(body || '{}');
-      const newRate = Number(parsed.takeRate || 5.0);
+      const requestedRate = Number(parsed.takeRate ?? parsed.takeRatePct ?? parsed.rate ?? 5.0);
+      const floorPct = Math.max(0.1, Number(riskManagementEngine.getRiskPolicies().platformTakeRateFloorPct || 2.5));
+      const effectiveRate = Math.min(10.0, Math.max(floorPct, requestedRate));
+      if (requestedRate < floorPct) {
+        riskManagementEngine.recordRiskEvent({
+          category: 'DISINTERMEDIATION_FEE_LOSS',
+          severity: 'MEDIUM',
+          direction: 'RECOVERED_OR_SAVED',
+          amountSov: 0,
+          actorDid: checkAdminRbac(req, 'take_rate:write').adminDid || 'did:sov:admin_root',
+          endpoint: '/api/admin/revenue/take-rate',
+          description: `Clamped requested take-rate ${requestedRate}% up to Risk Policy floor (${floorPct}%)`,
+          prevented: true,
+          metadata: { requestedRate, enforcedFloorPct: floorPct },
+        });
+      }
+      const sqlite = sovraDb.getSqliteEngine();
+      if (sqlite && typeof sqlite.setPlatformTakeRate === 'function') {
+        sqlite.setPlatformTakeRate(effectiveRate);
+      }
+      const persRate = Math.max(floorPct, sqlite?.getPlatformTakeRate?.() ?? effectiveRate);
       const authInfo = checkAdminRbac(req, 'take_rate:write');
       sovraDb.logAudit({
         id: 'audit_takerate_' + Date.now(),
         type: 'ADMIN_TAKE_RATE_UPDATE',
         actorDid: authInfo.adminDid,
         actorHandle: '@admin',
-        details: 'Updated network protocol take-rate to ' + newRate.toFixed(1) + '%',
+        details: 'Updated network protocol take-rate to ' + persRate.toFixed(1) + '%',
         timestamp: Date.now()
       });
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, takeRate: newRate }));
+      res.end(JSON.stringify({
+        ok: true,
+        takeRate: persRate,
+        takeRatePct: persRate,
+        clampedToFloor: requestedRate < floorPct,
+        floorPct,
+      }));
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: err.message || 'Invalid JSON' }));

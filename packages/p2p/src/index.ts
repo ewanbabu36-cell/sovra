@@ -1,6 +1,7 @@
 export * from './errors.js';
 export * from './types.js';
 export * from './identity.js';
+export * from './qr-discovery.js';
 export * from './transport.js';
 export * from './multiplex.js';
 export * from './discovery.js';
@@ -22,5 +23,8 @@ export * from './delay-skew.js';
 export * from './bootstrap-seeds.js';
 export * from './signaling.js';
 export * from './wire.js';
+export * from './bootstrap-bundle.js';
+export * from './socks5.js';
+export * from './upnp.js';
 export * from './mesh/index.js';
 

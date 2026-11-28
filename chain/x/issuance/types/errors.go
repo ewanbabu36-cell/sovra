@@ -9,7 +9,7 @@ var (
 	ErrEpochAllowanceExceeded = errors.New("mint amount exceeds remaining epoch allowance")
 	ErrPoolCapExceeded        = errors.New("mint amount exceeds pool lifetime cap")
 	ErrGlobalCapExceeded      = errors.New("mint amount exceeds global lifetime cap of 100M SOV")
-	ErrTerminalPhaseActive    = errors.New("emission period has permanently terminated (9,125 epochs completed)")
+	ErrTerminalPhaseActive    = errors.New("emission period has permanently terminated (46,720 epochs / 32 halving eras completed)")
 	ErrPreGenesisBlock        = errors.New("block timestamp is before genesis")
 	ErrInsufficientBalance    = errors.New("insufficient balance for burn")
 	ErrUnauthorizedCaller     = errors.New("unauthorized caller for emission capability")

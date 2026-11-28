@@ -898,6 +898,11 @@ func startNode(flags NodeFlags) {
 		}
 		fmt.Printf("Initialized new chain from genesis at block 0\n")
 	} else {
+		if healedHeight, healed := app.HealIncompleteBlock(); healed {
+			lastHeight = healedHeight
+			appHash = app.GetAppHash()
+			fmt.Printf("[RECOVERY] Rolled back uncommitted height marker without saved block to H=%d\n", healedHeight)
+		}
 		hashPrefix := []byte("00000000")
 		if len(appHash) >= 8 {
 			hashPrefix = appHash[:8]
@@ -1059,14 +1064,14 @@ func startNode(flags NodeFlags) {
 				return fmt.Errorf("height/hash mismatch in commit certificate")
 			}
 
-			// Cryptographic quorum certified — commit state transition
+			// Cryptographic quorum certified — persist block before committing height advance
+			bBz, _ := json.Marshal(b)
+			app.SaveBlock(b.Height, bBz)
 			_ = app.BeginBlock(b.Height, b.Time)
 			for _, tx := range b.Txs {
 				_ = app.DeliverTx(tx)
 			}
 			newAppHash := app.Commit()
-			bBz, _ := json.Marshal(b)
-			app.SaveBlock(b.Height, bBz)
 
 			activeValSet, _ := valSchedule.GetValidatorSetForHeight(b.Height)
 			totalPow := canonicalValSet.TotalPower
@@ -1304,12 +1309,12 @@ func startNode(flags NodeFlags) {
 						cert, _ = consensusEngine.BuildCommitCertificate(nextHeight, currentRound, candidateHash)
 					}
 
-					// 5. Commit state atomically ONLY AFTER quorum certificate is verified
-					_ = app.BeginBlock(nextHeight, now)
-					newAppHash := app.Commit()
+					// 5. Persist block and commit state atomically ONLY AFTER quorum certificate is verified
 					blockData.CommitCert = cert
 					bBz, _ := json.Marshal(blockData)
 					app.SaveBlock(nextHeight, bBz)
+					_ = app.BeginBlock(nextHeight, now)
+					newAppHash := app.Commit()
 
 					lastSeenHeight = nextHeight
 					lastHeightTime = time.Now()
@@ -1364,17 +1369,27 @@ func startNode(flags NodeFlags) {
 
 	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		econ := app.QueryEconomyStats()
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"moniker":        cfg.Moniker,
-			"chain_id":       cfg.ChainID,
-			"node_id":        nodeID,
-			"height":         app.GetHeight(),
-			"app_hash":       hex.EncodeToString(app.GetAppHash()),
-			"total_supply":   app.QueryTotalSupply().String(),
-			"lifetime_mint":  app.QueryLifetimeMinted().String(),
-			"lifetime_burn":  app.QueryLifetimeBurned().String(),
-			"genesis_time":   gen.GenesisTime,
-			"supply_correct": app.QueryTotalSupply().Equal(app.QueryLifetimeMinted().Sub(app.QueryLifetimeBurned())),
+			"moniker":                 cfg.Moniker,
+			"chain_id":                cfg.ChainID,
+			"node_id":                 nodeID,
+			"height":                  app.GetHeight(),
+			"app_hash":                hex.EncodeToString(app.GetAppHash()),
+			"total_supply":            app.QueryTotalSupply().String(),
+			"lifetime_mint":           app.QueryLifetimeMinted().String(),
+			"lifetime_burn":           app.QueryLifetimeBurned().String(),
+			"liquid_circulating":      econ.LiquidCirculating,
+			"bonded_stake":            econ.BondedStake,
+			"vesting_locked":          econ.VestingLocked,
+			"seeder_collateral":       econ.SeederCollateral,
+			"patron_staked":           econ.PatronStaked,
+			"fee_burn_bps":            econ.FeeBurnBps,
+			"min_tx_fee_usov":         econ.MinTxFeeUsov,
+			"unbonding_period_sec":    econ.UnbondingPeriodSec,
+			"security_council_active": econ.SecurityCouncilActive,
+			"genesis_time":            gen.GenesisTime,
+			"supply_correct":          app.QueryTotalSupply().Equal(app.QueryLifetimeMinted().Sub(app.QueryLifetimeBurned())),
 		})
 	})
 
@@ -1569,13 +1584,15 @@ func startNode(flags NodeFlags) {
 			prevVals = currSet.Validators
 		}
 
-		// Security Authorization Gate:
-		// 1. Check for Emergency Recovery Auth Token using constant-time comparison
+		// Security Authorization Gate (Founderless Quorum Governance):
+		// Validator set transitions require 2/3+ Ed25519 quorum signatures from active validators.
+		// Token override is disabled everywhere except explicit opt-in local testnet dev labs.
 		recoveryToken := os.Getenv("SOVRA_RECOVERY_AUTH_TOKEN")
+		allowLocalDevBypass := os.Getenv("SOVRA_ALLOW_LOCAL_DEV_RECOVERY_TOKEN") == "true" && strings.HasPrefix(cfg.ChainID, "sovra-testnet-")
 		authHeader := r.Header.Get("Authorization")
 		customHeader := r.Header.Get("X-Sovra-Transition-Auth")
 		isTokenAuthorized := false
-		if recoveryToken != "" {
+		if allowLocalDevBypass && recoveryToken != "" {
 			bearerToken := ""
 			if strings.HasPrefix(authHeader, "Bearer ") {
 				bearerToken = strings.TrimPrefix(authHeader, "Bearer ")
@@ -1707,6 +1724,54 @@ func startNode(flags NodeFlags) {
 			"lifetime_minted":        minted.String(),
 			"lifetime_burned":        burned.String(),
 			"master_invariant_holds": supply.Equal(minted.Sub(burned)),
+		})
+	})
+
+	mux.HandleFunc("/query/economy", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(app.QueryEconomyStats())
+	})
+
+	mux.HandleFunc("/query/vesting", func(w http.ResponseWriter, r *http.Request) {
+		addr := r.URL.Query().Get("address")
+		w.Header().Set("Content-Type", "application/json")
+		sched, locked, spendable := app.QueryVestingSchedule(addr, 0)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"address":   addr,
+			"schedule":  sched,
+			"locked":    locked.String(),
+			"spendable": spendable.String(),
+		})
+	})
+
+	mux.HandleFunc("/query/seeder", func(w http.ResponseWriter, r *http.Request) {
+		addr := r.URL.Query().Get("address")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"address": addr,
+			"bond":    app.QuerySeederBond(addr),
+		})
+	})
+
+	mux.HandleFunc("/query/handle", func(w http.ResponseWriter, r *http.Request) {
+		handle := r.URL.Query().Get("handle")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"handle": handle,
+			"record": app.QueryHandle(handle),
+		})
+	})
+
+	mux.HandleFunc("/query/delegation", func(w http.ResponseWriter, r *http.Request) {
+		delegator := r.URL.Query().Get("delegator")
+		validator := r.URL.Query().Get("validator")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"delegator":  delegator,
+			"validator":  validator,
+			"delegation": app.QueryDelegationRecord(delegator, validator),
+			"claimable":  app.QueryClaimableRewards(delegator).String(),
+			"unbondings": app.QueryPendingUnbondings(delegator),
 		})
 	})
 
@@ -2321,7 +2386,7 @@ func handleTx(args []string) {
 			Sender:    senderAddr,
 			Amount:    amount,
 			Nonce:     nonce,
-			Fee:       "0",
+			Fee:       "100",
 			PubKeyHex: hex.EncodeToString(pubKey),
 		}
 

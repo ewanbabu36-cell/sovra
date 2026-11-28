@@ -110,26 +110,20 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
 
     try {
       const parsed = body ? JSON.parse(body) : {};
-      const principal = ctx.resolvePrincipal(req);
-      let creatorDid = '';
-      if (principal && principal.did) {
-        creatorDid = principal.did;
-      } else if (parsed && parsed.creatorDid) {
-        creatorDid = String(parsed.creatorDid);
-      } else {
-        const allUsers = sovraDb.getAllUsers();
-        creatorDid = allUsers.length > 0 ? allUsers[0].did : 'did:sovra:creator_genesis';
-      }
+      const principal = ctx.enforceAuth(req, res);
+      if (!principal) return true;
+      const creatorDid = principal.did;
       const user = sovraDb.findUserByDid(creatorDid);
-      const rawTitle = parsed.title !== undefined ? String(parsed.title).trim() : 'Sovereign Swarm Live Broadcast';
+
+      const rawTitle = parsed.title !== undefined ? String(parsed.title).replace(/<[^>]*>?/gm, '').trim() : 'Sovereign Swarm Live Broadcast';
       if (!rawTitle) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Broadcast title cannot be empty' }));
         return true;
       }
-      const title = rawTitle;
-      const description = String(parsed.description || 'Live P2P interactive swarm broadcast').trim();
-      const category = String(parsed.category || 'tech');
+      const title = rawTitle.substring(0, 120);
+      const description = String(parsed.description || 'Live P2P interactive swarm broadcast').replace(/<[^>]*>?/gm, '').trim().substring(0, 1000);
+      const category = String(parsed.category || 'tech').replace(/[^a-zA-Z0-9_-]/g, '').substring(0, 32);
 
       const session = sovraDb.createLiveSession({
         creatorDid,
@@ -140,6 +134,7 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
         description,
         category,
         scheduledStartTime: Date.now(),
+        forceNew: parsed.forceNew === true,
       });
 
       // Transition immediately to LIVE status
@@ -156,6 +151,59 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Invalid live broadcast payload: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // 2b. POST /api/live/stream/heartbeat - Broadcaster heartbeat keep-alive
+  if (url.pathname === '/api/live/stream/heartbeat' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+    if (!ok) return true;
+
+    try {
+      const parsed = body ? JSON.parse(body) : {};
+      const sessionId = String(parsed.sessionId || parsed.streamId || '');
+      if (!sessionId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'sessionId is required' }));
+        return true;
+      }
+
+      const principal = ctx.enforceAuth(req, res);
+      if (!principal) return true;
+
+      const session = sovraDb.getLiveSessionById(sessionId);
+      if (!session) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Live session not found' }));
+        return true;
+      }
+
+      const isHost = session.creatorDid === principal.did || principal.role === 'SUPER_ADMIN' || principal.role === 'ADMIN';
+      if (!isHost) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Forbidden: Only broadcaster or admin can send heartbeat' }));
+        return true;
+      }
+
+      session.updatedAt = Date.now();
+      if (session.status === 'DISCONNECTED') {
+        session.status = 'LIVE';
+      }
+      sovraDb.save();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: true,
+        status: session.status,
+        viewerCount: session.viewerCount || 0,
+        peakViewers: session.peakViewers || 0,
+        tipTotalSov: session.tipTotalSov || 0,
+        timestamp: Date.now(),
+      }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid heartbeat payload: ' + (err?.message || err) }));
     }
     return true;
   }
@@ -253,6 +301,8 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
       }
       const user = senderDid ? sovraDb.findUserByDid(senderDid) : null;
       const senderName = parsed.senderName || user?.displayName || 'Supporter';
+      const rawIdemp = parsed.idempotencyKey || req.headers['idempotency-key'];
+      const idempotencyKey = rawIdemp ? String(rawIdemp) : undefined;
 
       const tipRes = sovraDb.sendLiveStreamTip({
         sessionId,
@@ -260,6 +310,7 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
         senderName,
         amountSov,
         note,
+        idempotencyKey,
       });
 
       if (!tipRes.ok) {
@@ -596,7 +647,18 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
         return true;
       }
 
-      const fromDid = resolveUserDid(ctx, parsed);
+      const principal = ctx.resolvePrincipal(req);
+      let fromDid: string;
+      if (principal?.did) {
+        fromDid = principal.did;
+      } else {
+        const candidate = parsed.fromDid || parsed.viewerDid || parsed.senderDid;
+        if (candidate && typeof candidate === 'string' && candidate.startsWith('did:sovra:guest_')) {
+          fromDid = candidate;
+        } else {
+          fromDid = 'did:sovra:guest_' + Math.random().toString(36).substring(2, 10);
+        }
+      }
       const toDid = parsed.toDid || parsed.targetDid ? String(parsed.toDid || parsed.targetDid) : undefined;
 
       const sigRes = sovraDb.sendLiveStreamSignal({
@@ -838,6 +900,54 @@ export async function handleLiveStreamingRoutes(ctx: LiveRouteContext): Promise<
     } catch (err: any) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Invalid end broadcast payload: ' + (err?.message || err) }));
+    }
+    return true;
+  }
+
+  // 9b. POST /api/live/status - Transition broadcast session state with strict RBAC & ownership check
+  if (url.pathname === '/api/live/status' && req.method === 'POST') {
+    const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
+    if (!ok) return true;
+
+    try {
+      const parsed = JSON.parse(body);
+      const sessionId = String(parsed.id || parsed.sessionId || parsed.streamId || '');
+      const newStatus = String(parsed.status || '') as LiveSessionStatus;
+      if (!sessionId || !newStatus) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'id and status are required' }));
+        return true;
+      }
+
+      const principal = ctx.enforceAuth(req, res);
+      if (!principal) return true;
+
+      if (newStatus === 'ENDED') {
+        const endRes = sovraDb.endLiveBroadcast(sessionId, principal.did);
+        if (!endRes.ok) {
+          const isAuth = endRes.error?.toLowerCase().includes('unauthorized');
+          res.writeHead(isAuth ? 403 : 400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: endRes.error }));
+          return true;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, session: endRes.session, archiveVideo: endRes.archiveVideo }));
+        return true;
+      }
+
+      const result = sovraDb.updateLiveSessionStatus(sessionId, newStatus, principal.did);
+      if (result.ok) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, session: result.session }));
+      } else {
+        const isAuth = result.error?.toLowerCase().includes('unauthorized');
+        const isInvalid = result.error?.toLowerCase().includes('invalid state');
+        res.writeHead(isAuth ? 403 : (isInvalid ? 400 : 404), { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: result.error }));
+      }
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Invalid live status payload: ' + (err?.message || err) }));
     }
     return true;
   }

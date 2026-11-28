@@ -1,0 +1,7 @@
+Sovra is a sovereign, decentralized social network powered by Ed25519 self-custody identities, Signal-grade Double Ratchet + ML-KEM-768 hybrid end-to-end encrypted messaging, adaptive HLS P2P streaming, and WebRTC voice/video calls.
+
+Key Features:
+- Sovereign Identity: Cryptographic DIDs backed by 12/24-word BIP-39 recovery phrases stored on your device.
+- Private E2EE Chats & Calls: End-to-end encrypted direct messaging, Bluetooth BLE/WiFi-Direct offline mesh relay, and multi-region Coturn NAT-traversed calling.
+- Zero-Algorithm Control: Subscribe to verified topic channels (#Tech, #AI, #Music, #Art, #Crypto, #Philosophy) or explore live streams, reels, and community feeds without shadowbans.
+- Creator Economy & Wallet: Direct 95/5 creator tipping, CosmWasm CW20 community tokens, and sovereign escrow marketplace.

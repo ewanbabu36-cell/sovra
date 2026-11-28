@@ -1,28 +1,15 @@
 # ============================================================
-#   SOVRA PRODUCTION REVERSE PROXY & TLS CONFIGURATION
-#   Caddyfile with unbuffered SSE and Security Headers
+#   SOVRA PRODUCTION REVERSE PROXY & AUTOMATIC TLS CONFIGURATION
+#   Supports Automatic Let's Encrypt ACME when SOVRA_DOMAIN is set
+#   (e.g. sovra.network) and Local Internal TLS when localhost.
 # ============================================================
 
 {
-  admin off
-  auto_https disable_redirects
+  email {$SOVRA_ACME_EMAIL:ops@sovra.network}
+  auto_https prefer_wildcard
 }
 
-:80 {
-  # Redirect HTTP to HTTPS in production
-  @insecure {
-    header_regexp Host ^(.*)$
-  }
-  handle @insecure {
-    # If TLS is enabled in prod, redirect to https://{host}{uri}
-    # For localhost testing, proxy directly
-    reverse_proxy sovra-node:3001
-  }
-}
-
-:443 {
-  tls internal
-
+{$SOVRA_DOMAIN:localhost} {
   # Security Headers (OWASP Hardening)
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
@@ -33,12 +20,21 @@
     Permissions-Policy "camera=(self), microphone=(self), geolocation=()"
   }
 
-  # Compression for static responses
   encode zstd gzip
 
-  # Realtime Server-Sent Events (SSE) bypass buffering
+  # Android Digital Asset Links & Apple App Site Association
+  @wellknown {
+    path /.well-known/assetlinks.json /.well-known/apple-app-site-association
+  }
+  handle @wellknown {
+    header Content-Type "application/json; charset=utf-8"
+    header Access-Control-Allow-Origin "*"
+    reverse_proxy sovra-node:3001
+  }
+
+  # Realtime Server-Sent Events (SSE) & CometBFT WebSocket bypass buffering
   @sse {
-    path /api/realtime/stream* /api/chat/events*
+    path /api/realtime/stream* /api/chat/events* /api/blockchain/stream* /websocket*
   }
   handle @sse {
     reverse_proxy sovra-node:3001 {
@@ -48,9 +44,9 @@
     }
   }
 
-  # Media streaming byte-range support
+  # Media, HLS Adaptive Streaming & Byte-Range Support
   @media {
-    path /api/feed/video/* /api/feed/image/*
+    path /api/feed/video/* /api/feed/image/* /api/videos/hls/* /api/video/hls/* /api/videos/storyboard/* /api/video/storyboard/* /api/media/*
   }
   handle @media {
     reverse_proxy sovra-node:3001 {

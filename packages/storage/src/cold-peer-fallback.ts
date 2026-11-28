@@ -14,6 +14,8 @@ export interface DePINStorageMiner {
   totalBytesServed: number;
   rewardBalance_uSOV: number;
   lastActive: number;
+  latencyMs?: number;
+  failures?: number;
 }
 
 export interface DePINGateway {
@@ -27,12 +29,18 @@ export interface DePINGateway {
 export interface ColdPeerFallbackOptions {
   readonly defaultTimeoutMs?: number;
   readonly rewardRate_uSOVPer64KB?: number;
+  readonly fastResponseThresholdMs?: number;
+  readonly speedBonusMultiplier?: number;
+  readonly hedgeConcurrency?: number;
   readonly customFetcher?: (url: string, timeoutMs: number) => Promise<Uint8Array | null>;
 }
 
 export class ColdPeerFallbackEngine {
   private readonly defaultTimeoutMs: number;
   private readonly rewardRate_uSOVPer64KB: number;
+  private readonly fastResponseThresholdMs: number;
+  private readonly speedBonusMultiplier: number;
+  private readonly hedgeConcurrency: number;
   private readonly customFetcher?: ((url: string, timeoutMs: number) => Promise<Uint8Array | null>) | undefined;
 
   private readonly miners = new Map<string, DePINStorageMiner>();
@@ -43,6 +51,9 @@ export class ColdPeerFallbackEngine {
   constructor(options: ColdPeerFallbackOptions = {}) {
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? 4000;
     this.rewardRate_uSOVPer64KB = options.rewardRate_uSOVPer64KB ?? 1.0;
+    this.fastResponseThresholdMs = options.fastResponseThresholdMs ?? 150;
+    this.speedBonusMultiplier = options.speedBonusMultiplier ?? 1.0;
+    this.hedgeConcurrency = Math.max(1, options.hedgeConcurrency ?? 3);
     this.customFetcher = options.customFetcher;
   }
 
@@ -97,8 +108,57 @@ export class ColdPeerFallbackEngine {
   }
 
   /**
-   * Resolves a cold or unavailable block from decentralized gateways or DePIN storage miners,
-   * verifying cryptographic authenticity before returning.
+   * Ranks eligible DePIN miners by lowest EWMA latency first, then highest reputation.
+   */
+  public rankMinersBySpeed(): DePINStorageMiner[] {
+    return Array.from(this.miners.values())
+      .filter(m => m.reputationScore >= 10)
+      .sort((a, b) => {
+        const latA = a.latencyMs ?? 250;
+        const latB = b.latencyMs ?? 250;
+        if (latA !== latB) return latA - latB;
+        return b.reputationScore - a.reputationScore;
+      });
+  }
+
+  private async tryFetchVerifiedBlock(
+    url: string,
+    cidStr: string,
+    timeoutMs: number,
+  ): Promise<{ data: Uint8Array; elapsedMs: number } | null> {
+    const startedAt = Date.now();
+    const data = await this.fetchData(url, timeoutMs);
+    if (!data || data.length === 0) return null;
+    this.verifyIntegrity(cidStr, data);
+    return { data, elapsedMs: Math.max(1, Date.now() - startedAt) };
+  }
+
+  private async raceHedgedBatch<T>(
+    items: readonly T[],
+    worker: (item: T) => Promise<Uint8Array | null>,
+  ): Promise<Uint8Array | null> {
+    for (let i = 0; i < items.length; i += this.hedgeConcurrency) {
+      const batch = items.slice(i, i + this.hedgeConcurrency);
+      try {
+        return await Promise.any(
+          batch.map(async (item) => {
+            const data = await worker(item);
+            if (!data) throw new Error('MISS');
+            return data;
+          }),
+        );
+      } catch (aggErr: any) {
+        const errs: unknown[] = Array.isArray(aggErr?.errors) ? aggErr.errors : [aggErr];
+        const integrityErr = errs.find(e => e instanceof IntegrityVerificationError);
+        if (integrityErr) throw integrityErr;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Resolves a cold or unavailable block via hedged parallel racing across latency-ranked
+   * DePIN miners first, then cold edge gateways, verifying cryptographic CID integrity.
    */
   public async resolveColdBlock(
     cidStr: string,
@@ -106,61 +166,65 @@ export class ColdPeerFallbackEngine {
   ): Promise<Uint8Array | null> {
     const timeoutMs = options?.timeoutMs ?? this.defaultTimeoutMs;
 
-    // 1. First probe registered DePIN storage miners
-    for (const miner of this.miners.values()) {
-      if (miner.reputationScore < 10) continue;
+    // 1. Race top latency-ranked DePIN storage miners in hedged parallel batches
+    const rankedMiners = this.rankMinersBySpeed();
+    const minerData = await this.raceHedgedBatch(rankedMiners, async (miner) => {
       const url = miner.endpoint.replace('{cid}', cidStr);
       try {
-        const data = await this.fetchData(url, timeoutMs);
-        if (data && data.length > 0) {
-          // Verify cryptographic authenticity
-          this.verifyIntegrity(cidStr, data);
-
-          // Credit DePIN miner with micro-rewards
-          const blocksOf64KB = Math.max(1, Math.ceil(data.length / (64 * 1024)));
-          miner.rewardBalance_uSOV += blocksOf64KB * this.rewardRate_uSOVPer64KB;
-          miner.totalBytesServed += data.length;
-          miner.reputationScore = Math.min(100, miner.reputationScore + 1);
-          miner.lastActive = Date.now();
-
-          this._totalBytesRecovered += data.length;
-          this._totalFallbacksServed += 1;
-          return data;
+        const result = await this.tryFetchVerifiedBlock(url, cidStr, timeoutMs);
+        if (!result) {
+          miner.failures = (miner.failures ?? 0) + 1;
+          return null;
         }
+        const { data, elapsedMs } = result;
+        miner.latencyMs = miner.latencyMs !== undefined
+          ? Math.round(miner.latencyMs * 0.7 + elapsedMs * 0.3)
+          : elapsedMs;
+        miner.failures = 0;
+
+        const blocksOf64KB = Math.max(1, Math.ceil(data.length / (64 * 1024)));
+        const bonus = elapsedMs <= this.fastResponseThresholdMs ? this.speedBonusMultiplier : 1.0;
+        miner.rewardBalance_uSOV += blocksOf64KB * this.rewardRate_uSOVPer64KB * bonus;
+        miner.totalBytesServed += data.length;
+        miner.reputationScore = Math.min(100, miner.reputationScore + 1);
+        miner.lastActive = Date.now();
+
+        this._totalBytesRecovered += data.length;
+        this._totalFallbacksServed += 1;
+        return data;
       } catch (err) {
         if (err instanceof IntegrityVerificationError) {
           miner.reputationScore = Math.max(0, miner.reputationScore - 20);
           throw err;
         }
-        // Network failure; try next miner
+        miner.failures = (miner.failures ?? 0) + 1;
+        return null;
       }
-    }
+    });
+    if (minerData) return minerData;
 
-    // 2. Fall back to registered cold edge gateways
-    for (const gw of this.gateways) {
-      if (!gw.isOnline) continue;
+    // 2. Fall back to concurrent batch racing across healthy gateways ordered by priority
+    const onlineGateways = this.gateways.filter(gw => gw.isOnline);
+    return this.raceHedgedBatch(onlineGateways, async (gw) => {
       const url = gw.urlTemplate.replace('{cid}', cidStr);
       try {
-        const data = await this.fetchData(url, timeoutMs);
-        if (data && data.length > 0) {
-          this.verifyIntegrity(cidStr, data);
-          gw.failures = 0;
-          this._totalBytesRecovered += data.length;
-          this._totalFallbacksServed += 1;
-          return data;
+        const result = await this.tryFetchVerifiedBlock(url, cidStr, timeoutMs);
+        if (!result) {
+          gw.failures += 1;
+          if (gw.failures >= 3) gw.isOnline = false;
+          return null;
         }
+        gw.failures = 0;
+        this._totalBytesRecovered += result.data.length;
+        this._totalFallbacksServed += 1;
+        return result.data;
       } catch (err) {
-        if (err instanceof IntegrityVerificationError) {
-          throw err;
-        }
+        if (err instanceof IntegrityVerificationError) throw err;
         gw.failures += 1;
-        if (gw.failures >= 3) {
-          gw.isOnline = false;
-        }
+        if (gw.failures >= 3) gw.isOnline = false;
+        return null;
       }
-    }
-
-    return null;
+    });
   }
 
   private async fetchData(url: string, timeoutMs: number): Promise<Uint8Array | null> {

@@ -10,6 +10,7 @@ export default [
       '**/coverage/**',
       '**/*.d.ts',
       '**/.sovra-storage*/**',
+      '**/.test-e2e-storage/**',
       '**/chain/data/**',
     ],
   },

@@ -78,6 +78,7 @@ describe('Sovereign RFC 6238 TOTP Authenticator & Multi-Factor Security Suite', 
       securityPin: initialPin,
     });
     expect(regRes.ok).toBe(true);
+    if (!regRes.ok) return;
     expect(regRes.recoveryPhrase).toBeDefined();
     const user = sovraDb.findUserByDid(did);
     expect(user).toBeDefined();

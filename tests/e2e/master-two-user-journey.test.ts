@@ -3,7 +3,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const BASE_URL = process.env.SOVRA_BASE_URL || 'http://localhost:3001';
-const STORAGE_FILE = path.resolve(process.cwd(), '.sovra-storage-dev', 'dynamic-social-state.json');
+const STORAGE_FILE = path.resolve(
+  process.env.SOVRA_STORAGE_DIR || path.resolve(process.cwd(), '.sovra-storage-dev'),
+  'dynamic-social-state.json'
+);
 
 describe('Sovra Master Two-User & Multi-Format End-to-End Journey', { timeout: 30000 }, () => {
   let userAToken: string;
@@ -358,7 +361,7 @@ describe('Sovra Master Two-User & Multi-Format End-to-End Journey', { timeout: 3
   // STEP 5: Verify Authorization Boundaries Before Friending
   it('enforces that User B cannot see Friends-Only or Only-Me posts prior to friending', async () => {
     // In feed list for User B:
-    const feedRes = await fetch(`${BASE_URL}/api/feed/list`, {
+    const feedRes = await fetch(`${BASE_URL}/api/feed/list?limit=50`, {
       headers: { Authorization: `Bearer ${userBToken}` },
     });
     expect(feedRes.status).toBe(200);
@@ -443,7 +446,7 @@ describe('Sovra Master Two-User & Multi-Format End-to-End Journey', { timeout: 3
     expect(friendsDirectData.post.caption).toContain('Friends-Only alpha');
 
     // User B in feed list now sees Friends-Only post
-    const feedResAfter = await fetch(`${BASE_URL}/api/feed/list`, {
+    const feedResAfter = await fetch(`${BASE_URL}/api/feed/list?limit=50`, {
       headers: { Authorization: `Bearer ${userBToken}` },
     });
     const feedDataAfter = await feedResAfter.json();

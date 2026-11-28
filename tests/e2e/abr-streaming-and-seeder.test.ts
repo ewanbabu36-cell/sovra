@@ -51,6 +51,7 @@ describe('Cycle 2: ABR Streaming & P2P Seeder Relay Reward Pipeline', () => {
     const url = new URL(`http://localhost:3001${urlPath}`);
     const REELS_DIR = path.resolve(process.cwd(), '.sovra-storage-dev', 'reels');
 
+    const authedDid = bodyJson?.seederDid || 'did:key:test_user';
     const ctx = {
       req,
       res,
@@ -61,8 +62,8 @@ describe('Cycle 2: ABR Streaming & P2P Seeder Relay Reward Pipeline', () => {
         body: bodyJson ? JSON.stringify(bodyJson) : '',
         ok: true,
       }),
-      resolvePrincipal: () => ({ did: 'did:key:test_user', handle: 'tester' } as any),
-      enforceAuth: () => ({ did: 'did:key:test_user', handle: 'tester' } as any),
+      resolvePrincipal: () => ({ did: authedDid, handle: 'tester' } as any),
+      enforceAuth: () => ({ did: authedDid, handle: 'tester' } as any),
       getResult: () => ({
         statusCode,
         headers,

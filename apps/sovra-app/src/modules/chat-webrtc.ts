@@ -17,6 +17,39 @@ export interface CallSession {
   state: 'connecting' | 'connected' | 'ended';
 }
 
+function resolveWebRtcIceServers(): RTCIceServer[] {
+  if (typeof window !== 'undefined') {
+    const win = window as any;
+    if (Array.isArray(win.SOVRA_ICE_SERVERS)) {
+      return win.SOVRA_ICE_SERVERS;
+    }
+    try {
+      const saved = window.localStorage?.getItem('sovra_ice_servers');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      const customStun = window.localStorage?.getItem('sovra_custom_stun_v1');
+      if (customStun) {
+        const parsedStun = JSON.parse(customStun);
+        if (Array.isArray(parsedStun) && parsedStun.length > 0) {
+          const mapped = parsedStun
+            .map((entry: unknown) => String(entry ?? '').trim())
+            .filter(Boolean)
+            .map((entry: string) => ({
+              urls: /^(stun|stuns|turn|turns):/i.test(entry) ? entry : `stun:${entry}`,
+            }));
+          if (mapped.length > 0) return mapped;
+        }
+      }
+      if (win.SOVRA_ALLOW_PUBLIC_STUN === true || window.localStorage?.getItem('sovra_allow_public_stun') === 'true') {
+        return [{ urls: 'stun:stun.l.google.com:19302' }];
+      }
+    } catch {}
+  }
+  return [];
+}
+
 export function initChatWebRtcModule(): void {
   if (typeof window === 'undefined') return;
 
@@ -68,12 +101,9 @@ export function initChatWebRtcModule(): void {
         console.warn('[WebRTC] Media stream access notice:', err);
       }
 
-      // 1. Initialize Direct WebRTC Peer Connection with STUN Candidates
+      // 1. Initialize Direct WebRTC Peer Connection with Configured ICE Servers
       const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478' },
-        ],
+        iceServers: resolveWebRtcIceServers(),
       });
       this.peerConnection = pc;
 
@@ -153,7 +183,7 @@ export function initChatWebRtcModule(): void {
         }
 
         const pc = new RTCPeerConnection({
-          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+          iceServers: resolveWebRtcIceServers(),
         });
         this.peerConnection = pc;
 

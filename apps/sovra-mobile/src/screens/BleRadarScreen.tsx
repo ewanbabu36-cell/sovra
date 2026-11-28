@@ -25,38 +25,7 @@ export interface BleRadarScreenProps {
 }
 
 export function BleRadarScreen({ onClose, onDirectPing }: BleRadarScreenProps): React.JSX.Element {
-  const [peers, setPeers] = useState<MobileBlePeer[]>([
-    {
-      peerDid: 'did:sovra:peer_alpha_01',
-      handle: '@satellite_relay',
-      displayName: 'Alpha Orbit Node',
-      rssiDbm: -49,
-      distanceMeters: 2.1,
-      angleDeg: 45,
-      transport: 'BLE_GATT_5.3',
-      signalQuality: 'EXCELLENT',
-    },
-    {
-      peerDid: 'did:sovra:peer_beta_02',
-      handle: '@mesh_ranger',
-      displayName: 'Mesh Ranger 9',
-      rssiDbm: -65,
-      distanceMeters: 5.8,
-      angleDeg: 140,
-      transport: 'BLE_MESH_RELAY',
-      signalQuality: 'GOOD',
-    },
-    {
-      peerDid: 'did:sovra:peer_gamma_03',
-      handle: '@zero_lag',
-      displayName: 'Zero Lag Courier',
-      rssiDbm: -79,
-      distanceMeters: 14.2,
-      angleDeg: 265,
-      transport: 'BLE_GATT_5.3',
-      signalQuality: 'FAIR',
-    },
-  ]);
+  const [peers, setPeers] = useState<MobileBlePeer[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [lastPingFeedback, setLastPingFeedback] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);

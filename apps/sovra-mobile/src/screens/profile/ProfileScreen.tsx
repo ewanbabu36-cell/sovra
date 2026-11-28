@@ -182,8 +182,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             if (onShareProfile) {
               onShareProfile();
             } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-              navigator.clipboard.writeText(`https://sovra.network/?peer=${profile.did}`);
-              alert('Profile link copied to clipboard!');
+              navigator.clipboard.writeText(`sovra://peer/${profile.did}`);
+              alert('Sovereign peer link copied to clipboard!');
             }
           }}
           style={{

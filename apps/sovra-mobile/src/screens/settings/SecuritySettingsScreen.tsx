@@ -38,8 +38,8 @@ export const SecuritySettingsScreen: React.FC<SecuritySettingsScreenProps> = ({
     setIsSyncing(true);
     setSyncStatus('Reading & hashing contacts locally with SHA-256...');
     try {
-      // Mock demo phone contacts normalized for test demonstration
-      const sampleContacts = ['+919876543210', '+14155552671', 'alice@sovra.network', 'bob@sovra.network'];
+      // Local sample identifiers formatted for zero-domain demo discovery
+      const sampleContacts = ['+919876543210', '+14155552671', 'did:key:z6MksDemoAlice', 'did:key:z6MksDemoBob'];
       const res = await discoverContacts(sampleContacts);
       if (res.ok) {
         setDiscoveredContacts(res.matches);

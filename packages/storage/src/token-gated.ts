@@ -20,8 +20,17 @@ export interface TokenGatedMetadata {
   readonly envelopeCid: string;
   readonly creatorDid: string;
   readonly minVoucherAmount: bigint;
+  readonly minHoldUsov?: bigint | undefined;
   readonly nonceHex: string;
   readonly byteLength: number;
+}
+
+export interface HoldAccessProof {
+  readonly holderDid: string;
+  readonly contentCid: string;
+  readonly checkedAt: number;
+  readonly liquidUsov: bigint;
+  readonly stakedUsov: bigint;
 }
 
 export interface UnlockResult {
@@ -165,5 +174,56 @@ export class TokenGatedStorageEngine {
 
   public getMetadata(contentCid: string): TokenGatedMetadata | undefined {
     return this.metadataStore.get(contentCid);
+  }
+
+  /**
+   * Registers Hold-to-Access gating (Pillar 5: Fan holds/stakes >= minHoldUsov without spending).
+   */
+  public async encryptAndStoreHoldGated(
+    plaintext: Uint8Array,
+    creatorDid: string,
+    minHoldUsov: bigint,
+    customKey?: Uint8Array,
+  ): Promise<{ contentCid: CID; envelopeCid: CID; key: Uint8Array }> {
+    const res = await this.encryptAndStore(plaintext, creatorDid, 0n, customKey);
+    const existing = this.metadataStore.get(res.contentCid.toString());
+    if (existing) {
+      this.metadataStore.set(res.contentCid.toString(), {
+        ...existing,
+        minHoldUsov,
+      });
+    }
+    return res;
+  }
+
+  /**
+   * Unlocks content when fan's held + staked balance satisfies minHoldUsov (zero balance spent).
+   */
+  public async unlockWithHoldProof(
+    contentCidOrStr: CID | string,
+    proof: HoldAccessProof,
+    contentKey: Uint8Array,
+    envelopeCidOverride?: CID,
+  ): Promise<{ plaintext: Uint8Array; totalHeldUsov: bigint; spentUsov: 0n }> {
+    const cidStr = contentCidOrStr.toString();
+    const meta = this.metadataStore.get(cidStr);
+    if (!meta) {
+      throw new ContentNotFoundError(cidStr, { reason: 'Token-gated metadata not found' });
+    }
+    const required = meta.minHoldUsov ?? 0n;
+    const totalHeldUsov = proof.liquidUsov + proof.stakedUsov;
+    if (totalHeldUsov < required) {
+      throw new StorageError(
+        `Hold-to-Access gate not met: held+staked ${totalHeldUsov} uSOV < required ${required} uSOV`,
+        'ERR_INSUFFICIENT_HOLD_BALANCE',
+      );
+    }
+    const targetEnvelopeCid = envelopeCidOverride ?? CID.parse(meta.envelopeCid);
+    const ciphertext = await this.blockstore.get(targetEnvelopeCid);
+    if (!ciphertext) {
+      throw new ContentNotFoundError(cidStr, { reason: 'Encrypted ciphertext envelope not found' });
+    }
+    const plaintext = decryptChaCha20Poly1305(contentKey, hexToBytes(meta.nonceHex), ciphertext);
+    return { plaintext, totalHeldUsov, spentUsov: 0n };
   }
 }

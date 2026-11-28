@@ -54,9 +54,10 @@ func (c *ContractStorageAdapter) DeleteContractKey(contractAddr string, key []by
 
 // Keeper manages CosmWasm contract storage, execution, and state sandboxing
 type Keeper struct {
-	mu     sync.RWMutex
-	config types.WasmConfig
-	vm     *vm.WasmVM
+	mu          sync.RWMutex
+	config      types.WasmConfig
+	vm          *vm.WasmVM
+	burnHandler func(s store.KVStore, contractAddr string, amount math.Int) error
 }
 
 func NewKeeper(config types.WasmConfig) *Keeper {
@@ -64,6 +65,13 @@ func NewKeeper(config types.WasmConfig) *Keeper {
 		config: config,
 		vm:     vm.NewWasmVM(config),
 	}
+}
+
+// SetBurnHandler attaches a protocol burn callback for CosmWasm BankMsg.Burn submessages.
+func (k *Keeper) SetBurnHandler(handler func(s store.KVStore, contractAddr string, amount math.Int) error) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.burnHandler = handler
 }
 
 // StoreCode saves new WASM bytecode and allocates a unique CodeID
@@ -297,6 +305,21 @@ func (k *Keeper) processMessages(s store.KVStore, bk *bank.Keeper, contractAddr 
 				}
 				if err := bk.SendCoins(s, contractAddr, sendMsg.ToAddress, amt); err != nil {
 					return fmt.Errorf("contract bank send failed: %w", err)
+				}
+			}
+		}
+		if subMsg.Msg.Bank != nil && subMsg.Msg.Bank.Burn != nil {
+			burnMsg := subMsg.Msg.Bank.Burn
+			for _, coin := range burnMsg.Amount {
+				amt, ok := math.NewIntFromString(coin.Amount)
+				if !ok || !amt.IsPositive() {
+					return fmt.Errorf("invalid bank burn amount: %s", coin.Amount)
+				}
+				if k.burnHandler == nil {
+					return fmt.Errorf("protocol burn handler not configured for wasm submessage")
+				}
+				if err := k.burnHandler(s, contractAddr, amt); err != nil {
+					return fmt.Errorf("contract bank burn failed: %w", err)
 				}
 			}
 		}

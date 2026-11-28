@@ -426,4 +426,24 @@ describe('services/api Security Middleware & Controller Hardening (BLK-06)', () 
     expect(feedReq.res.getStatusCode()).toBe(200);
     expect(feedReq.res.getBody().ok).toBe(true);
   });
+
+  it('enforces strict production Content-Security-Policy without unsafe-eval & exposes Redis health', async () => {
+    const { SecurityMiddleware } = await import('../src/middleware/security.middleware.js');
+    const prevEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const mw = new SecurityMiddleware();
+      const hdrs: Record<string, string> = {};
+      const fakeReq = { headers: {}, socket: { remoteAddress: '127.0.0.1' } } as any;
+      const fakeRes = { setHeader: (k: string, v: string) => { hdrs[k.toLowerCase()] = v; } } as any;
+      mw.applySecurityHeaders(fakeReq, fakeRes);
+      const csp = hdrs['content-security-policy'] || '';
+      expect(csp).toContain("script-src 'self'");
+      expect(csp).not.toContain('unsafe-eval');
+      const health = await mw['sharedStore'].healthCheck();
+      expect(health.ok).toBe(true);
+    } finally {
+      process.env.NODE_ENV = prevEnv;
+    }
+  });
 });

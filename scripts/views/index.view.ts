@@ -80,12 +80,8 @@ export function renderAppHtml(params: RenderAppHtmlParams): string {
   const livePeers = sovraDb.getAllPeers().slice(0, 30);
   const liveUsers = sovraDb.getAllUsers().slice(0, 30);
   const liveReels = sovraDb.getAllReels().slice(0, 15);
-  let hostUser = sovraDb.findUserByDid(masterKey.did);
-  if (hostUser && !hostUser.sessionToken) {
-    hostUser.sessionToken = 'stk_' + crypto.randomBytes(24).toString('hex');
-    sovraDb.save();
-  }
-  const hostSessionToken = hostUser?.sessionToken || '';
+  const hostUser = sovraDb.findUserByDid(masterKey.did);
+  const hostSessionToken = '';
   const isCreatorModeActive = true;
 
   const layoutCtx: AppLayoutContext = {
@@ -147,7 +143,6 @@ export function renderAppHtml(params: RenderAppHtmlParams): string {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700;800&family=Roboto+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/sovra.css?v=2.5.0">
   <style>
 ${renderGlobalStyles(isCreatorModeActive)}
   </style>
@@ -156,10 +151,8 @@ ${renderGlobalStyles(isCreatorModeActive)}
       hostSession: {
         did: masterKey.did,
         handle: hostUser ? hostUser.handle : "@laptop_host",
-        token: hostSessionToken,
       },
       knownHandleDids: Object.fromEntries(sovraDb.getAllUsers().map(u => [u.handle.toLowerCase(), u.did])),
-      knownUserTokens: Object.fromEntries(sovraDb.getAllUsers().filter(u => u.sessionToken).map(u => [u.did, u.sessionToken])),
       livePosts,
       reelsStore,
       creatorProfiles,

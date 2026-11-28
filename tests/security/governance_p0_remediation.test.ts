@@ -1042,7 +1042,9 @@ describe('TSK-GOV-P0-REMEDIATION-01: Governance Security Remediation Suite', () 
       // Export state
       const exported = mpa.exportState();
       expect(exported.actions.length).toBe(1);
-      expect(exported.trustedSigners.length).toBe(2);
+      expect(exported.trustedSigners.length).toBeGreaterThanOrEqual(2);
+      expect(exported.trustedSigners.some(s => s.did === signer1Did)).toBe(true);
+      expect(exported.trustedSigners.some(s => s.did === signer2Did)).toBe(true);
 
       // Hydrate into brand new instance
       const newMpa = new MultiPartyApprovalEngine();

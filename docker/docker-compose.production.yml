@@ -18,7 +18,11 @@ services:
       - SOVRA_STORAGE_DIR=/app/.sovra-storage-prod
       - SOVRA_P2P_PORT=4001
       - SOVRA_HTTP_PORT=3001
-      - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY:-sovra-production-admin-secret-key-32chars!}
+      - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY:?Set ADMIN_SECRET_KEY in environment or Vault}
+      - SESSION_SECRET=${SESSION_SECRET:?Set SESSION_SECRET in environment or Vault}
+      - SOVRA_INTERNAL_SERVICE_SECRET=${SOVRA_INTERNAL_SERVICE_SECRET:?Set SOVRA_INTERNAL_SERVICE_SECRET}
+      - DATABASE_URL=${DATABASE_URL:-}
+      - REDIS_URL=${REDIS_URL:-}
       - SOVRA_TURN_SERVERS=${SOVRA_TURN_SERVERS:-stun:stun.l.google.com:19302}
       - SOVRA_TURN_USERNAME=${SOVRA_TURN_USERNAME:-}
       - SOVRA_TURN_CREDENTIAL=${SOVRA_TURN_CREDENTIAL:-}
@@ -68,8 +72,8 @@ services:
     container_name: sovra-coturn-relay
     restart: always
     environment:
-      - SOVRA_TURN_SECRET=${SOVRA_TURN_SECRET:-sovra-dev-turn-secret-change-in-prod-replace-with-env!}
-    command: ["-c", "/etc/coturn/turnserver.conf", "--static-auth-secret=${SOVRA_TURN_SECRET:-sovra-dev-turn-secret-change-in-prod-replace-with-env!}"]
+      - SOVRA_TURN_SECRET=${SOVRA_TURN_SECRET:?Set SOVRA_TURN_SECRET in environment or Vault}
+    command: ["-c", "/etc/coturn/turnserver.conf", "--static-auth-secret=${SOVRA_TURN_SECRET:?Set SOVRA_TURN_SECRET in environment or Vault}"]
     volumes:
       - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
     ports:

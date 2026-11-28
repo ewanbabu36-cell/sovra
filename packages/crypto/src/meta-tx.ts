@@ -13,7 +13,7 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 export interface MetaTransactionRequest {
   from: string; // Caller DID or sovereign address
   to: string; // Target recipient DID or contract
-  action: 'TRANSFER' | 'TIP' | 'POST' | 'DELEGATE';
+  action: 'TRANSFER' | 'TIP' | 'POST' | 'DELEGATE' | 'SUBSCRIBE' | 'REGISTER_HANDLE' | 'STORAGE_RENT' | 'BOOST';
   amount?: string;
   data?: Record<string, any>;
   nonce: number;

@@ -11,8 +11,11 @@
   },
   "scripts": {
     "start": "node --experimental-strip-types scripts/dev-server.ts",
+    "node:volunteer": "node --experimental-strip-types scripts/volunteer-node.ts",
+    "node:seed": "node --experimental-strip-types scripts/bootstrap-node.ts",
     "build": "node --experimental-strip-types scripts/build-client-bundle.ts",
     "build:client": "node --experimental-strip-types scripts/build-client-bundle.ts",
+    "build:mobile": "node --experimental-strip-types apps/sovra-mobile/build-mobile-bundle.ts",
     "test:prod-build": "node --check scripts/dev-server.ts && node --check scripts/database-engine.ts && node --experimental-strip-types scripts/build-client-bundle.ts",
     "dev": "node --experimental-strip-types scripts/dev-server.ts",
     "tunnel:ngrok": "node scripts/run-ngrok.js",
@@ -43,5 +46,10 @@
   "overrides": {
     "tinypool": ">=2.1.2",
     "vite": ">=7.3.7"
+  },
+  "dependencies": {
+    "@types/pg": "^8.23.1",
+    "ioredis": "^6.1.0",
+    "pg": "^8.23.1"
   }
 }

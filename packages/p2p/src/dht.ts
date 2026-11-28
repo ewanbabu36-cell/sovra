@@ -1,6 +1,7 @@
 import { Result, ok } from '@sovra/shared';
-import { sha256 } from '@sovra/crypto';
+import { sha256, verifyEd25519, hexToBytes, bytesToHex } from '@sovra/crypto';
 import { BootstrapConfig, DHTRecord, DHTService, PeerInfo } from './types.js';
+import { extractPublicKeyFromPeerId } from './identity.js';
 
 export const K_BUCKET_SIZE = 20;
 export const HASH_BITS = 256;
@@ -8,12 +9,15 @@ export const ALPHA_CONCURRENCY = 3;
 export const MAX_RECORDS_COUNT = 10000;
 export const MAX_PROVIDERS_PER_KEY = 50;
 export const DEFAULT_PROVIDER_TTL_SECONDS = 86400; // 24 hours
+export const MAX_DHT_FUTURE_SKEW_SECONDS = 300;
+export const MAX_PEER_MULTIADDRS = 16;
 
 export interface ProviderRecord {
   readonly peerId: string;
   readonly addresses: readonly string[];
   readonly registeredAt: number;
   readonly expiresAt: number;
+  readonly signature?: string | undefined;
 }
 
 export type DhtRpcType =
@@ -84,6 +88,7 @@ export function getBucketIndex(dist: Uint8Array): number {
 }
 
 export const MAX_PEERS_PER_SUBNET = 2;
+export const MAX_ONION_PEERS_TOTAL = 8;
 
 export function extractSubnetPrefix(addr: string): string | null {
   const ip4Match = addr.match(/\/ip4\/(\d+\.\d+\.\d+)\.\d+/);
@@ -93,10 +98,17 @@ export function extractSubnetPrefix(addr: string): string | null {
   }
   const ip6Match = addr.match(/\/ip6\/([0-9a-fA-F:]+)/);
   if (ip6Match && ip6Match[1]) {
-    const parts = ip6Match[1].split(':');
+    const raw6 = ip6Match[1].toLowerCase();
+    if (raw6 === '::1') return null;
+    const parts = raw6.split(':');
     return `ip6:${parts.slice(0, 3).join(':')}`;
   }
   return null;
+}
+
+function isOnionAddr(addr: string): boolean {
+  const lower = addr.toLowerCase();
+  return lower.includes('/onion/') || lower.includes('/onion3/');
 }
 
 export class KademliaBucket {
@@ -165,11 +177,69 @@ export class KademliaBucket {
  * - Wire RPC handlers (FIND_NODE, FIND_VALUE, PUT_VALUE, ADD_PROVIDER, GET_PROVIDERS)
  * - Bounded signed record store & provider registry with TTL
  */
+const textEncoder = new TextEncoder();
+
+function coerceUint8Array(val: unknown): Uint8Array {
+  if (val instanceof Uint8Array) return val;
+  if (Array.isArray(val)) return Uint8Array.from(val);
+  if (val && typeof val === 'object') {
+    if (Array.isArray((val as any).__u8)) {
+      return Uint8Array.from((val as any).__u8);
+    }
+    const obj = val as Record<string, unknown>;
+    const keys = Object.keys(obj);
+    if (keys.length > 0 && keys.every((k, i) => k === String(i) && typeof obj[k] === 'number')) {
+      return Uint8Array.from(keys.map(k => obj[k] as number));
+    }
+  }
+  return new Uint8Array(0);
+}
+
+export function buildDhtRecordSignableBytes(
+  record: Pick<DHTRecord, 'key' | 'value' | 'authorPeerId' | 'sequenceNumber' | 'timestamp' | 'expiresAt'>,
+): Uint8Array {
+  const valBytes = coerceUint8Array(record.value);
+  const valHashHex = bytesToHex(sha256(valBytes));
+  const canonical = JSON.stringify({
+    tag: 'SOVRA-DHT-REC-v1',
+    key: record.key,
+    authorPeerId: record.authorPeerId,
+    sequenceNumber: record.sequenceNumber.toString(),
+    timestamp: record.timestamp,
+    expiresAt: record.expiresAt ?? 0,
+    valueSha256Hex: valHashHex,
+  });
+  return sha256(textEncoder.encode(canonical));
+}
+
+export function buildProviderRecordSignableBytes(
+  targetKey: string,
+  provider: Pick<ProviderRecord, 'peerId' | 'addresses' | 'registeredAt' | 'expiresAt'>,
+): Uint8Array {
+  const canonical = JSON.stringify({
+    tag: 'SOVRA-DHT-PROV-v1',
+    targetKey,
+    peerId: provider.peerId,
+    addresses: [...provider.addresses],
+    registeredAt: provider.registeredAt,
+    expiresAt: provider.expiresAt,
+  });
+  return sha256(textEncoder.encode(canonical));
+}
+
+export interface KademliaDhtSecurityOptions {
+  readonly requireSignedRecords?: boolean;
+  readonly signDigest?: (digest: Uint8Array) => Uint8Array;
+}
+
 export class KademliaDHT implements DHTService {
   private localKeyBytes: Uint8Array;
   private buckets: KademliaBucket[];
   private records = new Map<string, DHTRecord>();
   private providers = new Map<string, Map<string, ProviderRecord>>(); // key -> Map<peerId, ProviderRecord>
+  private localAddresses: string[] = [];
+  private readonly requireSignedRecords: boolean;
+  private readonly signDigest?: ((digest: Uint8Array) => Uint8Array) | undefined;
   public readonly bootstrapConfig: BootstrapConfig;
 
   constructor(
@@ -179,9 +249,12 @@ export class KademliaDHT implements DHTService {
       targetPeer: PeerInfo,
       msg: DhtRpcMessage,
     ) => Promise<DhtRpcResponse>,
+    securityOptions: KademliaDhtSecurityOptions = {},
   ) {
     this.localKeyBytes = keyToBytes(localPeerId);
     this.buckets = Array.from({ length: HASH_BITS }, () => new KademliaBucket());
+    this.requireSignedRecords = Boolean(securityOptions.requireSignedRecords);
+    this.signDigest = securityOptions.signDigest;
     this.bootstrapConfig = {
       bootstrapNodes: config?.bootstrapNodes ?? [],
       communityNodes: config?.communityNodes ?? [],
@@ -190,12 +263,59 @@ export class KademliaDHT implements DHTService {
     };
   }
 
+  public setLocalAddresses(addrs: readonly string[]): void {
+    this.localAddresses = Array.from(new Set(addrs.filter(Boolean))).slice(0, MAX_PEER_MULTIADDRS);
+  }
+
   public get allPeersCount(): number {
     return this.buckets.reduce((acc, b) => acc + b.peers.length, 0);
   }
 
+  private extractPeerQuotas(addresses: readonly string[]): { subnets: Set<string>; hasOnion: boolean } {
+    const subnets = new Set<string>();
+    let hasOnion = false;
+    for (const addr of addresses.slice(0, MAX_PEER_MULTIADDRS)) {
+      if (isOnionAddr(addr)) {
+        hasOnion = true;
+        continue;
+      }
+      const sub = extractSubnetPrefix(addr);
+      if (sub) subnets.add(sub);
+    }
+    return { subnets, hasOnion };
+  }
+
+  private countGlobalPrefixAndOnions(excludePeerId?: string): { subnetCounts: Map<string, number>; onionCount: number } {
+    const subnetCounts = new Map<string, number>();
+    let onionCount = 0;
+    for (const bucket of this.buckets) {
+      for (const existing of bucket.peers) {
+        if (excludePeerId && existing.id.peerId === excludePeerId) continue;
+        const { subnets, hasOnion } = this.extractPeerQuotas(existing.addresses);
+        if (hasOnion) onionCount++;
+        for (const sub of subnets) {
+          subnetCounts.set(sub, (subnetCounts.get(sub) ?? 0) + 1);
+        }
+      }
+    }
+    return { subnetCounts, onionCount };
+  }
+
   public addPeer(peer: PeerInfo, isPeerResponsiveFn?: (peer: PeerInfo) => boolean): boolean {
-    if (peer.id.peerId === this.localPeerId) return false;
+    if (!peer?.id?.peerId || peer.id.peerId === this.localPeerId) return false;
+    if (!Array.isArray(peer.addresses) || peer.addresses.length > MAX_PEER_MULTIADDRS) return false;
+    const { subnets, hasOnion } = this.extractPeerQuotas(peer.addresses);
+    if (subnets.size > 0 || hasOnion) {
+      const { subnetCounts, onionCount } = this.countGlobalPrefixAndOnions(peer.id.peerId);
+      if (hasOnion && onionCount >= MAX_ONION_PEERS_TOTAL) {
+        return false; // Bound .onion Sybil flooding globally across routing table
+      }
+      for (const subnet of subnets) {
+        if ((subnetCounts.get(subnet) ?? 0) >= MAX_PEERS_PER_SUBNET) {
+          return false; // Global anti-eclipse defense across ALL multiaddrs & ALL buckets
+        }
+      }
+    }
     const targetBytes = keyToBytes(peer.id.peerId);
     const dist = xorDistance(this.localKeyBytes, targetBytes);
     const bucketIndex = getBucketIndex(dist);
@@ -300,26 +420,44 @@ export class KademliaDHT implements DHTService {
     return sortedAll.slice(0, count).map(e => e.peer);
   }
 
-  public async putValue(key: string, value: Uint8Array): Promise<Result<void>> {
+  public async putValue(key: string, value: Uint8Array, ttlSeconds?: number): Promise<Result<void>> {
     // Enforce bounded records store
     if (this.records.size >= MAX_RECORDS_COUNT) {
       const oldestKey = this.records.keys().next().value;
       if (oldestKey) this.records.delete(oldestKey);
     }
 
-    const record: DHTRecord = {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const prev = this.records.get(key);
+    const baseSeq = BigInt(Date.now());
+    const sequenceNumber = prev && prev.sequenceNumber >= baseSeq ? prev.sequenceNumber + 1n : baseSeq;
+    const unsignedRecord = {
       key,
       value,
       authorPeerId: this.localPeerId,
-      sequenceNumber: BigInt(Date.now()),
-      timestamp: Math.floor(Date.now() / 1000),
+      sequenceNumber,
+      timestamp: nowSec,
+      ...(ttlSeconds !== undefined && ttlSeconds > 0 ? { expiresAt: nowSec + ttlSeconds } : {}),
+    };
+    const signature = this.signDigest
+      ? bytesToHex(this.signDigest(buildDhtRecordSignableBytes(unsignedRecord)))
+      : undefined;
+    const record: DHTRecord = {
+      ...unsignedRecord,
+      ...(signature ? { signature } : {}),
     };
     this.records.set(key, record);
     return ok(undefined);
   }
 
   public async getValue(key: string): Promise<Result<DHTRecord | undefined>> {
-    return ok(this.records.get(key));
+    const rec = this.records.get(key);
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (rec && rec.expiresAt !== undefined && rec.expiresAt <= nowSec) {
+      this.records.delete(key);
+      return ok(undefined);
+    }
+    return ok(rec);
   }
 
   public async provide(key: string): Promise<Result<void>> {
@@ -331,11 +469,18 @@ export class KademliaDHT implements DHTService {
       if (oldestProvider) providerMap.delete(oldestProvider);
     }
 
-    const providerRecord: ProviderRecord = {
+    const unsignedProvider = {
       peerId: this.localPeerId,
-      addresses: [],
+      addresses: [...this.localAddresses],
       registeredAt: now,
       expiresAt: now + DEFAULT_PROVIDER_TTL_SECONDS,
+    };
+    const signature = this.signDigest
+      ? bytesToHex(this.signDigest(buildProviderRecordSignableBytes(key, unsignedProvider)))
+      : undefined;
+    const providerRecord: ProviderRecord = {
+      ...unsignedProvider,
+      ...(signature ? { signature } : {}),
     };
     providerMap.set(this.localPeerId, providerRecord);
     this.providers.set(key, providerMap);
@@ -411,10 +556,81 @@ export class KademliaDHT implements DHTService {
     return Array.from(activeProviders).slice(0, count);
   }
 
+  private verifyRecordCryptographicAuth(record: DHTRecord): { ok: true; verified: boolean } | { ok: false; error: string } {
+    if (!record.signature) {
+      return this.requireSignedRecords
+        ? { ok: false, error: 'Missing Ed25519 signature on DHT record' }
+        : { ok: true, verified: false };
+    }
+    try {
+      const pubBytes = extractPublicKeyFromPeerId(record.authorPeerId);
+      const sigBytes = hexToBytes(record.signature);
+      if (sigBytes.length !== 64) {
+        return { ok: false, error: 'Malformed DHT record signature length' };
+      }
+      const digest = buildDhtRecordSignableBytes(record);
+      if (!verifyEd25519(pubBytes, digest, sigBytes)) {
+        return { ok: false, error: 'Invalid Ed25519 signature on DHT record' };
+      }
+      return { ok: true, verified: true };
+    } catch {
+      return { ok: false, error: 'Invalid Ed25519 authorPeerId or signature encoding' };
+    }
+  }
+
+  private verifyProviderCryptographicAuth(
+    targetKey: string,
+    provider: ProviderRecord,
+  ): { ok: true; verified: boolean } | { ok: false; error: string } {
+    if (!provider.signature) {
+      return this.requireSignedRecords
+        ? { ok: false, error: 'Missing Ed25519 signature on provider record' }
+        : { ok: true, verified: false };
+    }
+    try {
+      const pubBytes = extractPublicKeyFromPeerId(provider.peerId);
+      const sigBytes = hexToBytes(provider.signature);
+      if (sigBytes.length !== 64) {
+        return { ok: false, error: 'Malformed provider record signature length' };
+      }
+      const digest = buildProviderRecordSignableBytes(targetKey, provider);
+      if (!verifyEd25519(pubBytes, digest, sigBytes)) {
+        return { ok: false, error: 'Invalid Ed25519 signature on provider record' };
+      }
+      return { ok: true, verified: true };
+    } catch {
+      return { ok: false, error: 'Invalid Ed25519 provider peerId or signature encoding' };
+    }
+  }
+
+  private validateProviderAddressesOwnership(provider: ProviderRecord): string | null {
+    if (!Array.isArray(provider.addresses) || provider.addresses.length > MAX_PEER_MULTIADDRS) {
+      return 'Provider addresses missing or exceeds maximum multiaddr limit';
+    }
+    for (const rawAddr of provider.addresses) {
+      if (typeof rawAddr !== 'string' || rawAddr.trim().length === 0) {
+        return 'Malformed empty provider multiaddr';
+      }
+      const p2pMatch = rawAddr.match(/\/p2p\/([^/]+)/);
+      if (p2pMatch && p2pMatch[1] && p2pMatch[1] !== provider.peerId) {
+        return `Provider multiaddr /p2p/${p2pMatch[1]} does not match claimed peerId ${provider.peerId}`;
+      }
+    }
+    return null;
+  }
+
   /**
    * Handles incoming Kademlia RPC messages from remote peers over the wire.
+   * Enforces Noise_XX authenticated sender binding, Ed25519 record signatures,
+   * anti-spoofing, sequence monotonicity, replay/expiry checks, and TTL bounds.
    */
-  public handleRpcMessage(msg: DhtRpcMessage): DhtRpcResponse {
+  public handleRpcMessage(msg: DhtRpcMessage, authenticatedSenderPeerId?: string): DhtRpcResponse {
+    if (authenticatedSenderPeerId && msg.senderPeerId && msg.senderPeerId !== authenticatedSenderPeerId) {
+      return { type: msg.type, success: false, error: 'Authenticated senderPeerId mismatch' };
+    }
+    const effectiveSender = authenticatedSenderPeerId ?? msg.senderPeerId;
+    const now = Math.floor(Date.now() / 1000);
+
     switch (msg.type) {
       case 'FIND_NODE': {
         const closest = this.getLocalClosestPeers(msg.targetKey, K_BUCKET_SIZE);
@@ -423,35 +639,101 @@ export class KademliaDHT implements DHTService {
       case 'FIND_VALUE': {
         const record = this.records.get(msg.targetKey);
         if (record) {
-          return { type: 'FIND_VALUE', success: true, record };
+          if (record.expiresAt !== undefined && record.expiresAt <= now) {
+            this.records.delete(msg.targetKey);
+          } else {
+            return { type: 'FIND_VALUE', success: true, record };
+          }
         }
         const closest = this.getLocalClosestPeers(msg.targetKey, K_BUCKET_SIZE);
         return { type: 'FIND_VALUE', success: true, closestPeers: closest };
       }
       case 'PUT_VALUE': {
-        if (msg.record) {
-          if (this.records.size >= MAX_RECORDS_COUNT) {
-            const oldestKey = this.records.keys().next().value;
-            if (oldestKey) this.records.delete(oldestKey);
-          }
-          this.records.set(msg.targetKey, msg.record);
-          return { type: 'PUT_VALUE', success: true };
+        if (!msg.record || !msg.record.authorPeerId) {
+          return { type: 'PUT_VALUE', success: false, error: 'Missing record payload or authorPeerId' };
         }
-        return { type: 'PUT_VALUE', success: false, error: 'Missing record payload' };
+        if (msg.record.key !== msg.targetKey) {
+          return { type: 'PUT_VALUE', success: false, error: 'DHT record key mismatches targetKey' };
+        }
+        if (msg.record.timestamp > now + MAX_DHT_FUTURE_SKEW_SECONDS) {
+          return { type: 'PUT_VALUE', success: false, error: 'DHT record future timestamp skew rejected' };
+        }
+        if (msg.record.expiresAt !== undefined && msg.record.expiresAt <= now) {
+          return { type: 'PUT_VALUE', success: false, error: 'Expired DHT record rejected' };
+        }
+        const authRes = this.verifyRecordCryptographicAuth(msg.record);
+        if (!authRes.ok) {
+          return { type: 'PUT_VALUE', success: false, error: authRes.error };
+        }
+        if (effectiveSender && msg.record.authorPeerId !== effectiveSender && !authRes.verified) {
+          return { type: 'PUT_VALUE', success: false, error: 'PUT_VALUE authorPeerId does not match authenticated sender' };
+        }
+        const normalizedRecord: DHTRecord = {
+          ...msg.record,
+          value: coerceUint8Array(msg.record.value),
+          sequenceNumber: BigInt(msg.record.sequenceNumber),
+        };
+        const existing = this.records.get(msg.targetKey);
+        if (existing) {
+          if (normalizedRecord.sequenceNumber < existing.sequenceNumber) {
+            return { type: 'PUT_VALUE', success: false, error: 'Stale DHT record sequence number rejected' };
+          }
+          if (normalizedRecord.sequenceNumber === existing.sequenceNumber && normalizedRecord.timestamp <= existing.timestamp) {
+            return { type: 'PUT_VALUE', success: false, error: 'Duplicate or stale-timestamp DHT record replay rejected' };
+          }
+        }
+        if (this.records.size >= MAX_RECORDS_COUNT) {
+          const oldestKey = this.records.keys().next().value;
+          if (oldestKey) this.records.delete(oldestKey);
+        }
+        this.records.set(msg.targetKey, normalizedRecord);
+        return { type: 'PUT_VALUE', success: true };
       }
       case 'ADD_PROVIDER': {
-        if (msg.provider) {
-          const providerMap =
-            this.providers.get(msg.targetKey) ?? new Map<string, ProviderRecord>();
-          if (providerMap.size >= MAX_PROVIDERS_PER_KEY) {
-            const oldest = providerMap.keys().next().value;
-            if (oldest) providerMap.delete(oldest);
-          }
-          providerMap.set(msg.provider.peerId, msg.provider);
-          this.providers.set(msg.targetKey, providerMap);
-          return { type: 'ADD_PROVIDER', success: true };
+        if (!msg.provider || !msg.provider.peerId) {
+          return { type: 'ADD_PROVIDER', success: false, error: 'Missing provider record or peerId' };
         }
-        return { type: 'ADD_PROVIDER', success: false, error: 'Missing provider record' };
+        const addrOwnershipErr = this.validateProviderAddressesOwnership(msg.provider);
+        if (addrOwnershipErr) {
+          return { type: 'ADD_PROVIDER', success: false, error: addrOwnershipErr };
+        }
+        const provAuth = this.verifyProviderCryptographicAuth(msg.targetKey, msg.provider);
+        if (!provAuth.ok) {
+          return { type: 'ADD_PROVIDER', success: false, error: provAuth.error };
+        }
+        if (effectiveSender && msg.provider.peerId !== effectiveSender && !provAuth.verified) {
+          return { type: 'ADD_PROVIDER', success: false, error: 'ADD_PROVIDER peerId does not match authenticated sender' };
+        }
+        if (msg.provider.registeredAt > now + MAX_DHT_FUTURE_SKEW_SECONDS) {
+          return { type: 'ADD_PROVIDER', success: false, error: 'Provider record future timestamp skew rejected' };
+        }
+        if (msg.provider.expiresAt <= now) {
+          return { type: 'ADD_PROVIDER', success: false, error: 'Expired provider record rejected' };
+        }
+        const boundedExpiresAt = provAuth.verified
+          ? Math.min(msg.provider.expiresAt, msg.provider.registeredAt + DEFAULT_PROVIDER_TTL_SECONDS)
+          : Math.min(msg.provider.expiresAt, now + DEFAULT_PROVIDER_TTL_SECONDS);
+        if (boundedExpiresAt <= now) {
+          return { type: 'ADD_PROVIDER', success: false, error: 'Expired provider record TTL rejected' };
+        }
+        const existingMap = this.providers.get(msg.targetKey);
+        const existingProv = existingMap?.get(msg.provider.peerId);
+        if (existingProv && msg.provider.registeredAt < existingProv.registeredAt) {
+          return { type: 'ADD_PROVIDER', success: false, error: 'Stale provider timestamp replay rejected' };
+        }
+        const normalizedProvider: ProviderRecord = {
+          ...msg.provider,
+          expiresAt: boundedExpiresAt,
+        };
+        const providerMap =
+          existingMap ?? new Map<string, ProviderRecord>();
+        if (providerMap.size >= MAX_PROVIDERS_PER_KEY) {
+          const oldest = providerMap.keys().next().value;
+          if (oldest) providerMap.delete(oldest);
+        }
+        providerMap.set(normalizedProvider.peerId, normalizedProvider);
+        this.providers.set(msg.targetKey, providerMap);
+        return { type: 'ADD_PROVIDER', success: true };
       }
       case 'GET_PROVIDERS': {
         const now = Math.floor(Date.now() / 1000);

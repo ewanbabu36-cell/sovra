@@ -26,6 +26,7 @@ import { sovereignAdminSecurity } from '../admin-security.ts';
 import { selfHealingDaemon } from '../self-healing-daemon.ts';
 import { SovraBackupManager } from '../sovra-backup-restore.ts';
 import { renderAdminHtml, renderAdminLoginHtml } from '../admin-console.ts';
+import { riskManagementEngine } from '../risk-management-engine.ts';
 import type { AuthenticatedPrincipal, AdminRole } from '../../packages/identity/dist/index.js';
 import type { SovraP2PNode } from '../../packages/p2p/dist/index.js';
 import type { StorageNodeDaemon } from '../../nodes/storage-node/dist/index.js';
@@ -399,7 +400,7 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
 
       const diskBytes = getDirectorySize(STORAGE_DIR);
       const diskMb = Number((diskBytes / (1024 * 1024)).toFixed(2));
-      const allUsers = sovraDb.getAllUsers();
+      const allUsers = sovraDb.getAllUsers(true);
       const allMsgs = sovraDb.getState().chatMessages;
       const threadsCount = new Set(allMsgs.map(m => m.threadId)).size;
       const stats = storageDaemon.getStats();
@@ -676,6 +677,134 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
       const result = selfHealingDaemon.runPeerMeshDiagnostics(peers);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, ...result }));
+      return true;
+    }
+
+    // ==========================================
+    // 🛡️ AUTONOMOUS COMPANY RISK MANAGEMENT & P&L ENGINE
+    // ==========================================
+    if (url.pathname === '/api/admin/risk/overview' && req.method === 'GET') {
+      const overview = riskManagementEngine.getOverview();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(overview));
+      return true;
+    }
+
+    if (url.pathname === '/api/admin/risk/pnl' && req.method === 'GET') {
+      const pnl = riskManagementEngine.computeCompanyEconomicsAndPnL();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, pnl }));
+      return true;
+    }
+
+    if (url.pathname === '/api/admin/risk/leakage-audit' && req.method === 'GET') {
+      const audit = riskManagementEngine.auditSystemLeakageAndRisks();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, audit }));
+      return true;
+    }
+
+    if (url.pathname === '/api/admin/risk/policies' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, policies: riskManagementEngine.getRiskPolicies() }));
+      return true;
+    }
+
+    if (url.pathname === '/api/admin/risk/policies' && req.method === 'POST') {
+      const auth = checkAdminRbac(req, 'take_rate:write');
+      if (!auth.authorized) {
+        res.writeHead(auth.statusCode || 403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: auth.error || 'Forbidden' }));
+        return true;
+      }
+      const { body, ok } = await readBoundedBody(req, res, 32 * 1024);
+      if (!ok) return true;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const updated = riskManagementEngine.updateRiskPolicies(parsed, auth.adminDid || 'did:sov:admin_root');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, policies: updated }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON policy payload' }));
+      }
+      return true;
+    }
+
+    if (url.pathname === '/api/admin/risk/mitigate' && req.method === 'POST') {
+      const auth = checkAdminRbac(req, 'take_rate:write');
+      if (!auth.authorized) {
+        res.writeHead(auth.statusCode || 403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: auth.error || 'Forbidden' }));
+        return true;
+      }
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return true;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const action = String(parsed.action || '').trim();
+        const result = riskManagementEngine.executeMitigation(action, auth.adminDid || 'did:sov:admin_root');
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Mitigation execution failed' }));
+      }
+      return true;
+    }
+
+    if (url.pathname === '/api/admin/risk/ledger' && req.method === 'GET') {
+      const limit = Math.min(500, Math.max(10, Number(url.searchParams.get('limit') || 100)));
+      const entries = riskManagementEngine.getRiskLedger(limit);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, count: entries.length, entries }));
+      return true;
+    }
+
+    if (url.pathname === '/api/admin/risk/ledger' && req.method === 'POST') {
+      const auth = checkAdminRbac(req, 'take_rate:write');
+      if (!auth.authorized) {
+        res.writeHead(auth.statusCode || 403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: auth.error || 'Forbidden' }));
+        return true;
+      }
+      const { body, ok } = await readBoundedBody(req, res, 16 * 1024);
+      if (!ok) return true;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const amountSov = Number(parsed.amountSov || 0);
+        if (isNaN(amountSov) || amountSov <= 0 || !parsed.description) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Positive amountSov and description required' }));
+          return true;
+        }
+        const entry = riskManagementEngine.recordRiskEvent({
+          category: parsed.category || 'OPERATIONAL_INFRA_EXPENSE',
+          severity: parsed.severity || 'MEDIUM',
+          direction: parsed.direction || 'LOSS_OR_COST',
+          amountSov,
+          actorDid: parsed.actorDid || auth.adminDid || 'did:sov:admin_root',
+          endpoint: '/api/admin/risk/ledger',
+          description: String(parsed.description).slice(0, 400),
+          prevented: Boolean(parsed.prevented),
+          metadata: parsed.metadata,
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, entry }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Failed to record risk ledger entry' }));
+      }
+      return true;
+    }
+
+    if (url.pathname === '/api/admin/risk/export-report' && req.method === 'GET') {
+      const overview = riskManagementEngine.getOverview();
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Content-Disposition': 'attachment; filename="sovra-company-risk-pnl-audit.json"',
+      });
+      res.end(JSON.stringify(overview, null, 2));
       return true;
     }
 
@@ -993,17 +1122,39 @@ export async function handleAdminConsoleRoutes(ctx: AdminConsoleRouteContext): P
       if (!ok) return true;
       try {
         const parsed = JSON.parse(body);
-        const rate = Number(parsed.takeRatePct ?? parsed.rate ?? 5.0);
+        const rawRate = Number(parsed.takeRatePct ?? parsed.takeRate ?? parsed.rate ?? 5.0);
+        const floorPct = Math.max(0.1, Number(riskManagementEngine.getRiskPolicies().platformTakeRateFloorPct || 2.5));
+        const clampedRate = Math.min(10.0, Math.max(floorPct, rawRate));
+        if (rawRate < floorPct) {
+          riskManagementEngine.recordRiskEvent({
+            category: 'DISINTERMEDIATION_FEE_LOSS',
+            severity: 'MEDIUM',
+            direction: 'RECOVERED_OR_SAVED',
+            amountSov: 0,
+            actorDid: auth.adminDid || 'did:sov:admin_root',
+            endpoint: '/api/admin/revenue/take-rate',
+            description: `Clamped requested take-rate ${rawRate}% up to Risk Policy floor (${floorPct}%)`,
+            prevented: true,
+            metadata: { requestedRate: rawRate, enforcedFloorPct: floorPct },
+          });
+        }
         const sqlite = sovraDb.getSqliteEngine();
         let success = false;
         if (sqlite) {
-          success = sqlite.setPlatformTakeRate(rate);
+          success = sqlite.setPlatformTakeRate(clampedRate);
         }
-        const updatedRate = sqlite ? sqlite.getPlatformTakeRate() : rate;
+        const updatedRate = Math.max(floorPct, sqlite ? sqlite.getPlatformTakeRate() : clampedRate);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: success, takeRatePct: updatedRate, message: `Platform take-rate set to ${updatedRate}%` }));
+        res.end(JSON.stringify({
+          ok: success,
+          takeRatePct: updatedRate,
+          takeRate: updatedRate,
+          clampedToFloor: rawRate < floorPct,
+          floorPct,
+          message: `Platform take-rate set to ${updatedRate}%`,
+        }));
       } catch (err: any) {
-        console.error('[ADMIN ROUTE EXCEPTION /api/admin/nuclear/switch]:', err);
+        console.error('[ADMIN ROUTE EXCEPTION /api/admin/revenue/take-rate]:', err);
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Invalid JSON' }));
       }

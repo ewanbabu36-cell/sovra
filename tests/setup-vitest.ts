@@ -17,7 +17,7 @@ function patchReactInstance(r: any) {
     useMemo: (fn: any) => typeof fn === 'function' ? fn() : fn,
     useRef: (initial: any) => ({ current: initial }),
     useContext: (ctx: any) => ctx?._currentValue,
-    useReducer: (reducer: any, initial: any, init: any) => [init ? init(initial) : initial, () => {}],
+    useReducer: (_reducer: any, initial: any, init: any) => [init ? init(initial) : initial, () => {}],
     useId: () => 'id_mock',
     useTransition: () => [false, (fn: any) => typeof fn === 'function' ? fn() : undefined],
     useDeferredValue: (val: any) => val,
@@ -25,7 +25,7 @@ function patchReactInstance(r: any) {
     useLayoutEffect: () => {},
     useInsertionEffect: () => {},
     useDebugValue: () => {},
-    useSyncExternalStore: (subscribe: any, getSnapshot: any) => getSnapshot(),
+    useSyncExternalStore: (_subscribe: any, getSnapshot: any) => getSnapshot(),
   };
 
   // React 19 / Modern

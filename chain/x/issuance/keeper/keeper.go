@@ -199,20 +199,26 @@ func (k *Keeper) BeginBlocker(s store.KVStore, blockTimeUnix int64, mintHandler 
 
 	k.SetLastProcessedEpoch(s, epoch)
 
-	// Atomic issuance of scheduled allowances:
+	// Atomic issuance of scheduled allowances (skip zero-amount dust if terminal tail reached):
 	// 1. Validator Pool -> fee_collector
-	if err := k.ExecuteMint(s, types.PoolValidator, types.FeeCollectorName, vAllow, epoch, mintHandler); err != nil {
-		return fmt.Errorf("failed to mint validator epoch allowance: %w", err)
+	if vAllow.IsPositive() {
+		if err := k.ExecuteMint(s, types.PoolValidator, types.FeeCollectorName, vAllow, epoch, mintHandler); err != nil {
+			return fmt.Errorf("failed to mint validator epoch allowance: %w", err)
+		}
 	}
 
 	// 2. Community Pool -> community_pool
-	if err := k.ExecuteMint(s, types.PoolCommunity, types.CommunityPoolName, cAllow, epoch, mintHandler); err != nil {
-		return fmt.Errorf("failed to mint community epoch allowance: %w", err)
+	if cAllow.IsPositive() {
+		if err := k.ExecuteMint(s, types.PoolCommunity, types.CommunityPoolName, cAllow, epoch, mintHandler); err != nil {
+			return fmt.Errorf("failed to mint community epoch allowance: %w", err)
+		}
 	}
 
 	// 3. Seeder Pool -> seeder_escrow
-	if err := k.ExecuteMint(s, types.PoolSeeder, types.SeederEscrowPoolName, sAllow, epoch, mintHandler); err != nil {
-		return fmt.Errorf("failed to mint seeder epoch allowance: %w", err)
+	if sAllow.IsPositive() {
+		if err := k.ExecuteMint(s, types.PoolSeeder, types.SeederEscrowPoolName, sAllow, epoch, mintHandler); err != nil {
+			return fmt.Errorf("failed to mint seeder epoch allowance: %w", err)
+		}
 	}
 
 	return nil

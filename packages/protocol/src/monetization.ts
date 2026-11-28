@@ -461,4 +461,116 @@ export function aggregateMicropaymentVouchers(
   };
 }
 
+export interface ContributionAuditRecord {
+  readonly receiptId: string;
+  readonly seederDid: string;
+  readonly downloaderDid: string;
+  readonly contentCid: string;
+  readonly bytesServed: number;
+  readonly verifiedAt: number;
+  readonly downloaderSignatureHex: string;
+}
+
+export interface OptionalSettlementAdapter {
+  readonly adapterId: string;
+  recordVerifiedContribution(record: ContributionAuditRecord): Promise<{ settled: boolean; referenceId?: string | undefined }>;
+}
+
+/**
+ * Default IA-01 Section 7 token-free settlement adapter: auditable logging without mandatory coin/ledger.
+ */
+export class NoopNonTokenSettlementAdapter implements OptionalSettlementAdapter {
+  public readonly adapterId = 'noop-non-token-v1';
+  public readonly auditTrail: ContributionAuditRecord[] = [];
+
+  public async recordVerifiedContribution(
+    record: ContributionAuditRecord,
+  ): Promise<{ settled: boolean; referenceId?: string | undefined }> {
+    this.auditTrail.push(record);
+    return { settled: false, referenceId: `audit-${record.receiptId}` };
+  }
+}
+
+/**
+ * Decoupled Contribution Auditor (IA-01 Section 7):
+ * Verifies downloader co-signatures, unique IDs, replay protection, self-report rejection,
+ * and wash-trading quarantine strictly isolated from core identity & node admission.
+ */
+export class DecoupledContributionAuditor {
+  private readonly seenReceiptIds = new Set<string>();
+  private readonly records: SeederBandwidthReceipt[] = [];
+
+  public constructor(
+    private readonly settlementAdapter: OptionalSettlementAdapter = new NoopNonTokenSettlementAdapter(),
+  ) {}
+
+  public async recordReceipt(
+    receipt: SeederBandwidthReceipt,
+    downloaderPublicKey: Uint8Array,
+  ): Promise<{ accepted: boolean; reason?: string | undefined; referenceId?: string | undefined }> {
+    if (!receipt.receiptId || this.seenReceiptIds.has(receipt.receiptId)) {
+      return { accepted: false, reason: 'Missing or replayed receiptId' };
+    }
+    if (!receipt.seederDid || !receipt.downloaderDid || receipt.seederDid === receipt.downloaderDid) {
+      return { accepted: false, reason: 'Self-reported or missing party rejected' };
+    }
+    if (receipt.bytesServed <= 0 || !verifyBandwidthReceipt(receipt, downloaderPublicKey)) {
+      return { accepted: false, reason: 'Invalid downloader cryptographic co-signature' };
+    }
+
+    const candidateList = [...this.records, receipt];
+    const collusion = detectSeederWashTrading(candidateList);
+    if (collusion.payoutHold) {
+      return { accepted: false, reason: collusion.reason || 'Collusion wash-trading detected' };
+    }
+
+    this.seenReceiptIds.add(receipt.receiptId);
+    this.records.push(receipt);
+
+    const settlement = await this.settlementAdapter.recordVerifiedContribution({
+      receiptId: receipt.receiptId,
+      seederDid: receipt.seederDid,
+      downloaderDid: receipt.downloaderDid,
+      contentCid: receipt.contentCid,
+      bytesServed: receipt.bytesServed,
+      verifiedAt: Math.floor(Date.now() / 1000),
+      downloaderSignatureHex: receipt.signatureHex!,
+    });
+    return { accepted: true, referenceId: settlement.referenceId };
+  }
+
+  public getAuditableRecords(): readonly SeederBandwidthReceipt[] {
+    return [...this.records];
+  }
+}
+
+export const MIN_SEEDER_BOND_USOV = 100_000_000n; // 100 SOV minimum collateral
+export const MIN_SEEDER_BOND_PER_GB_USOV = 10_000_000n; // 10 SOV per committed GB
+
+export interface SeederCollateralValidation {
+  readonly eligible: boolean;
+  readonly bondedUsov: bigint;
+  readonly requiredUsov: bigint;
+  readonly shortfallUsov: bigint;
+}
+
+/**
+ * Enforces "Work-to-Earn Requires Stake-to-Work" before disbursing DePIN seeder rewards.
+ */
+export function validateSeederCollateralRequirement(
+  bondedUsov: bigint,
+  storageCapacityGb: number,
+): SeederCollateralValidation {
+  const safeGb = BigInt(Math.max(0, Math.ceil(storageCapacityGb)));
+  const perGbReq = safeGb * MIN_SEEDER_BOND_PER_GB_USOV;
+  const requiredUsov = perGbReq > MIN_SEEDER_BOND_USOV ? perGbReq : MIN_SEEDER_BOND_USOV;
+  const shortfallUsov = bondedUsov >= requiredUsov ? 0n : requiredUsov - bondedUsov;
+  return {
+    eligible: bondedUsov >= requiredUsov,
+    bondedUsov,
+    requiredUsov,
+    shortfallUsov,
+  };
+}
+
 

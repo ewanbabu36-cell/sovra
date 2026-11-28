@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { performance } from 'node:perf_hooks';
 import { SqliteSocialDatabaseEngine } from '../../scripts/database-sqlite.ts';
 import fs from 'node:fs';
@@ -31,6 +31,7 @@ function calculateLatencyStats(latencies: number[], errors: number): LatencyStat
 
 describe('Load & Throughput Performance Benchmark Suite', { timeout: 45000 }, () => {
   let sessionToken: string;
+  const createdBenchPostIds: string[] = [];
 
   beforeAll(async () => {
     // Register bench user
@@ -48,7 +49,7 @@ describe('Load & Throughput Performance Benchmark Suite', { timeout: 45000 }, ()
 
     // Create 5 sample posts for feed benchmark realism
     for (let i = 0; i < 5; i++) {
-      await fetch(`${BASE_URL}/api/feed/create`, {
+      const pRes = await fetch(`${BASE_URL}/api/feed/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -60,13 +61,35 @@ describe('Load & Throughput Performance Benchmark Suite', { timeout: 45000 }, ()
           visibility: 'public',
         }),
       });
+      const pData = await pRes.json().catch(() => null);
+      if (pData?.post?.id) createdBenchPostIds.push(pData.post.id);
     }
 
-    // Warm-up requests
-    for (let i = 0; i < 5; i++) {
+    // Warm-up requests for JIT and loopback socket pooling
+    for (let i = 0; i < 10; i++) {
       await fetch(`${BASE_URL}/api/status`);
+      await fetch(`${BASE_URL}/api/feed/list`, {
+        headers: { Authorization: `Bearer ${sessionToken}` },
+      });
+      await fetch(`${BASE_URL}/api/node/storage-stats`, {
+        headers: { Authorization: `Bearer ${sessionToken}` },
+      });
     }
   }, 30000);
+
+  afterAll(async () => {
+    if (!sessionToken) return;
+    for (const postId of createdBenchPostIds) {
+      await fetch(`${BASE_URL}/api/feed/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({ postId }),
+      }).catch(() => {});
+    }
+  });
 
   // --- BENCH-01: STATUS ENDPOINT THROUGHPUT & P95 LATENCY ---
   it('[BENCH-01] GET /api/status sustains 100 requests with p95 < 150ms and 0 errors', async () => {

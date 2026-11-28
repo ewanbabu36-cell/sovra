@@ -93,24 +93,30 @@ func TestCreatorRevenueSplit_DistributeAndBankSubmessages(t *testing.T) {
 	_, err := wasmVM.Instantiate(bytecode, storage, env, info, initBz)
 	require.NoError(t, err)
 
-	// Simulate distribution of 1,000,000 uSOV (1 SOVRA)
+	// Simulate distribution of 1,000,000 uSOV (1 SOVRA) with mandatory 5% (500 bps) protocol burn sink
 	simQueryBz := []byte(`{"simulate_distribute":{"amount":"1000000"}}`)
 	simBz, err := wasmVM.Query(bytecode, storage, env, simQueryBz)
 	require.NoError(t, err)
 
 	var simResult struct {
-		DistributableAmount string `json:"distributable_amount"`
-		Payouts             []struct {
+		DistributableAmount    string `json:"distributable_amount"`
+		ProtocolBurnBps        uint64 `json:"protocol_burn_bps"`
+		ProtocolBurnAmount     string `json:"protocol_burn_amount"`
+		NetDistributableAmount string `json:"net_distributable_amount"`
+		Payouts                []struct {
 			Address string `json:"address"`
 			Amount  string `json:"amount"`
 		} `json:"payouts"`
 	}
 	require.NoError(t, json.Unmarshal(simBz, &simResult))
 	require.Equal(t, "1000000", simResult.DistributableAmount)
+	require.Equal(t, uint64(500), simResult.ProtocolBurnBps)
+	require.Equal(t, "50000", simResult.ProtocolBurnAmount)
+	require.Equal(t, "950000", simResult.NetDistributableAmount)
 	require.Len(t, simResult.Payouts, 3)
-	require.Equal(t, "600000", simResult.Payouts[0].Amount) // 60%
-	require.Equal(t, "250000", simResult.Payouts[1].Amount) // 25%
-	require.Equal(t, "150000", simResult.Payouts[2].Amount) // 15%
+	require.Equal(t, "570000", simResult.Payouts[0].Amount) // 60% of 950,000
+	require.Equal(t, "237500", simResult.Payouts[1].Amount) // 25% of 950,000
+	require.Equal(t, "142500", simResult.Payouts[2].Amount) // 15% of 950,000
 
 	// Execute Distribute with attached 1,000,000 uSOV funds
 	execInfo := types.MessageInfo{
@@ -124,17 +130,21 @@ func TestCreatorRevenueSplit_DistributeAndBankSubmessages(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, distResp)
 
-	// Verify exact on-chain Bank.Send submessages
-	require.Len(t, distResp.Messages, 3)
-	require.Equal(t, "sovra1alice", distResp.Messages[0].Msg.Bank.Send.ToAddress)
-	require.Equal(t, "600000", distResp.Messages[0].Msg.Bank.Send.Amount[0].Amount)
-	require.Equal(t, "usov", distResp.Messages[0].Msg.Bank.Send.Amount[0].Denom)
+	// Verify mandatory Bank.Burn submessage + exact Bank.Send payout submessages
+	require.Len(t, distResp.Messages, 4)
+	require.NotNil(t, distResp.Messages[0].Msg.Bank.Burn)
+	require.Equal(t, "50000", distResp.Messages[0].Msg.Bank.Burn.Amount[0].Amount)
+	require.Equal(t, "usov", distResp.Messages[0].Msg.Bank.Burn.Amount[0].Denom)
 
-	require.Equal(t, "sovra1bob", distResp.Messages[1].Msg.Bank.Send.ToAddress)
-	require.Equal(t, "250000", distResp.Messages[1].Msg.Bank.Send.Amount[0].Amount)
+	require.Equal(t, "sovra1alice", distResp.Messages[1].Msg.Bank.Send.ToAddress)
+	require.Equal(t, "570000", distResp.Messages[1].Msg.Bank.Send.Amount[0].Amount)
+	require.Equal(t, "usov", distResp.Messages[1].Msg.Bank.Send.Amount[0].Denom)
 
-	require.Equal(t, "sovra1carol", distResp.Messages[2].Msg.Bank.Send.ToAddress)
-	require.Equal(t, "150000", distResp.Messages[2].Msg.Bank.Send.Amount[0].Amount)
+	require.Equal(t, "sovra1bob", distResp.Messages[2].Msg.Bank.Send.ToAddress)
+	require.Equal(t, "237500", distResp.Messages[2].Msg.Bank.Send.Amount[0].Amount)
+
+	require.Equal(t, "sovra1carol", distResp.Messages[3].Msg.Bank.Send.ToAddress)
+	require.Equal(t, "142500", distResp.Messages[3].Msg.Bank.Send.Amount[0].Amount)
 
 	// Query updated recipient earnings for Alice
 	queryAliceBz := []byte(`{"recipient_share":{"address":"sovra1alice"}}`)
@@ -144,7 +154,7 @@ func TestCreatorRevenueSplit_DistributeAndBankSubmessages(t *testing.T) {
 		TotalEarned string `json:"total_earned_usov"`
 	}
 	require.NoError(t, json.Unmarshal(aliceShareBz, &aliceShare))
-	require.Equal(t, "600000", aliceShare.TotalEarned)
+	require.Equal(t, "570000", aliceShare.TotalEarned)
 }
 
 func TestCreatorRevenueSplit_ZeroFloatRemainderPreservation(t *testing.T) {

@@ -316,3 +316,4 @@ export class SearchWorker {
 }
 
 export * from './vector-search.js';
+export * from './server.js';
